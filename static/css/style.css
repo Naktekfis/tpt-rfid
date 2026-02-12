@@ -1,0 +1,159 @@
+/**
+ * Custom CSS for RFID Workshop Tool Monitoring System
+ * Tailwind CSS handles most styling via CDN
+ * This file contains additional custom styles and touch optimizations
+ */
+
+/* Touch-friendly animations and transitions */
+* {
+    -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+
+/* Smooth scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Custom touch-friendly button active states */
+button:active,
+a:active {
+    transform: scale(0.98);
+}
+
+/* Loading spinner animation */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.animate-spin {
+    animation: spin 1s linear infinite;
+}
+
+/* Pulse animation for RFID indicators */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.animate-pulse {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Custom gradient backgrounds */
+.gradient-primary {
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+}
+
+.gradient-secondary {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+}
+
+/* Card shadow effects */
+.card-shadow {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+}
+
+.card-shadow-lg {
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15);
+}
+
+/* Touchscreen optimizations */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase button sizes on touchscreens */
+    button,
+    a.btn {
+        min-height: 80px;
+        font-size: 1.25rem;
+    }
+    
+    /* Increase form input sizes */
+    input,
+    select,
+    textarea {
+        min-height: 60px;
+        font-size: 1.125rem;
+    }
+}
+
+/* Print styles (hide unnecessary elements when printing) */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+    width: 12px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 6px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+    outline: 2px solid #3B82F6;
+    outline-offset: 2px;
+}
+
+/* Disabled state */
+button:disabled,
+input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Toast notification animation */
+@keyframes slideIn {
+    from {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(400px);
+        opacity: 0;
+    }
+}
+
+/* File upload drag and drop */
+.file-drop-zone {
+    transition: all 0.3s ease;
+}
+
+.file-drop-zone:hover {
+    border-color: #3B82F6;
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+.file-drop-zone.dragover {
+    border-color: #3B82F6;
+    background-color: rgba(59, 130, 246, 0.1);
+    transform: scale(1.02);
+}

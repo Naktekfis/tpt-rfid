@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}RFID Workshop Tool System{% endblock %}</title>
+
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <!-- Tailwind Config -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Clean Blue Theme
+                        primary: {
+                            50: '#EFF6FF',   // Lightest blue
+                            100: '#DBEAFE',
+                            200: '#BFDBFE',
+                            300: '#93C5FD',
+                            400: '#60A5FA',  // Light blue
+                            500: '#3B82F6',  // Main blue
+                            600: '#2563EB',  // Dark blue
+                            700: '#1D4ED8',
+                            800: '#1E40AF',
+                            900: '#1E3A8A',  // Darkest blue
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body class="bg-gradient-to-br from-primary-50 via-white to-primary-100 min-h-screen font-sans">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-primary-100">
+        <div class="container mx-auto px-6 py-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}"
+                        alt="Logo ITB" class="h-12 w-12 object-contain">
+                    <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}"
+                        alt="Logo Teknik Fisika" class="h-12 w-12 object-contain">
+                    <div>
+                        <h1 class="text-xl font-bold text-primary-900">Lab Fabrikasi</h1>
+                        <p class="text-xs text-primary-600">Teknik Fisika ITB</p>
+                    </div>
+                </div>
+                <a href="/" class="text-primary-600 hover:text-primary-800 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-6 py-6">
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-20 right-4 z-50 space-y-2">
+        <!-- Toast messages will be inserted here by JavaScript -->
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay"
+        class="hidden fixed inset-0 bg-primary-900 bg-opacity-40 backdrop-blur-sm z-50 flex items-center justify-center">
+        <div class="bg-white rounded-2xl p-8 flex flex-col items-center shadow-2xl">
+            <div class="animate-spin rounded-full h-16 w-16 border-4 border-primary-100 border-t-primary-600"></div>
+            <p class="mt-4 text-lg font-semibold text-primary-900">Memproses...</p>
+        </div>
+    </div>
+
+    <!-- Common JavaScript Functions -->
+    <script>
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            const colors = {
+                success: 'bg-gradient-to-r from-green-500 to-green-600',
+                error: 'bg-gradient-to-r from-red-500 to-red-600',
+                warning: 'bg-gradient-to-r from-yellow-500 to-yellow-600',
+                info: 'bg-gradient-to-r from-primary-500 to-primary-600'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `${colors[type]} text-white px-6 py-4 rounded-xl shadow-lg transform transition-all duration-300 ease-in-out min-w-[250px]`;
+            toast.innerHTML = `
+                <div class="flex items-center space-x-3">
+                    <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span class="font-medium">${message}</span>
+                </div>
+            `;
+
+            const container = document.getElementById('toast-container');
+            container.appendChild(toast);
+
+            // Animate in
+            setTimeout(() => {
+                toast.style.transform = 'translateX(0)';
+            }, 10);
+
+            // Remove after 5 seconds
+            setTimeout(() => {
+                toast.style.transform = 'translateX(400px)';
+                toast.style.opacity = '0';
+                setTimeout(() => {
+                    if (container.contains(toast)) {
+                        container.removeChild(toast);
+                    }
+                }, 300);
+            }, 5000);
+        }
+
+        // Show loading overlay
+        function showLoading() {
+            document.getElementById('loading-overlay').classList.remove('hidden');
+        }
+
+        // Hide loading overlay
+        function hideLoading() {
+            document.getElementById('loading-overlay').classList.add('hidden');
+        }
+
+        // Format timestamp
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return '-';
+            const date = new Date(timestamp);
+            return date.toLocaleString('id-ID');
+        }
+
+        // Simulate RFID scan (for debugging via console)
+        window.simulateRFID = function (uid) {
+            fetch(`/debug/scan?uid=${uid}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast(`Simulated RFID scan: ${uid}`, 'success');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error simulating RFID:', error);
+                });
+        }
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>
