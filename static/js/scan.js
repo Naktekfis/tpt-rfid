@@ -208,6 +208,10 @@ function fetchStudentData(uid) {
                 updateStepIndicator();
                 updateStatusMessage('Mahasiswa terdeteksi. Silakan scan tag alat', 'success');
 
+                // Clear the RFID reader so the student UID doesn't get
+                // picked up again as a tool scan in step 2
+                fetch('/debug/clear').catch(err => console.error('Error clearing RFID:', err));
+
                 // Show tool scanner
                 document.getElementById('tool-scanner-container').classList.remove('hidden');
 

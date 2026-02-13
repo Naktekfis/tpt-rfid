@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Selamat Datang - Workshop RFID{% endblock %}
+{% block title %}Lab Fabrikasi ITB - Sistem Manajemen Alat{% endblock %}
 
 {% block content %}
 <div class="flex items-center justify-center min-h-[82vh]">
@@ -12,24 +12,24 @@
                     class="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
                     <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
                 </div>
             </div>
 
             <h1 class="text-4xl font-bold text-primary-900 mb-3">
-                Selamat Datang, Mahasiswa!
+                Lab Fabrikasi ITB
             </h1>
 
             <p class="text-lg text-primary-700 font-medium">
-                Pilih menu di bawah untuk memulai
+                Sistem Manajemen Alat Workshop
             </p>
         </div>
 
-        <!-- Action Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Scan/Borrow Tool Card -->
-            <a href="{{ url_for('scan') }}"
+        <!-- Role Selection Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Admin Card -->
+            <a href="{{ url_for('admin_menu') }}"
                 class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
                 <div class="flex flex-col items-center space-y-3">
                     <div
@@ -37,22 +37,22 @@
                         <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Pinjam / Kembalikan Alat
+                            Admin
                         </h2>
                         <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Sudah terdaftar di sistem
+                            Kelola data sistem dan monitoring
                         </p>
                     </div>
                 </div>
             </a>
 
-            <!-- New Registration Card -->
-            <a href="{{ url_for('register') }}"
+            <!-- Mahasiswa Card -->
+            <a href="{{ url_for('mahasiswa_menu') }}"
                 class="group bg-white hover:bg-gradient-to-br hover:from-primary-600 hover:to-primary-700 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-600">
                 <div class="flex flex-col items-center space-y-3">
                     <div
@@ -60,52 +60,18 @@
                         <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
                             stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Daftar Akun Baru
+                            Mahasiswa
                         </h2>
                         <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Belum pernah meminjam alat
+                            Pinjam dan kembalikan alat
                         </p>
                     </div>
                 </div>
-            </a>
-
-            <!-- Monitor Tools Card -->
-            <a href="{{ url_for('monitor') }}"
-                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
-                <div class="flex flex-col items-center space-y-3">
-                    <div
-                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Monitor Alat
-                        </h2>
-                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Lihat status semua alat
-                        </p>
-                    </div>
-                </div>
-            </a>
-        </div>
-
-        <!-- Back to Landing Button -->
-        <div class="mt-8">
-            <a href="{{ url_for('index') }}"
-                class="inline-flex items-center space-x-2 text-primary-600 hover:text-primary-800 font-semibold transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                <span>Kembali ke Menu Utama</span>
             </a>
         </div>
     </div>
@@ -113,5 +79,8 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/welcome.js') }}"></script>
+<script>
+    // Simple analytics or page load effects can go here
+    console.log('Landing page loaded');
+</script>
 {% endblock %}

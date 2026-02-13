@@ -33,8 +33,11 @@ instance/
 # Environment variables
 .env
 
-# Firebase credentials
+# Firebase credentials (legacy, can be removed)
 serviceAccountKey.json
+
+# Flask-Migrate
+migrations/
 
 # Uploads
 uploads/*

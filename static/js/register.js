@@ -157,37 +157,18 @@ function onRFIDDetected(uid) {
 
 /**
  * Handle RFID card removed
+ * Once an RFID UID has been detected for registration, we keep the UID value
+ * so the user can continue filling the form. Only the visual indicator updates.
  */
 function onRFIDRemoved() {
-    const rfidIndicator = document.getElementById('rfid-indicator');
+    // If no RFID was ever detected, nothing to do
+    if (currentRFID === null) return;
+
+    // Keep currentRFID and rfid_uid input intact — the user is filling the form.
+    // Only update the visual indicator to show the card was physically removed,
+    // but do NOT clear the UID or disable the submit button.
     const rfidStatus = document.getElementById('rfid-status');
-    const rfidIcon = document.getElementById('rfid-icon');
-    const rfidUidDisplay = document.getElementById('rfid-uid-display');
-    const rfidUidInput = document.getElementById('rfid_uid');
-
-    if (currentRFID !== null) {
-        currentRFID = null;
-
-        // Reset indicator
-        rfidIndicator.classList.remove('border-blue-500', 'bg-blue-50');
-        rfidIndicator.classList.add('border-gray-300');
-
-        // Reset icon
-        rfidIcon.classList.remove('text-blue-500');
-        rfidIcon.classList.add('text-gray-400');
-
-        // Reset status
-        rfidStatus.textContent = 'Menunggu kartu...';
-        rfidStatus.classList.remove('text-blue-600');
-        rfidStatus.classList.add('text-gray-600');
-
-        // Hide UID
-        rfidUidDisplay.classList.add('hidden');
-        rfidUidInput.value = '';
-
-        // Disable submit
-        document.getElementById('submit-btn').disabled = true;
-    }
+    rfidStatus.textContent = 'Kartu tercatat (boleh dilepas)';
 }
 
 /**
