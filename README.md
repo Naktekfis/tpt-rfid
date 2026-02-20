@@ -51,15 +51,15 @@ Sistem peminjaman alat workshop berbasis RFID untuk Lab Fabrikasi Teknik Fisika 
 
 ### Mode Production (Real Hardware)
 ```
-┌─────────────┐        MQTT           ┌──────────────┐        WebSocket       ┌──────────────┐
+┌─────────────┐        MQTT           ┌──────────────┐        WebSocket        ┌──────────────┐
 │  ESP32 #1   │────rfid/scan─────────▶│   Flask App  │────────────────────────▶│ Web Clients  │
-│ RFID Reader │   (QoS 1)             │  + Mosquitto │   (Real-time updates)  │  (Browser)   │
-└─────────────┘                        │              │                        └──────────────┘
-                                       │              │
+│ RFID Reader │   (QoS 1)             │  + Mosquitto │   (Real-time updates)   │  (Browser)   │
+└─────────────┘                       │              │                         └──────────────┘
+                                      │              │
 ┌─────────────┐        MQTT           │              │
 │  ESP32 #2   │────sensor/*──────────▶│              │
 │  Sensors    │   (QoS 0)             │              │
-└─────────────┘                        └──────────────┘
+└─────────────┘                       └──────────────┘
                                               │
                                        ┌──────┴──────┐
                                        │ PostgreSQL  │
