@@ -124,12 +124,10 @@ if not app.config.get("WEBSOCKET_ENABLED", False):
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-# Admin authentication via PIN (from environment variable)
-ADMIN_PIN = os.getenv("ADMIN_PIN", "133133")  # Fallback to default only in development
-if not os.getenv("ADMIN_PIN"):
-    logger.warning(
-        "ADMIN_PIN not set in .env - using default PIN (change this in production!)"
-    )
+# Admin authentication via hardcoded hashed PIN
+# PIN: 133133 (hashed with werkzeug scrypt)
+from werkzeug.security import check_password_hash
+ADMIN_PIN_HASH = "scrypt:32768:8:1$v6unCJMhmE1m6btB$6cff2d6ce01facfb3b8c13ce4c248175507f02b1ef3d442013ccc2b79d0ae1f12c6aa48ee2051e706e096c05fa2279bccfd4b2e40099f742742fedbb6bc41097"
 
 
 def admin_required(f):
@@ -645,7 +643,7 @@ def api_admin_login():
         data = request.json
         pin = data.get("pin", "")
 
-        if secrets.compare_digest(pin, ADMIN_PIN):
+        if check_password_hash(ADMIN_PIN_HASH, pin):
             session["admin_logged_in"] = True
             session.permanent = (
                 True  # Uses config PERMANENT_SESSION_LIFETIME (default 31 days)

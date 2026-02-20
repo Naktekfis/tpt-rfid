@@ -64,13 +64,16 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "Step 3/8: Setting up PostgreSQL..."
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+# Stop existing service if any to release DB locks
+sudo systemctl stop tpt-rfid 2>/dev/null || true
+
 # Generate random password for PostgreSQL
 DB_PASSWORD=$(openssl rand -base64 16 | tr -d "=+/" | cut -c1-20)
 
 # Create database and user
 sudo -u postgres psql << EOF
 -- Drop if exists (untuk re-run)
-DROP DATABASE IF EXISTS tpt_rfid;
+DROP DATABASE IF EXISTS tpt_rfid WITH (FORCE);
 DROP ROLE IF EXISTS "$CURRENT_USER";
 
 -- Create new
@@ -128,8 +131,8 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # Generate SECRET_KEY
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 
-# Generate ADMIN_PIN
-ADMIN_PIN=$(python3 -c "import secrets; print(secrets.token_urlsafe(8))")
+# ADMIN_PIN is hardcoded (hashed) in app.py as '133133'
+ADMIN_PIN="133133"
 
 # Create .env file
 cat > .env << EOF
@@ -137,7 +140,7 @@ FLASK_ENV=production
 DEBUG=False
 SECRET_KEY=$SECRET_KEY
 DATABASE_URL=postgresql://$CURRENT_USER:$DB_PASSWORD@localhost/tpt_rfid
-ADMIN_PIN=$ADMIN_PIN
+ADMIN_PIN=133133  # hardcoded in app.py (hashed)
 
 # Email (optional - configure later if needed)
 MAIL_SERVER=smtp.gmail.com
