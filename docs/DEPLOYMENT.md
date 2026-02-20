@@ -5,7 +5,6 @@ Panduan lengkap deployment aplikasi TPT RFID ke production environment menggunak
 ## Daftar Isi
 
 1. [Overview](#overview)
-2. [Hardware Requirements](#hardware-requirements)
 3. [Persiapan Raspberry Pi](#persiapan-raspberry-pi)
 4. [PostgreSQL Production Setup](#postgresql-production-setup)
 5. [Mosquitto Production Setup](#mosquitto-production-setup)
@@ -66,36 +65,6 @@ Panduan lengkap deployment aplikasi TPT RFID ke production environment menggunak
 - **Web Server:** Nginx
 - **App Server:** Gunicorn
 - **Python:** 3.11+
-- **Display:** Official 7" Touchscreen (optional, untuk kiosk mode)
-
----
-
-## Hardware Requirements
-
-### Minimum Specification
-
-| Komponen | Requirement | Harga Est. | Catatan |
-|----------|-------------|------------|---------|
-| Raspberry Pi 4B | 4GB RAM | Rp 1.200.000 | 8GB recommended untuk performa lebih baik |
-| MicroSD Card | 32GB Class 10 | Rp 100.000 | SanDisk/Samsung recommended |
-| Power Supply | 5V 3A USB-C | Rp 150.000 | Official PSU recommended |
-| Case + Heatsink | - | Rp 100.000 | Untuk cooling |
-| Ethernet Cable | Cat5e/Cat6 | Rp 30.000 | Optional jika pakai WiFi |
-| **Total** | | **~Rp 1.580.000** | Tanpa touchscreen |
-
-### Optional Components
-
-| Komponen | Requirement | Harga Est. | Catatan |
-|----------|-------------|------------|---------|
-| Official 7" Touchscreen | 800x480 | Rp 1.000.000 | Untuk kiosk mode |
-| UPS/Power Bank | 5V output | Rp 300.000 | Untuk prevent data loss saat mati listrik |
-
-### Recommended: SSD Boot (Performance)
-
-Untuk performa lebih baik, gunakan SSD external via USB 3.0:
-
-- **SSD:** 128GB USB 3.0 SSD (~Rp 400.000)
-- **Benefit:** 5-10x faster database operations, longer lifespan
 
 ---
 
@@ -2098,11 +2067,4 @@ Jika ada pertanyaan atau issues:
 
 1. Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 2. Check logs: `sudo journalctl -u tpt-rfid -f`
-3. Verify service status: `sudo /usr/local/bin/tpt-status.sh`
-4. Contact system administrator
-
----
-
-**Last Updated:** 2024-01-15  
-**Version:** 1.0  
-**Author:** TPT RFID Team
+3. Verify service status: `sudo /usr/local/bin/tpt-status.sh
