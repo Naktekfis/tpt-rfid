@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Input Alat Baru - Admin Lab Fabrikasi{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="text-center mb-8">
+        <h1 class="text-3xl font-bold text-primary-900 mb-1">Input Alat Baru</h1>
+        <p class="text-base text-primary-700">Isi detail alat dan <span class="font-bold">tempelkan tag RFID</span>
+            untuk mendaftarkan alat</p>
+    </div>
+
+    <!-- Two Column Layout - 5:3 Ratio (Match Register Page) -->
+    <div class="grid grid-cols-1 lg:grid-cols-8 gap-8">
+        <!-- Left Column: Tool Form (5/8) -->
+        <div class="lg:col-span-5">
+            <div class="bg-white rounded-2xl shadow-lg p-6 border border-primary-100">
+                <form id="tool-form" enctype="multipart/form-data">
+                    <!-- Tool Name -->
+                    <div class="mb-5">
+                        <label class="block text-primary-900 text-base font-semibold mb-2" for="name">
+                            Nama Alat <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="name" name="name" required
+                            class="w-full px-4 py-3 text-base border-2 border-primary-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                            placeholder="Contoh: Bor Tangan Bosch">
+                    </div>
+
+                    <!-- Category -->
+                    <div class="mb-5">
+                        <label class="block text-primary-900 text-base font-semibold mb-2" for="category">
+                            Kategori (Opsional)
+                        </label>
+                        <input type="text" id="category" name="category"
+                            class="w-full px-4 py-3 text-base border-2 border-primary-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                            placeholder="Contoh: Power Tools">
+                    </div>
+
+                    <!-- Hidden RFID UID -->
+                    <input type="hidden" id="rfid_uid" name="rfid_uid" value="">
+
+                    <!-- Hidden Status (Default Available) -->
+                    <input type="hidden" name="status" value="available">
+
+                    <!-- Buttons -->
+                    <div class="flex space-x-3 mt-8">
+                        <button type="submit" id="submit-btn" disabled
+                            class="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold py-4 px-6 rounded-xl text-lg shadow-lg transition-all disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed">
+                            Simpan Alat
+                        </button>
+                        <a href="{{ url_for('admin_menu') }}"
+                            class="flex-1 bg-white hover:bg-primary-50 text-primary-700 border-2 border-primary-300 hover:border-primary-500 font-bold py-4 px-6 rounded-xl text-lg text-center shadow-lg transition-all">
+                            Batal
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Form Status Message Area -->
+            <div id="form-status" class="mt-4"></div>
+        </div>
+
+        <!-- Right Column: RFID Scanner (3/8) -->
+        <div class="lg:col-span-3">
+            <div class="bg-white rounded-2xl shadow-lg p-6 sticky top-4 border border-primary-100">
+                <h2 class="text-xl font-bold text-primary-900 mb-4 flex items-center space-x-2">
+                    <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Scan Tag Alat</span>
+                </h2>
+
+                <!-- RFID Status Indicator -->
+                <div id="rfid-indicator"
+                    class="border-4 border-primary-200 rounded-2xl p-6 text-center transition-all duration-300 bg-primary-50/30">
+                    <svg id="rfid-icon" class="mx-auto h-20 w-20 text-primary-400" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+
+                    <p id="rfid-status" class="text-lg font-semibold text-primary-700 mt-4">
+                        Menunggu tag alat...
+                    </p>
+
+                    <div id="rfid-uid-display" class="mt-4 hidden">
+                        <p class="text-xs text-primary-600 mb-2 font-medium">UID Terdeteksi:</p>
+                        <p id="rfid-uid-text"
+                            class="text-xl font-mono font-bold text-primary-900 bg-white px-4 py-2 rounded-xl border-2 border-primary-300 shadow-sm">
+                            -
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Instructions -->
+                <div
+                    class="mt-4 p-4 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl border border-primary-200">
+                    <p class="text-sm text-primary-900 leading-relaxed">
+                        <span class="font-bold text-base block mb-2 text-primary-900">Instruksi:</span>
+                        <span class="block mb-1 text-xs">1. Masukkan nama alat</span>
+                        <span class="block mb-1 text-xs">2. Tempelkan tag RFID pada reader</span>
+                        <span class="block mb-1 text-xs">3. Pastikan UID muncul</span>
+                        <span class="block text-xs">4. Klik tombol "Simpan Alat"</span>
+                    </p>
+                </div>
+
+                <!-- Debug Helper -->
+                <div class="mt-3 p-3 bg-yellow-50 rounded-xl border border-yellow-200">
+                    <p class="text-xs text-yellow-900">
+                        <span class="font-semibold">🛠️ Dev Mode:</span><br>
+                        <code
+                            class="bg-yellow-200 px-2 py-1 rounded mt-1 inline-block font-mono text-xs">simulateRFID("TOOL001")</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/input_tool.js') }}"></script>
+{% endblock %}

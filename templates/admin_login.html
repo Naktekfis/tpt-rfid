@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Login Admin - Lab Fabrikasi{% endblock %}
+
+{% block content %}
+<div class="min-h-[82vh] flex items-center justify-center">
+    <div class="max-w-md w-full">
+        <div class="bg-white rounded-3xl shadow-2xl border border-primary-100 overflow-hidden transform transition-all">
+            <!-- Header -->
+            <div class="bg-primary-600 px-8 py-6 text-center">
+                <div class="mx-auto w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center mb-3 text-white">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <h1 class="text-2xl font-bold text-white tracking-wide">Akses Admin</h1>
+                <p class="text-primary-100 text-sm mt-1">Masukkan PIN Keamanan</p>
+            </div>
+
+            <div class="p-8">
+                <!-- PIN Display -->
+                <div class="mb-8 relative">
+                    <input type="password" id="pin-display"
+                        class="w-full text-center text-4xl font-mono tracking-[0.5em] py-4 bg-gray-50 border-2 border-primary-200 rounded-2xl text-primary-900 focus:outline-none focus:border-primary-500 transition-colors"
+                        value="" placeholder="••••••" autofocus>
+                    <div id="error-message"
+                        class="absolute -bottom-6 left-0 right-0 text-center text-sm text-red-500 font-medium opacity-0 transition-opacity">
+                        PIN yang Anda masukkan salah
+                    </div>
+                </div>
+
+                <!-- Action Button -->
+                <div class="mb-4">
+                    <button id="enter-btn"
+                        class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transition-all active:scale-95 flex items-center justify-center space-x-2">
+                        <span>Masuk</span>
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="text-center">
+                    <a href="{{ url_for('index') }}"
+                        class="text-sm text-primary-400 hover:text-primary-600 transition-colors">
+                        Kembali ke Menu Utama
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @keyframes shake {
+
+        0%,
+        100% {
+            transform: translateX(0);
+        }
+
+        25% {
+            transform: translateX(-5px);
+        }
+
+        75% {
+            transform: translateX(5px);
+        }
+    }
+
+    .shake {
+        animation: shake 0.3s ease-in-out;
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const display = document.getElementById('pin-display');
+        const errorMsg = document.getElementById('error-message');
+        const container = document.querySelector('.bg-white');
+        const enterBtn = document.getElementById('enter-btn');
+
+        function updateDisplayState() {
+            errorMsg.classList.add('opacity-0');
+            display.classList.remove('border-red-500', 'text-red-900');
+            display.classList.add('border-primary-200', 'text-primary-900');
+        }
+
+        // Reset error on input
+        display.addEventListener('input', updateDisplayState);
+
+        // Submit on Enter key
+        display.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                submitLogin();
+            }
+        });
+
+        enterBtn.addEventListener('click', submitLogin);
+
+        function submitLogin() {
+            const pin = display.value;
+            if (!pin) return;
+
+            fetch('/api/admin/login', {
+                method: 'POST',
+                headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
+                body: JSON.stringify({ pin: pin })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = "{{ url_for('admin_menu') }}";
+                    } else {
+                        showError();
+                    }
+                })
+                .catch(err => {
+                    console.error(err);
+                    showError();
+                });
+        }
+
+        function showError() {
+            container.classList.add('shake');
+            setTimeout(() => container.classList.remove('shake'), 300);
+
+            errorMsg.classList.remove('opacity-0');
+            display.classList.remove('border-primary-200', 'text-primary-900');
+            display.classList.add('border-red-500', 'text-red-900');
+            display.value = '';
+        }
+    });
+</script>
+{% endblock %}

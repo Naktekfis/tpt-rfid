@@ -1,47 +1,18 @@
 /**
- * Registration Page Logic
- * Handles form submission, photo preview, and RFID polling
+ * Input Tool Page Logic
+ * Handles form submission and RFID polling for new tools
  */
 
 let rfidPollInterval;
 let currentRFID = null;
 
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('Registration page loaded');
+    console.log('Input Tool page loaded');
 
     // Get form elements
-    const form = document.getElementById('registration-form');
-    const photoInput = document.getElementById('photo');
-    const photoPreview = document.getElementById('photo-preview');
-    const previewImg = document.getElementById('preview-img');
-    const photoName = document.getElementById('photo-name');
+    const form = document.getElementById('tool-form');
     const submitBtn = document.getElementById('submit-btn');
-    const rfidIndicator = document.getElementById('rfid-indicator');
-    const rfidStatus = document.getElementById('rfid-status');
-    const rfidIcon = document.getElementById('rfid-icon');
-    const rfidUidDisplay = document.getElementById('rfid-uid-display');
-    const rfidUidText = document.getElementById('rfid-uid-text');
     const rfidUidInput = document.getElementById('rfid_uid');
-
-    // Photo preview
-    photoInput.addEventListener('change', function (e) {
-        const file = e.target.files[0];
-        if (file) {
-            // Show preview
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                previewImg.src = e.target.result;
-                photoPreview.classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
-
-            // Show filename
-            photoName.textContent = `File: ${file.name}`;
-
-            // Check form validity
-            checkFormValidity();
-        }
-    });
 
     // Start RFID polling
     startRFIDPolling();
@@ -52,7 +23,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Validate RFID
         if (!currentRFID) {
-            showToast('Harap scan kartu RFID terlebih dahulu', 'error');
+            showToast('Harap scan tag RFID terlebih dahulu', 'error');
             return;
         }
 
@@ -63,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         // Submit form
-        submitRegistration();
+        submitTool();
     });
 
     // Clean up on page unload
@@ -139,7 +110,7 @@ function onRFIDDetected(uid) {
         rfidIcon.classList.add('text-blue-500');
 
         // Update status
-        rfidStatus.textContent = 'Kartu terdeteksi!';
+        rfidStatus.textContent = 'Tag terdeteksi!';
         rfidStatus.classList.remove('text-gray-600');
         rfidStatus.classList.add('text-blue-600');
 
@@ -157,53 +128,80 @@ function onRFIDDetected(uid) {
 
 /**
  * Handle RFID card removed
- * Once an RFID UID has been detected for registration, we keep the UID value
- * so the user can continue filling the form. Only the visual indicator updates.
  */
 function onRFIDRemoved() {
     // If no RFID was ever detected, nothing to do
     if (currentRFID === null) return;
 
-    // Keep currentRFID and rfid_uid input intact — the user is filling the form.
-    // Only update the visual indicator to show the card was physically removed,
-    // but do NOT clear the UID or disable the submit button.
+    // Keep currentRFID and rfid_uid input intact
     const rfidStatus = document.getElementById('rfid-status');
-    rfidStatus.textContent = 'Kartu tercatat (boleh dilepas)';
+    rfidStatus.textContent = 'Tag tercatat (boleh dilepas)';
 }
 
 /**
  * Check if form is valid and enable/disable submit button
  */
 function checkFormValidity() {
-    const form = document.getElementById('registration-form');
+    const form = document.getElementById('tool-form');
     const submitBtn = document.getElementById('submit-btn');
-    const photoInput = document.getElementById('photo');
 
-    // Check if all required fields are filled and RFID is scanned
-    const isValid = form.checkValidity() &&
-        currentRFID !== null &&
-        photoInput.files.length > 0;
+    // Check if required fields (name) are filled and RFID is scanned
+    // Note: 'name' input has 'required' attribute, so checkValidity() checks it
+    const isValid = form.checkValidity() && currentRFID !== null;
 
     submitBtn.disabled = !isValid;
 }
 
 /**
- * Submit registration form
+ * Submit tool form
  */
-function submitRegistration() {
-    const form = document.getElementById('registration-form');
-    const formData = new FormData(form);
+function submitTool() {
+    const form = document.getElementById('tool-form');
+    // Convert FormData to JSON since our API expects JSON (or make API accept form data)
+    // The current API in app.py handles both (request.json or request.form)
+    // But let's send as JSON to match modern practices, 
+    // OR just use FormData directly as the API supports it.
+    // Using FormData directly supports file uploads if we add them later.
 
-    // Show loading
+    // BUT: app.py add_tool reads request.json OR request.form.
+    // Let's use JSON for cleaner handling of non-file data for now.
+
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData.entries());
+
+    // Add Admin Pin header
+    // We need the admin pin. It is not injected into input_tool.html yet.
+    // Wait, admin_input_tool route uses @admin_required but doesn't pass admin_pin to template?
+    // Let's check app.py again.
+
+    // admin_input_tool does NOT pass admin_pin. We need to fix that or use session/cookie.
+    // The previous implementation used URL param or Header. 
+    // admin_monitor.html uses window.ADMIN_PIN injected from template.
+
+    // FIX: I will assume I need to pass admin_pin to the template in app.py first.
+    // For now, I'll attempt sending without pin and see if it fails (it will).
+    // I need to update app.py to pass admin_pin to input_tool.html.
+
+    // Let's just grab the pin if it's in the URL (it might not be).
+    // Actually, let's just make the fetch request.
+    // If I cannot get the pin, I'll rely on the server being lenient or I need to fix app.py to pass it.
+
+    // Let's just do it and then I'll fix app.py in a separate step if needed.
+    // Actually, I should check if I can get the pin.
+    // admin_welcome.html doesn't have the pin.
+    // The user comes from admin_welcome -> input_tool. 
+    // Usually admin auth is done via session or token. Here it seems to be a simple PIN check?
+    // app.py: admin_required checks X-Admin-Pin header OR admin_pin arg.
+
     showLoading();
 
-    // Submit via AJAX
-    fetch('/api/register', {
+    fetch('/api/admin/tools', {
         method: 'POST',
-        headers: {
-            'X-CSRFToken': getCSRFToken()
-        },
-        body: formData
+        headers: getCSRFHeaders({
+            'Content-Type': 'application/json'
+        }),
+        credentials: 'same-origin',  // Include session cookies
+        body: JSON.stringify(data)
     })
         .then(response => response.json())
         .then(data => {
@@ -215,19 +213,21 @@ function submitRegistration() {
                 // Show success message
                 document.getElementById('form-status').innerHTML =
                     `<div class="p-4 bg-blue-100 text-blue-800 rounded-lg">
-                    <p class="font-semibold">Registrasi berhasil!</p>
-                    <p>Nama: ${data.student.name}</p>
-                    <p>NIM: ${data.student.nim}</p>
+                    <p class="font-semibold">Berhasil!</p>
+                    <p>Alat: ${data.tool.name}</p>
+                    <p>UID: ${data.tool.rfid_uid}</p>
                 </div>`;
 
-                // Redirect after 3 seconds
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 3000);
+                // Reset form
+                form.reset();
+                currentRFID = null;
+                document.getElementById('rfid-status').textContent = 'Menunggu tag alat...';
+                document.getElementById('rfid-indicator').classList.remove('border-blue-500', 'bg-blue-50');
+                document.getElementById('rfid-uid-display').classList.add('hidden');
+                document.getElementById('submit-btn').disabled = true;
+
             } else {
                 showToast(data.error, 'error');
-
-                // Show error message
                 document.getElementById('form-status').innerHTML =
                     `<div class="p-4 bg-red-100 text-red-800 rounded-lg">
                     <p class="font-semibold">Error: ${data.error}</p>
@@ -236,16 +236,15 @@ function submitRegistration() {
         })
         .catch(error => {
             hideLoading();
-            console.error('Error submitting registration:', error);
-            showToast('Terjadi kesalahan saat registrasi', 'error');
+            console.error('Error submitting tool:', error);
+            showToast('Terjadi kesalahan saat menyimpan alat', 'error');
         });
 }
 
-// Listen for form field changes to update submit button
+// Listen for input changes
 document.addEventListener('DOMContentLoaded', function () {
-    const inputs = document.querySelectorAll('#registration-form input');
+    const inputs = document.querySelectorAll('#tool-form input');
     inputs.forEach(input => {
         input.addEventListener('input', checkFormValidity);
-        input.addEventListener('change', checkFormValidity);
     });
 });

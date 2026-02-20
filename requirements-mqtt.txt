@@ -1,0 +1,21 @@
+# Optional MQTT and WebSocket dependencies for TPT-RFID System
+# Install only if you want to enable MQTT functionality
+# 
+# Installation:
+#   pip install -r requirements-mqtt.txt
+#
+# Usage:
+#   Set MQTT_ENABLED=true in .env to use real MQTT client
+#   Set WEBSOCKET_ENABLED=true in .env to use real WebSocket handler
+
+# MQTT Client Library
+paho-mqtt==1.6.1
+
+# WebSocket Support for Flask
+flask-socketio==5.3.6
+
+# Async support for Socket.IO
+python-socketio[client]==5.11.1
+
+# Event handling
+simple-websocket==1.0.0

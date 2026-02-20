@@ -5,8 +5,68 @@ Helper utility functions for the RFID Workshop Tool Monitoring System
 import os
 import uuid
 import html
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from werkzeug.utils import secure_filename
+
+# Indonesia Timezone - WIB (Western Indonesia Time) = UTC+7
+WIB_OFFSET = timedelta(hours=7)
+
+
+def get_wib_time():
+    """
+    Get current time in WIB (UTC+7)
+
+    Returns:
+        datetime: Current time in WIB timezone
+    """
+    return datetime.now(timezone.utc) + WIB_OFFSET
+
+
+def utc_to_wib(utc_datetime):
+    """
+    Convert UTC datetime to WIB (UTC+7)
+
+    Args:
+        utc_datetime: datetime object in UTC (can be naive or aware)
+
+    Returns:
+        datetime: datetime in WIB timezone (naive)
+    """
+    if utc_datetime is None:
+        return None
+
+    # If naive datetime, assume it's UTC
+    if utc_datetime.tzinfo is None:
+        utc_datetime = utc_datetime.replace(tzinfo=timezone.utc)
+
+    # Convert to WIB
+    wib_datetime = utc_datetime.astimezone(timezone(WIB_OFFSET))
+
+    # Return as naive datetime (remove timezone info for consistency)
+    return wib_datetime.replace(tzinfo=None)
+
+
+def wib_to_utc(wib_datetime):
+    """
+    Convert WIB datetime to UTC
+
+    Args:
+        wib_datetime: datetime object in WIB (naive)
+
+    Returns:
+        datetime: datetime in UTC timezone (naive)
+    """
+    if wib_datetime is None:
+        return None
+
+    # Add WIB timezone info
+    wib_aware = wib_datetime.replace(tzinfo=timezone(WIB_OFFSET))
+
+    # Convert to UTC
+    utc_datetime = wib_aware.astimezone(timezone.utc)
+
+    # Return as naive datetime
+    return utc_datetime.replace(tzinfo=None)
 
 
 def allowed_file(filename, allowed_extensions):

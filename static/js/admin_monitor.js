@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', function () {
  */
 function fetchToolsData() {
     fetch('/api/admin/tools_status', {
-        headers: { 'X-Admin-Pin': window.ADMIN_PIN || '' }
+        credentials: 'same-origin'  // Include session cookies
     })
         .then(response => response.json())
         .then(data => {
@@ -608,10 +608,10 @@ function sendWarningEmail() {
 
     fetch('/api/admin/send_warning_email', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Admin-Pin': window.ADMIN_PIN || ''
-        },
+        headers: getCSRFHeaders({
+            'Content-Type': 'application/json'
+        }),
+        credentials: 'same-origin',  // Include session cookies
         body: JSON.stringify(payload)
     })
         .then(response => response.json())

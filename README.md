@@ -1,21 +1,25 @@
 # Lab Fabrikasi ITB - RFID Tool Monitoring System
 
-Sistem peminjaman alat workshop berbasis RFID untuk Lab Fabrikasi Teknik Fisika ITB.
+Sistem peminjaman alat workshop berbasis RFID untuk Lab Fabrikasi Teknik Fisika ITB dengan integrasi MQTT untuk komunikasi real-time dengan ESP32.
 
-**Tech Stack:** Flask 3 (Python) · PostgreSQL · SQLAlchemy · Tailwind CSS · Vanilla JS
+**Tech Stack:** Flask 3 (Python) · PostgreSQL · SQLAlchemy · MQTT (Mosquitto) · WebSocket · Tailwind CSS · Vanilla JS
 
 ---
 
 ## Daftar Isi
 
 1. [Fitur](#fitur)
-2. [Arsitektur Proyek](#arsitektur-proyek)
-3. [Setup di Laptop (Development)](#setup-di-laptop-development)
-4. [Setup di Raspberry Pi (Production)](#setup-di-raspberry-pi-production)
-5. [Seed Data (Opsional)](#seed-data-opsional)
-6. [Cara Penggunaan Aplikasi](#cara-penggunaan-aplikasi)
-7. [Environment Variables](#environment-variables)
-8. [Troubleshooting](#troubleshooting)
+2. [Arsitektur Sistem](#arsitektur-sistem)
+3. [Arsitektur Proyek](#arsitektur-proyek)
+4. [Setup Otomatis (Recommended)](#setup-otomatis-recommended)
+5. [Setup di Laptop (Development)](#setup-di-laptop-development)
+6. [Setup MQTT & ESP32](#setup-mqtt--esp32)
+7. [Setup di Raspberry Pi (Production)](#setup-di-raspberry-pi-production)
+8. [Seed Data (Opsional)](#seed-data-opsional)
+9. [Cara Penggunaan Aplikasi](#cara-penggunaan-aplikasi)
+10. [Environment Variables](#environment-variables)
+11. [Troubleshooting](#troubleshooting)
+12. [Dokumentasi Lengkap](#dokumentasi-lengkap)
 
 ---
 
@@ -26,7 +30,51 @@ Sistem peminjaman alat workshop berbasis RFID untuk Lab Fabrikasi Teknik Fisika 
 - **Pengembalian alat** — scan kartu mahasiswa + tag RFID alat, konfirmasi kembali
 - **Monitor alat** — lihat status semua alat (tersedia / sedang dipinjam)
 - **Admin panel** — monitor dengan info peminjam lengkap + kirim email peringatan
-- **Mock RFID** — simulasi RFID via browser console untuk development tanpa hardware
+- **MQTT Integration** — komunikasi real-time dengan ESP32 RFID reader
+- **WebSocket Support** — notifikasi real-time ke web clients
+- **Mock Mode** — simulasi RFID dan MQTT untuk development tanpa hardware
+
+---
+
+## Arsitektur Sistem
+
+### Mode Development (Mock)
+```
+┌─────────────────┐
+│   Flask App     │
+│  (Mock Mode)    │◄─── Browser Console (simulateRFID)
+│                 │
+│ - Mock MQTT     │
+│ - Mock RFID     │
+└─────────────────┘
+```
+
+### Mode Production (Real Hardware)
+```
+┌─────────────┐        MQTT           ┌──────────────┐        WebSocket       ┌──────────────┐
+│  ESP32 #1   │────rfid/scan─────────▶│   Flask App  │────────────────────────▶│ Web Clients  │
+│ RFID Reader │   (QoS 1)             │  + Mosquitto │   (Real-time updates)  │  (Browser)   │
+└─────────────┘                        │              │                        └──────────────┘
+                                       │              │
+┌─────────────┐        MQTT           │              │
+│  ESP32 #2   │────sensor/*──────────▶│              │
+│  Sensors    │   (QoS 0)             │              │
+└─────────────┘                        └──────────────┘
+                                              │
+                                       ┌──────┴──────┐
+                                       │ PostgreSQL  │
+                                       │  Database   │
+                                       └─────────────┘
+```
+
+### MQTT Topics
+
+| Topic | Direction | QoS | Deskripsi |
+|-------|-----------|-----|-----------|
+| `rfid/scan` | ESP32 → Server | 1 | RFID card scans |
+| `transaction/update` | Server → Clients | 1 | Borrow/return events |
+| `tool/status` | Server → Clients | 1 | Tool availability |
+| `sensor/*` | ESP32 → Server | 0 | Sensor data (temp, humidity, etc.) |
 
 ---
 
@@ -34,12 +82,15 @@ Sistem peminjaman alat workshop berbasis RFID untuk Lab Fabrikasi Teknik Fisika 
 
 ```
 tpt-rfid/
-├── app.py                     # Aplikasi Flask utama
-├── config.py                  # Konfigurasi (dev/production)
+├── app.py                     # Aplikasi Flask utama (dengan MQTT integration)
+├── config.py                  # Konfigurasi (dev/production + MQTT)
 ├── seed_database.py           # Script seed data testing
 ├── setup.sh                   # Script setup otomatis
-├── requirements.txt           # Dependensi Python
+├── requirements.txt           # Dependensi Python (base)
+├── requirements-mqtt.txt      # Dependensi MQTT (optional)
+├── .env                       # Environment variables
 ├── .env.example               # Template environment variables
+│
 ├── templates/                 # HTML templates (Jinja2)
 │   ├── base.html
 │   ├── landing.html           # Halaman landing (pilih role)
@@ -49,17 +100,59 @@ tpt-rfid/
 │   ├── monitor.html           # Monitor alat (publik)
 │   ├── admin_welcome.html     # Menu admin
 │   └── admin_monitor.html     # Monitor alat (admin)
+│
 ├── static/
 │   ├── css/                   # Stylesheet
 │   ├── js/                    # JavaScript
 │   └── assets/                # Gambar dan ikon
-└── utils/
-    ├── __init__.py
-    ├── models.py              # SQLAlchemy models (Student, Tool, Transaction)
-    ├── database_handler.py    # Operasi CRUD PostgreSQL
-    ├── rfid_mock.py           # Simulasi RFID reader
-    └── helpers.py             # Fungsi utilitas
+│
+├── utils/
+│   ├── __init__.py
+│   ├── models.py              # SQLAlchemy models (Student, Tool, Transaction)
+│   ├── database_handler.py    # Operasi CRUD PostgreSQL
+│   ├── mqtt_client.py         # MQTT client (Mock + Real)
+│   ├── websocket_handler.py   # WebSocket handler (Mock + Real)
+│   ├── rfid_mock.py           # Simulasi RFID reader
+│   └── helpers.py             # Fungsi utilitas
+│
+├── scripts/
+│   ├── install_mosquitto.sh   # Install Mosquitto broker
+│   ├── test_mqtt.sh           # Test MQTT broker
+│   ├── test_mqtt_integration.py # Test MQTT dengan app
+│   ├── migrate_database.sh    # Migrate dari Firebase
+│   └── verify_database.py     # Verifikasi database
+│
+└── docs/
+    ├── MIGRATION_SUMMARY.md   # Summary migrasi & setup
+    ├── MQTT_SETUP.md          # Panduan setup MQTT
+    ├── ESP32_CLIENT_GUIDE.md  # Panduan programming ESP32
+    ├── DEPLOYMENT.md          # Panduan deployment production
+    └── TROUBLESHOOTING.md     # Troubleshooting guide
 ```
+
+---
+
+## Setup Otomatis (Recommended)
+
+Kami menyediakan script installer otomatis untuk Raspberry Pi dan Ubuntu/Debian. Script ini akan:
+1. Update sistem
+2. Install dependencies (Python, PostgreSQL, dll)
+3. Setup database dan user PostgreSQL otomatis
+4. Clone/Update repository
+5. Setup Python environment
+6. Setup auto-start service (systemd)
+7. Setup Kiosk mode (opsional)
+
+**Cara Pakai:**
+
+Download script installer:
+```bash
+wget https://raw.githubusercontent.com/Naktekfis/tpt-rfid/main/tpt-rfid-installer.sh
+chmod +x tpt-rfid-installer.sh
+./tpt-rfid-installer.sh
+```
+
+Ikuti instruksi di layar. Kopi sambil menunggu (estimasi 30-45 menit).
 
 ---
 
@@ -172,6 +265,9 @@ python app.py
 
 Buka browser: **http://localhost:5000**
 
+> **Catatan MQTT:** Secara default, aplikasi berjalan dalam **mock mode** (tidak perlu MQTT broker).
+> Untuk mengaktifkan MQTT, lihat [Setup MQTT & ESP32](#setup-mqtt--esp32).
+
 ### Simulasi RFID (Development)
 
 Karena di laptop tidak ada hardware RFID, gunakan browser console (F12):
@@ -191,6 +287,147 @@ Atau lewat URL (hanya mode development):
 ```
 http://localhost:5000/debug/scan?uid=STUDENT001
 ```
+
+---
+
+## Setup MQTT & ESP32
+
+Sistem mendukung dua mode operasi:
+
+### Mode 1: Mock Mode (Default - Development)
+
+**Tidak perlu MQTT broker atau ESP32.** Semua operasi MQTT di-log saja.
+
+```bash
+# Di .env (default):
+MQTT_ENABLED=false
+WEBSOCKET_ENABLED=false
+
+# Jalankan app
+python app.py
+
+# Logs akan menampilkan:
+# [MOCK] MQTT Client initialized
+# [MOCK] WebSocket handler initialized
+```
+
+### Mode 2: Real MQTT (Production)
+
+**Butuh Mosquitto broker dan ESP32.**
+
+#### Step 1: Install Mosquitto
+
+```bash
+# Install Mosquitto MQTT broker
+sudo ./scripts/install_mosquitto.sh
+
+# Verifikasi service running
+sudo systemctl status mosquitto
+
+# Test MQTT broker
+./scripts/test_mqtt.sh
+```
+
+Service akan berjalan di:
+- Port `1883` - MQTT (TCP)
+- Port `8083` - WebSocket
+
+#### Step 2: Install Dependencies MQTT
+
+```bash
+source venv/bin/activate
+pip install -r requirements-mqtt.txt
+```
+
+Dependencies yang diinstall:
+- `paho-mqtt` - MQTT client library
+- `flask-socketio` - WebSocket support
+- `python-socketio` - Socket.IO client
+
+#### Step 3: Enable MQTT di .env
+
+```bash
+# Edit .env
+MQTT_ENABLED=true
+MQTT_BROKER_HOST=localhost
+MQTT_BROKER_PORT=1883
+MQTT_CLIENT_ID=tpt-rfid-server
+
+# Optional: WebSocket untuk real-time updates ke browser
+WEBSOCKET_ENABLED=true
+```
+
+#### Step 4: Test MQTT Integration
+
+```bash
+# Terminal 1: Jalankan Flask app
+python app.py
+
+# Terminal 2: Test dengan simulator ESP32
+./scripts/test_mqtt_integration.py
+```
+
+Jika berhasil, logs Flask app akan menampilkan:
+```
+MQTT client connected successfully
+Subscribed to MQTT topics
+MQTT RFID scan received: 1234567890 from esp32_01
+Student identified: Ahmad Fauzi (NIM: 1234567890)
+```
+
+#### Step 5: Programming ESP32
+
+Lihat dokumentasi lengkap di [docs/ESP32_CLIENT_GUIDE.md](docs/ESP32_CLIENT_GUIDE.md)
+
+**Quick Start:**
+
+1. Install Arduino IDE + library:
+   - `PubSubClient` (MQTT)
+   - `MFRC522` (RFID reader)
+   - `ArduinoJson`
+
+2. Upload code ke ESP32 (contoh di docs)
+
+3. Konfigurasi WiFi dan MQTT broker:
+   ```cpp
+   const char* mqtt_server = "192.168.1.100";  // IP Raspberry Pi
+   const char* mqtt_topic = "rfid/scan";
+   ```
+
+4. ESP32 akan publish RFID scans ke broker
+
+**Hardware yang dibutuhkan:**
+- ESP32 Dev Board
+- MFRC522 RFID Reader Module
+- RFID cards/tags
+- Jumper wires
+
+**Wiring:**
+```
+MFRC522 → ESP32
+SDA     → GPIO 21
+SCK     → GPIO 18
+MOSI    → GPIO 23
+MISO    → GPIO 19
+IRQ     → (not connected)
+GND     → GND
+RST     → GPIO 22
+3.3V    → 3.3V
+```
+
+### Mode Switching
+
+Untuk berpindah antara mock dan real mode, cukup ubah `.env`:
+
+```bash
+# Development (mock mode)
+MQTT_ENABLED=false
+
+# Production (real mode)
+MQTT_ENABLED=true
+```
+
+Tidak perlu ubah code. Aplikasi otomatis menggunakan mock atau real client berdasarkan config.
 
 ---
 
@@ -445,13 +682,63 @@ python seed_database.py
 | `DATABASE_URL` | Ya | URL koneksi PostgreSQL | `postgresql://user:pass@localhost/tpt_rfid` |
 | `SECRET_KEY` | Ya | Secret key Flask session | random string panjang |
 | `FLASK_ENV` | Tidak | Mode aplikasi | `development` / `production` |
-| `ADMIN_PIN` | Tidak | PIN untuk admin API | `1234` (auto-generate jika kosong) |
+| `ADMIN_PIN` | Ya | PIN untuk admin API | `BLlVwramuPg` |
+| `MQTT_ENABLED` | Tidak | Enable MQTT client | `true` / `false` (default: false) |
+| `MQTT_BROKER_HOST` | Tidak | MQTT broker hostname | `localhost` |
+| `MQTT_BROKER_PORT` | Tidak | MQTT broker port | `1883` |
+| `MQTT_CLIENT_ID` | Tidak | Client ID untuk MQTT | `tpt-rfid-server` |
+| `MQTT_USERNAME` | Tidak | Username MQTT (optional) | `mqtt_user` |
+| `MQTT_PASSWORD` | Tidak | Password MQTT (optional) | `mqtt_pass` |
+| `WEBSOCKET_ENABLED` | Tidak | Enable WebSocket | `true` / `false` (default: false) |
+| `WEBSOCKET_CORS_ORIGINS` | Tidak | CORS origins untuk WS | `*` (dev), `https://domain.com` (prod) |
 | `MAIL_SERVER` | Tidak | SMTP server | `smtp.gmail.com` |
 | `MAIL_PORT` | Tidak | SMTP port | `587` |
 | `MAIL_USE_TLS` | Tidak | Gunakan TLS | `True` |
 | `MAIL_USERNAME` | Tidak | Email pengirim | `lab@gmail.com` |
 | `MAIL_PASSWORD` | Tidak | Password / app password | `xxxx-xxxx-xxxx` |
 | `MAIL_DEFAULT_SENDER` | Tidak | Default sender | `lab@gmail.com` |
+
+### Contoh .env Development (Mock Mode)
+
+```env
+FLASK_ENV=development
+DEBUG=True
+SECRET_KEY=dev-secret-key-change-in-production
+DATABASE_URL=postgresql://ahmad:password@localhost/tpt_rfid
+ADMIN_PIN=1234
+
+# MQTT & WebSocket (disabled by default)
+MQTT_ENABLED=false
+WEBSOCKET_ENABLED=false
+```
+
+### Contoh .env Production (Real MQTT)
+
+```env
+FLASK_ENV=production
+DEBUG=False
+SECRET_KEY=449840b0530d247ccf6e3772e21174aa43b177e00061a192423075f632d37855
+DATABASE_URL=postgresql://pi:secure_password@localhost/tpt_rfid
+ADMIN_PIN=secure_pin_here
+
+# MQTT & WebSocket (enabled for production)
+MQTT_ENABLED=true
+MQTT_BROKER_HOST=localhost
+MQTT_BROKER_PORT=1883
+MQTT_CLIENT_ID=tpt-rfid-server
+
+# Enable WebSocket for real-time updates
+WEBSOCKET_ENABLED=true
+WEBSOCKET_CORS_ORIGINS=*
+
+# Email notifications
+MAIL_SERVER=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USE_TLS=True
+MAIL_USERNAME=lab@itb.ac.id
+MAIL_PASSWORD=app_password_here
+MAIL_DEFAULT_SENDER=lab@itb.ac.id
+```
 
 ---
 
@@ -507,6 +794,85 @@ sudo systemctl status postgresql
 ```bash
 chmod +x app.py setup.sh
 ```
+
+### MQTT tidak konek
+
+```bash
+# Cek Mosquitto service
+sudo systemctl status mosquitto
+
+# Restart Mosquitto
+sudo systemctl restart mosquitto
+
+# Test koneksi MQTT
+mosquitto_sub -h localhost -t '#' -v
+
+# Cek port listening
+ss -tlnp | grep -E '1883|8083'
+
+# Lihat logs Mosquitto
+sudo journalctl -u mosquitto -f
+```
+
+### ESP32 tidak bisa publish
+
+```bash
+# Test dari laptop dulu
+mosquitto_pub -h <raspberry-pi-ip> -t rfid/scan -m '{"rfid_uid":"test"}'
+
+# Cek firewall
+sudo ufw status
+sudo ufw allow 1883
+sudo ufw allow 8083
+
+# Verify network
+ping <raspberry-pi-ip>
+```
+
+### App tidak menerima MQTT messages
+
+```bash
+# Verifikasi MQTT_ENABLED=true di .env
+cat .env | grep MQTT_ENABLED
+
+# Install dependencies MQTT
+pip install -r requirements-mqtt.txt
+
+# Test dengan simulator
+./scripts/test_mqtt_integration.py
+
+# Cek logs Flask app
+# Seharusnya ada: "MQTT client connected successfully"
+```
+
+### ModuleNotFoundError: No module named 'paho'
+
+```bash
+# Install MQTT dependencies
+pip install -r requirements-mqtt.txt
+
+# Atau install manual
+pip install paho-mqtt flask-socketio
+```
+
+---
+
+## Dokumentasi Lengkap
+
+Dokumentasi detail tersedia di folder `docs/`:
+
+- **[MIGRATION_SUMMARY.md](docs/MIGRATION_SUMMARY.md)** - Summary lengkap migrasi database & MQTT setup
+- **[MQTT_SETUP.md](docs/MQTT_SETUP.md)** - Panduan setup Mosquitto broker step-by-step
+- **[ESP32_CLIENT_GUIDE.md](docs/ESP32_CLIENT_GUIDE.md)** - Programming ESP32 dengan RFID reader
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment ke Raspberry Pi production
+- **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Troubleshooting guide lengkap
+
+### Quick Links
+
+- Test MQTT broker: `./scripts/test_mqtt.sh`
+- Test MQTT integration: `./scripts/test_mqtt_integration.py`
+- Migrate from Firebase: `./scripts/migrate_database.sh`
+- Verify database: `./scripts/verify_database.py`
 
 ---
 

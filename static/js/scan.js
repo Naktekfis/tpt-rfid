@@ -194,7 +194,7 @@ function fetchStudentData(uid) {
 
     fetch('/api/scan_student', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ rfid_uid: uid })
     })
         .then(response => response.json())
@@ -262,7 +262,7 @@ function fetchToolData(uid) {
 
     fetch('/api/scan_tool', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ rfid_uid: uid })
     })
         .then(response => response.json())
@@ -349,7 +349,7 @@ function confirmTransaction() {
 
     fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({
             student_id: studentData.student_id,
             tool_id: toolData.tool_id

@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{% block title %}RFID Workshop Tool System{% endblock %}</title>
 
     <!-- Google Fonts - Inter -->
@@ -43,6 +44,22 @@
                     },
                 }
             }
+        }
+    </script>
+
+    <!-- CSRF Token Helper -->
+    <script>
+        // Get CSRF token from meta tag
+        function getCSRFToken() {
+            return document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+        }
+        
+        // Helper to add CSRF token to fetch headers
+        function getCSRFHeaders(additionalHeaders = {}) {
+            return {
+                'X-CSRFToken': getCSRFToken(),
+                ...additionalHeaders
+            };
         }
     </script>
 

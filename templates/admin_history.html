@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}Riwayat Peminjaman - Lab Fabrikasi{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <!-- Header Card -->
+    <div class="bg-white rounded-2xl shadow-lg border border-primary-100 overflow-hidden mb-6">
+        <div class="px-6 py-5 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <a href="{{ url_for('admin_menu') }}"
+                    class="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                </a>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-800">Riwayat Peminjaman</h1>
+                    <p class="text-sm text-gray-500">Rekapitulasi data peminjaman alat</p>
+                </div>
+            </div>
+
+            <!-- Export Actions -->
+            <div class="flex items-center gap-2">
+                <button id="btn-email-export"
+                    class="inline-flex items-center space-x-2 bg-blue-50 text-blue-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-100 border border-blue-200 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span>Kirim via Email</span>
+                </button>
+                <a id="btn-export-csv" href="#"
+                    class="inline-flex items-center space-x-2 bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-100 border border-gray-200 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                    </svg>
+                    <span>CSV</span>
+                </a>
+                <a id="btn-export-xlsx" href="#"
+                    class="inline-flex items-center space-x-2 bg-green-50 text-green-700 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-100 border border-green-200 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Excel</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-100">
+            <div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <!-- Quick Filters -->
+                <div class="flex bg-white rounded-lg p-1 border border-gray-200 shadow-sm w-full md:w-auto">
+                    <button
+                        class="filter-btn flex-1 md:flex-none px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-primary-700 hover:bg-gray-50 transition-all"
+                        data-range="week">1 Minggu</button>
+                    <button
+                        class="filter-btn flex-1 md:flex-none px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-primary-700 hover:bg-gray-50 transition-all"
+                        data-range="month">1 Bulan</button>
+                    <button
+                        class="filter-btn flex-1 md:flex-none px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-primary-700 hover:bg-gray-50 transition-all"
+                        data-range="year">1 Tahun</button>
+                    <button
+                        class="filter-btn flex-1 md:flex-none px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-primary-700 hover:bg-gray-50 transition-all"
+                        data-range="all">Semua</button>
+                </div>
+
+                <!-- Custom Range -->
+                <div class="flex items-center gap-2 w-full md:w-auto">
+                    <div
+                        class="flex items-center gap-2 bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex-1">
+                        <input type="date" id="start-date"
+                            class="text-sm border-none focus:ring-0 text-gray-600 p-0 w-32">
+                        <span class="text-gray-400">→</span>
+                        <input type="date" id="end-date"
+                            class="text-sm border-none focus:ring-0 text-gray-600 p-0 w-32">
+                    </div>
+                    <button id="btn-apply-filter"
+                        class="px-4 py-2 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700 shadow-sm active:scale-95 transition-all">
+                        Terapkan
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto">
+            <table class="w-full text-left">
+                <thead
+                    class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider font-semibold border-b border-gray-100">
+                    <tr>
+                        <th class="px-6 py-4">Waktu Pinjam</th>
+                        <th class="px-6 py-4">Mahasiswa</th>
+                        <th class="px-6 py-4">Alat</th>
+                        <th class="px-6 py-4 text-center">Status</th>
+                        <th class="px-6 py-4">Waktu Kembali</th>
+                    </tr>
+                </thead>
+                <tbody id="transactions-body" class="divide-y divide-gray-100 text-sm">
+                    <!-- Data rows injected by JS -->
+                    <tr class="loading-skeleton">
+                        <td class="px-6 py-4">
+                            <div class="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="h-4 bg-gray-200 rounded w-40 animate-pulse"></div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="h-4 bg-gray-200 rounded w-24 animate-pulse"></div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="h-4 bg-gray-200 rounded w-16 mx-auto animate-pulse"></div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="h-4 bg-gray-200 rounded w-32 animate-pulse"></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Empty State -->
+        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-12 text-center">
+            <div class="bg-gray-100 p-4 rounded-full mb-3">
+                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </div>
+            <h3 class="text-gray-900 font-medium">Tidak ada data</h3>
+            <p class="text-gray-500 text-sm mt-1">Belum ada riwayat peminjaman pada periode ini.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Email Export Modal -->
+<div id="email-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <!-- Backdrop -->
+    <div id="email-modal-backdrop" class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+    
+    <!-- Modal Content -->
+    <div class="flex items-center justify-center min-h-screen px-4 py-8">
+        <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all modal-content">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    Kirim via Email
+                </h3>
+                <button id="close-modal" class="text-gray-400 hover:text-gray-600 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Description -->
+            <p class="text-gray-600 text-sm mb-4">
+                Masukkan alamat email untuk menerima laporan rekap peminjaman dalam format Excel (.xlsx)
+            </p>
+
+            <!-- Email Input -->
+            <div class="mb-6">
+                <label for="email-input" class="block text-sm font-semibold text-gray-700 mb-2">
+                    Alamat Email
+                </label>
+                <input
+                    type="email"
+                    id="email-input"
+                    placeholder="contoh@email.com"
+                    class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                    required
+                />
+                <p id="email-error" class="hidden text-red-500 text-xs mt-2">Format email tidak valid</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex gap-3">
+                <button
+                    id="cancel-email"
+                    class="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-sm">
+                    Batal
+                </button>
+                <button
+                    id="submit-email"
+                    class="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition-colors text-sm disabled:bg-gray-300 disabled:cursor-not-allowed">
+                    Kirim
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-btn.active {
+        @apply bg-primary-100 text-primary-700 shadow-sm border-primary-200;
+    }
+    
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        to {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+    }
+    
+    .animate-fade-in {
+        animation: fadeIn 0.3s ease-out;
+    }
+    
+    .animate-fade-out {
+        animation: fadeOut 0.3s ease-in;
+    }
+    
+    /* Modal animations */
+    @keyframes modalFadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+    
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95) translateY(-20px);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+    
+    #email-modal:not(.hidden) {
+        animation: modalFadeIn 0.2s ease-out;
+    }
+    
+    #email-modal:not(.hidden) .modal-content {
+        animation: modalSlideIn 0.3s ease-out;
+    }
+</style>
+
+<script src="{{ url_for('static', filename='js/admin_history.js') }}"></script>
+{% endblock %}

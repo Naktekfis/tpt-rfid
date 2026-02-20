@@ -8,6 +8,18 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 
+# Import timezone helpers (will be available after helpers.py is loaded)
+def _get_utc_to_wib():
+    """Lazy import to avoid circular dependency"""
+    try:
+        from .helpers import utc_to_wib
+
+        return utc_to_wib
+    except ImportError:
+        # Fallback if helpers not available yet
+        return lambda x: x
+
+
 class Student(db.Model):
     """Student model - represents registered students with RFID cards"""
 
@@ -110,17 +122,19 @@ class Transaction(db.Model):
     )
 
     def to_dict(self):
-        """Convert model to dictionary"""
+        """Convert model to dictionary with WIB timezone conversion"""
+        utc_to_wib = _get_utc_to_wib()
         return {
             "transaction_id": str(self.id),
             "student_id": str(self.student_id),
             "student_name": self.student_name,
             "tool_id": str(self.tool_id),
             "tool_name": self.tool_name,
-            "borrow_time": self.borrow_time,
-            "return_time": self.return_time,
+            # Convert timestamps from UTC to WIB
+            "borrow_time": utc_to_wib(self.borrow_time),
+            "return_time": utc_to_wib(self.return_time) if self.return_time else None,
             "status": self.status,
-            "created_at": self.created_at,
+            "created_at": utc_to_wib(self.created_at),
         }
 
     def __repr__(self):

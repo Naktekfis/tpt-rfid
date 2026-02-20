@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Dict, List, Optional
 
 from .models import db, Student, Tool, Transaction
+from .helpers import utc_to_wib
 
 logger = logging.getLogger(__name__)
 
@@ -225,6 +226,29 @@ class DatabaseHandler:
 
         except Exception as e:
             logger.error(f"Error getting tool by UID: {str(e)}")
+            raise
+
+    def get_tool_by_name(self, name: str) -> Optional[Dict]:
+        """
+        Get tool by name (case-insensitive)
+
+        Args:
+            name (str): Tool name
+
+        Returns:
+            dict or None: Tool data if found, None otherwise
+        """
+        try:
+            tool = Tool.query.filter(Tool.name.ilike(name)).first()
+
+            if tool:
+                logger.info(f"Found tool by name: {tool.name}")
+                return tool.to_dict()
+
+            return None
+
+        except Exception as e:
+            logger.error(f"Error getting tool by name: {str(e)}")
             raise
 
     def update_tool_status(self, tool_id: str, status: str):
@@ -583,7 +607,8 @@ class DatabaseHandler:
 
                 if txn and student:
                     tool_dict["borrower_name"] = txn.student_name
-                    tool_dict["borrow_time"] = txn.borrow_time
+                    # Convert borrow_time from UTC to WIB
+                    tool_dict["borrow_time"] = utc_to_wib(txn.borrow_time)
 
                     if student:
                         tool_dict["borrower_nim"] = student.nim
@@ -602,4 +627,75 @@ class DatabaseHandler:
 
         except Exception as e:
             logger.error(f"Error getting tools with borrowers: {str(e)}")
+            raise
+
+    def get_transactions_filtered(
+        self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None
+    ) -> List[Dict]:
+        """
+        Get filtered transactions for admin history and export.
+
+        Args:
+            start_date (datetime, optional): Start date filter (inclusive)
+            end_date (datetime, optional): End date filter (inclusive)
+
+        Returns:
+            list: List of transaction dicts with student and tool info
+                  (timestamps converted to WIB timezone)
+        """
+        try:
+            # Build query with JOINs to get student and tool info
+            query = (
+                db.session.query(
+                    Transaction.id,
+                    Transaction.student_name,
+                    Transaction.tool_name,
+                    Transaction.borrow_time,
+                    Transaction.return_time,
+                    Transaction.status,
+                    Student.nim.label("student_nim"),
+                    Tool.category.label("tool_category"),
+                )
+                .join(Student, Student.id == Transaction.student_id)
+                .join(Tool, Tool.id == Transaction.tool_id)
+            )
+
+            # Apply date filters if provided
+            if start_date:
+                query = query.filter(Transaction.borrow_time >= start_date)
+            if end_date:
+                query = query.filter(Transaction.borrow_time <= end_date)
+
+            # Order by borrow time descending (newest first)
+            query = query.order_by(Transaction.borrow_time.desc())
+
+            results = query.all()
+
+            # Convert to list of dicts with timezone conversion
+            transactions = []
+            for row in results:
+                transactions.append(
+                    {
+                        "id": row.id,
+                        "student_name": row.student_name,
+                        "student_nim": row.student_nim,
+                        "tool_name": row.tool_name,
+                        "tool_category": row.tool_category,
+                        # Convert UTC timestamps to WIB for display
+                        "borrow_time": utc_to_wib(row.borrow_time),
+                        "return_time": utc_to_wib(row.return_time)
+                        if row.return_time
+                        else None,
+                        "status": row.status,
+                    }
+                )
+
+            logger.info(
+                f"Retrieved {len(transactions)} filtered transactions "
+                f"(start: {start_date}, end: {end_date})"
+            )
+            return transactions
+
+        except Exception as e:
+            logger.error(f"Error getting filtered transactions: {str(e)}")
             raise

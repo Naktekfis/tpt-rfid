@@ -4,7 +4,19 @@
 
 {% block content %}
 <div class="flex items-center justify-center min-h-[82vh]">
-    <div class="text-center max-w-4xl w-full">
+    <div class="text-center max-w-4xl w-full relative">
+        <!-- Logout Button -->
+        <div class="absolute top-0 right-0 -mt-2 -mr-2">
+            <a href="{{ url_for('admin_logout') }}"
+                class="inline-flex items-center space-x-1 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-red-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Logout</span>
+            </a>
+        </div>
+
         <!-- Hero Section -->
         <div class="mb-10">
             <div class="inline-block mb-5">
@@ -27,7 +39,7 @@
         </div>
 
         <!-- Action Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-1 gap-6 max-w-md mx-auto">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
             <!-- Monitor & Kelola Alat Card -->
             <a href="{{ url_for('admin_monitor') }}"
                 class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
@@ -42,10 +54,56 @@
                     </div>
                     <div>
                         <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Monitor & Kelola Alat
+                            Monitor & Kelola
                         </h2>
                         <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Pantau peminjaman dan kirim pengingat ke mahasiswa
+                            Pantau peminjaman dan kirim pengingat
+                        </p>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Input Alat Card -->
+            <a href="{{ url_for('admin_input_tool') }}"
+                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
+                <div class="flex flex-col items-center space-y-3">
+                    <div
+                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
+                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
+                            Input Alat
+                        </h2>
+                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
+                            Registrasi alat baru ke sistem RFID
+                        </p>
+                    </div>
+                </div>
+            </a>
+
+            <!-- Riwayat & Export Card -->
+            <a href="{{ url_for('admin_history') }}"
+                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
+                <div class="flex flex-col items-center space-y-3">
+                    <div
+                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
+                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
+                            stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
+                            Riwayat & Export
+                        </h2>
+                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
+                            Lihat dan unduh data
                         </p>
                     </div>
                 </div>
