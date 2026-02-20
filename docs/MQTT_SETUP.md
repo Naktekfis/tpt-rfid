@@ -20,14 +20,6 @@ Panduan lengkap setup Mosquitto MQTT broker untuk TPT-RFID system.
 
 TPT-RFID menggunakan MQTT (Message Queuing Telemetry Transport) untuk komunikasi real-time antara ESP32 dan server Flask. Mosquitto adalah MQTT broker yang lightweight dan cocok untuk Raspberry Pi.
 
-### Mengapa MQTT?
-
-- **Lightweight** - Hemat bandwidth dan resource
-- **Real-time** - Notifikasi instant saat RFID discan
-- **Reliable** - QoS (Quality of Service) guarantee
-- **Scalable** - Support multiple ESP32 clients
-- **Event-driven** - Tidak perlu HTTP polling
-
 ### Architecture
 
 ```
@@ -59,7 +51,7 @@ ESP32 (Publisher)  →  Mosquitto Broker  →  Flask App (Subscriber)
 Kami menyediakan script installer otomatis:
 
 ```bash
-cd /home/ahmad/tpt-rfid
+cd /home/(nama-user)/tpt-rfid
 sudo ./scripts/install_mosquitto.sh
 ```
 
@@ -271,7 +263,7 @@ mosquitto_pub -h localhost -t 'sensor/temperature' -m '{"value":25.5,"unit":"cel
 Gunakan script test kami:
 
 ```bash
-cd /home/ahmad/tpt-rfid
+cd /home/(nama-user)/tpt-rfid
 ./scripts/test_mqtt.sh
 ```
 
@@ -287,7 +279,7 @@ Script akan test:
 
 ```bash
 # Terminal 1: Start Flask app with MQTT enabled
-cd /home/ahmad/tpt-rfid
+cd /home/(nama-user)/tpt-rfid
 source venv/bin/activate
 # Pastikan MQTT_ENABLED=true di .env
 python app.py
@@ -301,7 +293,7 @@ Check Flask logs untuk:
 MQTT client connected successfully
 Subscribed to MQTT topics
 MQTT RFID scan received: 1234567890 from esp32_01
-Student identified: Ahmad Fauzi (NIM: 1234567890)
+Student identified: (nama-user) Fauzi (NIM: 1234567890)
 ```
 
 ---
