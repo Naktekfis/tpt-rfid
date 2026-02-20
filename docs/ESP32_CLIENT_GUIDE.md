@@ -79,11 +79,6 @@ ESP32 publish JSON ke topic `rfid/scan`:
 - GPIO pins: 30+
 - Built-in WiFi and Bluetooth
 
-**Where to buy:**
-- Tokopedia: ~Rp 50.000
-- Shopee: ~Rp 45.000
-- AliExpress: ~$3
-
 ### RFID Reader Module
 
 **Model:** MFRC522
@@ -95,31 +90,12 @@ ESP32 publish JSON ke topic `rfid/scan`:
 - Read distance: ~3-5cm
 - Supported cards: MIFARE Classic 1K, 4K
 
-**Where to buy:**
-- Tokopedia: ~Rp 15.000
-- Shopee: ~Rp 12.000
-
 ### RFID Cards/Tags
 
 **Types:**
 - ISO14443A cards (credit card size)
 - Key fobs
 - Stickers
-
-**Where to buy:**
-- Usually included with MFRC522 module
-- Separate packs: ~Rp 2.000/card
-
-### Additional Components
-
-| Item | Quantity | Price (approx) |
-|------|----------|----------------|
-| Jumper wires (Female-Female) | 10 pcs | Rp 5.000 |
-| Breadboard (optional) | 1 | Rp 15.000 |
-| USB Micro cable | 1 | Rp 10.000 |
-| Power supply 5V 2A (optional) | 1 | Rp 25.000 |
-
-**Total estimated cost: ~Rp 100.000 per ESP32 station**
 
 ---
 
@@ -211,8 +187,6 @@ ESP32 DevKit V1                MFRC522
 ## Arduino Code
 
 ### Complete Code - RFID MQTT Client
-
-Paste code ini ke Arduino IDE:
 
 ```cpp
 /*
