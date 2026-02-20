@@ -152,7 +152,7 @@ chmod +x tpt-rfid-installer.sh
 ./tpt-rfid-installer.sh
 ```
 
-Ikuti instruksi di layar. Kopi sambil menunggu (estimasi 30-45 menit).
+Ikuti instruksi di layar.
 
 ---
 
