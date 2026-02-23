@@ -1,1 +1,21 @@
-an effort to create a branch
+username: ubuntu
+password: dongo
+
+hostname: TPT
+
+Wifi
+SSID : AndroidAP4781
+pass : bkpl2501
+
+network-config with Justin's Hotspot
+network:
+  version: 2
+  renderer: networkd
+  wifis:
+    wlan0:
+      dhcp4: true
+      optional: true
+      regulatory-domain: ID
+      access-points:
+        "AndroidAP4781":
+          password: "bkpl2501"
