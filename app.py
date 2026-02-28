@@ -84,10 +84,12 @@ migrate = Migrate(app, db)
 logger.info("PostgreSQL database handler initialized successfully")
 
 # Import and register CV Benchmark blueprint (optional, requires opencv)
+CV_BENCHMARK_AVAILABLE = False
 try:
     from routes.cv_routes import cv_bp
 
     app.register_blueprint(cv_bp)
+    CV_BENCHMARK_AVAILABLE = True
     logger.info("CV Benchmark blueprint registered")
 except ImportError as e:
     logger.warning(f"CV Benchmark not available (missing dependencies: {e})")
@@ -236,6 +238,15 @@ def _serialize_borrow_timestamps(tools_data):
         bt = tool_info.get("borrow_time")
         if bt is not None and isinstance(bt, datetime):
             tool_info["borrow_time"] = {"_seconds": int(bt.timestamp())}
+
+
+# ==================== Template Context ====================
+
+
+@app.context_processor
+def inject_cv_availability():
+    """Make CV_BENCHMARK_AVAILABLE available in all templates"""
+    return {"cv_benchmark_available": CV_BENCHMARK_AVAILABLE}
 
 
 # ==================== Page Routes ====================
