@@ -2,6 +2,7 @@
 {% block title %}Live Monitor — CV Benchmark{% endblock %}
 
 {% block content %}
+<style>body { background: #030712 !important; }</style>
 <div class="min-h-screen bg-gray-950 flex flex-col">
 
   <!-- Top bar -->
@@ -38,7 +39,7 @@
       <div id="stream-placeholder"
            class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-950">
         <div class="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-gray-500 text-sm">Membuka kamera…</p>
+        <p class="text-gray-500 text-sm">Membuka kamera...</p>
       </div>
 
       <!-- Error state -->
@@ -114,8 +115,8 @@
         </div>
 
         <!-- Warning thresholds -->
-        <p id="temp-warn" class="mt-3 text-xs text-orange-400 hidden">⚠ Suhu tinggi!</p>
-        <p id="cpu-warn"  class="mt-1 text-xs text-red-400 hidden">⚠ CPU overload!</p>
+        <p id="temp-warn" class="mt-3 text-xs text-orange-400 hidden">Suhu tinggi</p>
+        <p id="cpu-warn"  class="mt-1 text-xs text-red-400 hidden">CPU overload</p>
       </div>
 
       <!-- Resolution info -->
@@ -233,11 +234,13 @@ async function updateStats() {
     // RAM
     setBar('ram-bar', 'ram-val', d.ram, '%', 'bg-blue-500');
 
-    // Temp (scale 0–80°C)
-    const tempPct = Math.min((d.temp / 80) * 100, 100);
-    setBarRaw('temp-bar', 'temp-val', tempPct, `${d.temp}°C`,
-              d.temp >= 70 ? 'bg-red-500' : d.temp >= 60 ? 'bg-orange-500' : 'bg-teal-500');
-    document.getElementById('temp-warn').classList.toggle('hidden', d.temp < 70);
+    // Temp (display N/A if unavailable)
+    const tempVal = d.temp || 0;
+    const tempText = tempVal > 0 ? `${tempVal}°C` : 'N/A';
+    const tempPct = tempVal > 0 ? Math.min((tempVal / 80) * 100, 100) : 0;
+    setBarRaw('temp-bar', 'temp-val', tempPct, tempText,
+              tempVal >= 70 ? 'bg-red-500' : tempVal >= 60 ? 'bg-orange-500' : 'bg-teal-500');
+    document.getElementById('temp-warn').classList.toggle('hidden', tempVal < 70);
 
     // Camera open → hide placeholder
     if (d.camera_open && !cameraReady) {

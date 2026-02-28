@@ -2,6 +2,7 @@
 {% block title %}Face Recognition — CV Benchmark{% endblock %}
 
 {% block content %}
+<style>body { background: #030712 !important; }</style>
 <div class="min-h-screen bg-gray-950 flex flex-col">
 
   <!-- Top bar -->
@@ -38,7 +39,7 @@
       <div id="capture-placeholder"
            class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-950">
         <div class="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-gray-500 text-sm">Membuka kamera…</p>
+        <p class="text-gray-500 text-sm">Membuka kamera...</p>
       </div>
 
       <!-- Face guide overlay (crosshair) -->
@@ -60,7 +61,7 @@
               class="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 disabled:opacity-40
                      disabled:cursor-not-allowed text-white font-semibold rounded-xl
                      transition-all duration-150 text-base">
-        📸 Ambil Foto Referensi
+        Ambil Foto Referensi
       </button>
       <p id="capture-msg" class="text-red-400 text-sm hidden">—</p>
     </div>
@@ -212,7 +213,7 @@ async function captureReference() {
   const msg = document.getElementById('capture-msg');
 
   btn.disabled = true;
-  btn.textContent = '⏳ Mengambil foto…';
+  btn.textContent = 'Mengambil foto...';
   msg.classList.add('hidden');
 
   const res = await fetch('/cv/capture', { method: 'POST' });
@@ -221,10 +222,10 @@ async function captureReference() {
   if (d.ok) {
     enterRecognitionPhase();
   } else {
-    msg.textContent = '⚠ ' + d.message;
+    msg.textContent = d.message;
     msg.classList.remove('hidden');
     btn.disabled = false;
-    btn.textContent = '📸 Ambil Foto Referensi';
+    btn.textContent = 'Ambil Foto Referensi';
   }
 }
 
@@ -330,14 +331,14 @@ function showMatchResult(matched, similarity) {
 
   if (matched) {
     badge.className = 'px-8 py-4 rounded-2xl text-2xl font-bold shadow-2xl text-white bg-emerald-600/90';
-    badge.textContent = `✓ COCOK  ${(similarity*100).toFixed(0)}%`;
-    document.getElementById('match-badge').textContent = 'COCOK';
+    badge.textContent = `MATCH  ${(similarity*100).toFixed(0)}%`;
+    document.getElementById('match-badge').textContent = 'MATCH';
     document.getElementById('match-badge').className =
       'text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400';
   } else {
     badge.className = 'px-8 py-4 rounded-2xl text-2xl font-bold shadow-2xl text-white bg-red-700/90';
-    badge.textContent = '✗ TIDAK COCOK';
-    document.getElementById('match-badge').textContent = 'TIDAK COCOK';
+    badge.textContent = 'NO MATCH';
+    document.getElementById('match-badge').textContent = 'NO MATCH';
     document.getElementById('match-badge').className =
       'text-xs font-semibold px-2 py-0.5 rounded-full bg-red-900 text-red-400';
   }

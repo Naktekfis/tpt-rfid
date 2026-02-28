@@ -2,6 +2,7 @@
 {% block title %}CV Benchmark — TPT-RFID{% endblock %}
 
 {% block content %}
+<style>body { background: #030712 !important; }</style>
 <div class="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-6">
 
   <!-- Header -->
@@ -18,8 +19,7 @@
       <h1 class="text-3xl font-bold text-white tracking-tight">CV Benchmark</h1>
     </div>
     <p class="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
-      Pengujian performa Computer Vision pada Raspberry Pi 4B.<br>
-      Ukur FPS, load CPU/RAM, dan akurasi face recognition pada berbagai resolusi.
+      Test performa Computer Vision pada Raspberry Pi 4B. Ukur FPS, CPU/RAM load, dan akurasi face recognition.
     </p>
   </div>
 
@@ -41,10 +41,10 @@
       </div>
       <div class="text-center">
         <h2 class="text-lg font-semibold text-white mb-1">Live Monitor</h2>
-        <p class="text-gray-500 text-sm">Kamera langsung · FPS counter · Resolusi variabel · CPU/RAM/Suhu</p>
+        <p class="text-gray-500 text-sm">Live camera, FPS counter, resolution toggle, CPU/RAM/Temp</p>
       </div>
       <span class="absolute top-4 right-4 text-xs text-violet-400 font-mono
-                   opacity-0 group-hover:opacity-100 transition-opacity">→ mulai</span>
+                   opacity-0 group-hover:opacity-100 transition-opacity">start</span>
     </a>
 
     <!-- Face Recognition -->
@@ -62,10 +62,10 @@
       </div>
       <div class="text-center">
         <h2 class="text-lg font-semibold text-white mb-1">Face Recognition</h2>
-        <p class="text-gray-500 text-sm">Jepret referensi · Live matching · Similarity score · Retry threshold</p>
+        <p class="text-gray-500 text-sm">Capture reference, live matching, similarity score, retry threshold</p>
       </div>
       <span class="absolute top-4 right-4 text-xs text-emerald-400 font-mono
-                   opacity-0 group-hover:opacity-100 transition-opacity">→ mulai</span>
+                   opacity-0 group-hover:opacity-100 transition-opacity">start</span>
     </a>
   </div>
 
