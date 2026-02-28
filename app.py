@@ -89,6 +89,8 @@ try:
     from routes.cv_routes import cv_bp
 
     app.register_blueprint(cv_bp)
+    # Exempt CV blueprint from CSRF (all POST endpoints are API)
+    csrf.exempt(cv_bp)
     CV_BENCHMARK_AVAILABLE = True
     logger.info("CV Benchmark blueprint registered")
 except ImportError as e:
