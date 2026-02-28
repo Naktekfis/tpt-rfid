@@ -83,12 +83,17 @@ database = DatabaseHandler(app)
 migrate = Migrate(app, db)
 logger.info("PostgreSQL database handler initialized successfully")
 
-# Register blueprints
-app.register_blueprint(cv_bp)
-logger.info("CV Benchmark blueprint registered")
+# Import and register CV Benchmark blueprint (optional, requires opencv)
+try:
+    from routes.cv_routes import cv_bp
 
-# Import blueprints
-from routes.cv_routes import cv_bp
+    app.register_blueprint(cv_bp)
+    logger.info("CV Benchmark blueprint registered")
+except ImportError as e:
+    logger.warning(f"CV Benchmark not available (missing dependencies: {e})")
+    logger.info(
+        "To enable CV Benchmark: pip install opencv-python face-recognition psutil"
+    )
 
 # Initialize MQTT client (mock or real based on MQTT_ENABLED)
 from utils import create_mqtt_client, create_websocket_handler
