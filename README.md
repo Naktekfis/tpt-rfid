@@ -9,17 +9,18 @@ Sistem peminjaman alat workshop berbasis RFID untuk Lab Fabrikasi Teknik Fisika 
 ## Daftar Isi
 
 1. [Fitur](#fitur)
-2. [Arsitektur Sistem](#arsitektur-sistem)
-3. [Arsitektur Proyek](#arsitektur-proyek)
-4. [Setup Otomatis (Recommended)](#setup-otomatis-recommended)
-5. [Setup di Laptop (Development)](#setup-di-laptop-development)
-6. [Setup MQTT & ESP32](#setup-mqtt--esp32)
-7. [Setup di Raspberry Pi (Production)](#setup-di-raspberry-pi-production)
-8. [Seed Data (Opsional)](#seed-data-opsional)
-9. [Cara Penggunaan Aplikasi](#cara-penggunaan-aplikasi)
-10. [Environment Variables](#environment-variables)
-11. [Troubleshooting](#troubleshooting)
-12. [Dokumentasi Lengkap](#dokumentasi-lengkap)
+2. [CV Benchmark (Branch: cvtest)](#cv-benchmark-branch-cvtest)
+3. [Arsitektur Sistem](#arsitektur-sistem)
+4. [Arsitektur Proyek](#arsitektur-proyek)
+5. [Setup Otomatis (Recommended)](#setup-otomatis-recommended)
+6. [Setup di Laptop (Development)](#setup-di-laptop-development)
+7. [Setup MQTT & ESP32](#setup-mqtt--esp32)
+8. [Setup di Raspberry Pi (Production)](#setup-di-raspberry-pi-production)
+9. [Seed Data (Opsional)](#seed-data-opsional)
+10. [Cara Penggunaan Aplikasi](#cara-penggunaan-aplikasi)
+11. [Environment Variables](#environment-variables)
+12. [Troubleshooting](#troubleshooting)
+13. [Dokumentasi Lengkap](#dokumentasi-lengkap)
 
 ---
 
@@ -33,6 +34,70 @@ Sistem peminjaman alat workshop berbasis RFID untuk Lab Fabrikasi Teknik Fisika 
 - **MQTT Integration** — komunikasi real-time dengan ESP32 RFID reader
 - **WebSocket Support** — notifikasi real-time ke web clients
 - **Mock Mode** — simulasi RFID dan MQTT untuk development tanpa hardware
+
+---
+
+## CV Benchmark (Branch: cvtest)
+
+> **⚠️ EXPERIMENTAL FEATURE**  
+> Branch `cvtest` berisi fitur **Computer Vision Benchmark** untuk testing face recognition pada Raspberry Pi 4B.
+
+### Quick Access
+
+```bash
+git checkout cvtest
+```
+
+### Apa itu CV Benchmark?
+
+Modul testing mandiri untuk mengevaluasi performa Computer Vision (face recognition) pada Raspberry Pi:
+- **Live Monitor**: Stream kamera dengan FPS counter dan system stats (CPU, RAM, suhu)
+- **Face Recognition**: Capture foto referensi + live matching realtime (dlib HOG + ResNet)
+- **Multi-resolution**: Test dari 240p sampai 1080p
+
+### Quick Start (Laptop Testing)
+
+```bash
+# 1. Checkout branch
+git checkout cvtest
+
+# 2. Install CV dependencies
+pip install opencv-python face-recognition psutil
+
+# 3. Jalankan Flask (database setup sama seperti main branch)
+python app.py
+
+# 4. Buka browser
+# http://localhost:5000 → Klik "CV Benchmark (Beta)"
+```
+
+**TIDAK BUTUH:**
+- ✗ RFID hardware
+- ✗ MQTT broker
+- ✗ ESP32
+- ✗ Seed data (student/tool)
+
+**HANYA BUTUH:**
+- ✓ Kamera (webcam/laptop camera)
+- ✓ PostgreSQL (minimal setup)
+- ✓ Python dependencies
+
+### Performance Benchmark Results
+
+Expected performance pada **Raspberry Pi 4B (4GB RAM)**:
+
+| Resolusi | Face Rec FPS | CPU Load | Recommendation |
+|----------|--------------|----------|----------------|
+| 240p     | 15-20        | 30-40%   | ⚡ Very fast, low accuracy |
+| 360p     | 12-15        | 40-50%   | ✅ Good balance |
+| **480p** | **8-12**     | **50-65%** | **⭐ RECOMMENDED** |
+| 720p     | 5-8          | 70-85%   | 🔥 High CPU usage |
+| 1080p    | 2-4          | 85-95%   | ❌ Too slow |
+
+### Dokumentasi Lengkap
+
+📖 **[QUICKSTART_CV_BENCHMARK.md](QUICKSTART_CV_BENCHMARK.md)** — Panduan testing step-by-step (laptop & RPi)  
+📖 **[docs/CV_BENCHMARK.md](docs/CV_BENCHMARK.md)** — Dokumentasi teknis lengkap
 
 ---
 
@@ -866,6 +931,12 @@ Dokumentasi detail tersedia di folder `docs/`:
 - **[ESP32_CLIENT_GUIDE.md](docs/ESP32_CLIENT_GUIDE.md)** - Programming ESP32 dengan RFID reader
 - **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Deployment ke Raspberry Pi production
 - **[TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - Troubleshooting guide lengkap
+- **[CV_BENCHMARK.md](docs/CV_BENCHMARK.md)** - 🆕 CV Benchmark technical documentation (branch: cvtest)
+
+### CV Benchmark Quick Links
+
+- **[QUICKSTART_CV_BENCHMARK.md](QUICKSTART_CV_BENCHMARK.md)** - 🚀 Quick start guide untuk testing CV
+- **[CV_INTEGRATION_CHECKLIST.md](CV_INTEGRATION_CHECKLIST.md)** - Checklist integrasi untuk developer
 
 ### Quick Links
 

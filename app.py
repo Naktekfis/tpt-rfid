@@ -83,6 +83,13 @@ database = DatabaseHandler(app)
 migrate = Migrate(app, db)
 logger.info("PostgreSQL database handler initialized successfully")
 
+# Register blueprints
+app.register_blueprint(cv_bp)
+logger.info("CV Benchmark blueprint registered")
+
+# Import blueprints
+from routes.cv_routes import cv_bp
+
 # Initialize MQTT client (mock or real based on MQTT_ENABLED)
 from utils import create_mqtt_client, create_websocket_handler
 
@@ -127,6 +134,7 @@ os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 # Admin authentication via hardcoded hashed PIN
 # PIN: 133133 (hashed with werkzeug scrypt)
 from werkzeug.security import check_password_hash
+
 ADMIN_PIN_HASH = "scrypt:32768:8:1$v6unCJMhmE1m6btB$6cff2d6ce01facfb3b8c13ce4c248175507f02b1ef3d442013ccc2b79d0ae1f12c6aa48ee2051e706e096c05fa2279bccfd4b2e40099f742742fedbb6bc41097"
 
 

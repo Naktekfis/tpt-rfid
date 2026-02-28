@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}CV Benchmark — TPT-RFID{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-950 flex flex-col items-center justify-center px-6">
+
+  <!-- Header -->
+  <div class="text-center mb-12">
+    <div class="inline-flex items-center gap-3 mb-4">
+      <div class="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center">
+        <!-- camera icon -->
+        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z"/>
+        </svg>
+      </div>
+      <h1 class="text-3xl font-bold text-white tracking-tight">CV Benchmark</h1>
+    </div>
+    <p class="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
+      Pengujian performa Computer Vision pada Raspberry Pi 4B.<br>
+      Ukur FPS, load CPU/RAM, dan akurasi face recognition pada berbagai resolusi.
+    </p>
+  </div>
+
+  <!-- Mode cards -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
+
+    <!-- Live Monitor -->
+    <a href="{{ url_for('cv.cv_live') }}"
+       class="group relative bg-gray-900 border border-gray-800 hover:border-violet-500 rounded-2xl p-8
+              flex flex-col items-center gap-4 cursor-pointer transition-all duration-200
+              hover:shadow-[0_0_32px_rgba(139,92,246,0.2)]">
+      <div class="w-16 h-16 rounded-2xl bg-violet-900/50 group-hover:bg-violet-600 transition-colors
+                  flex items-center justify-center">
+        <svg class="w-8 h-8 text-violet-300 group-hover:text-white transition-colors"
+             fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.125 1.125 0 01-1.667-.986V5.653z"/>
+        </svg>
+      </div>
+      <div class="text-center">
+        <h2 class="text-lg font-semibold text-white mb-1">Live Monitor</h2>
+        <p class="text-gray-500 text-sm">Kamera langsung · FPS counter · Resolusi variabel · CPU/RAM/Suhu</p>
+      </div>
+      <span class="absolute top-4 right-4 text-xs text-violet-400 font-mono
+                   opacity-0 group-hover:opacity-100 transition-opacity">→ mulai</span>
+    </a>
+
+    <!-- Face Recognition -->
+    <a href="{{ url_for('cv.cv_face_rec') }}"
+       class="group relative bg-gray-900 border border-gray-800 hover:border-emerald-500 rounded-2xl p-8
+              flex flex-col items-center gap-4 cursor-pointer transition-all duration-200
+              hover:shadow-[0_0_32px_rgba(16,185,129,0.2)]">
+      <div class="w-16 h-16 rounded-2xl bg-emerald-900/50 group-hover:bg-emerald-600 transition-colors
+                  flex items-center justify-center">
+        <svg class="w-8 h-8 text-emerald-300 group-hover:text-white transition-colors"
+             fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M7.5 3.75H6A2.25 2.25 0 003.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0120.25 6v1.5m0 9V18A2.25 2.25 0 0118 20.25h-1.5m-9 0H6A2.25 2.25 0 013.75 18v-1.5M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+      </div>
+      <div class="text-center">
+        <h2 class="text-lg font-semibold text-white mb-1">Face Recognition</h2>
+        <p class="text-gray-500 text-sm">Jepret referensi · Live matching · Similarity score · Retry threshold</p>
+      </div>
+      <span class="absolute top-4 right-4 text-xs text-emerald-400 font-mono
+                   opacity-0 group-hover:opacity-100 transition-opacity">→ mulai</span>
+    </a>
+  </div>
+
+  <!-- Back link -->
+  <a href="{{ url_for('index') }}"
+     class="mt-10 text-sm text-gray-600 hover:text-gray-400 transition-colors">
+    ← Kembali ke beranda
+  </a>
+
+</div>
+{% endblock %}
