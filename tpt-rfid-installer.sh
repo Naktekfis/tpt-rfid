@@ -23,8 +23,26 @@ echo ""
 echo "Installing for user: $CURRENT_USER"
 echo "Home directory:      $USER_HOME"
 echo ""
-echo "This will install everything automatically."
-echo "Estimated time: 30-45 minutes"
+echo "Select installation mode:"
+echo "  1) Standard (main branch) - RFID Tool Monitoring"
+echo "  2) CV Benchmark (cvtest branch) - Face Recognition Testing"
+echo ""
+read -p "Enter choice [1-2]: " INSTALL_MODE
+
+if [ "$INSTALL_MODE" = "2" ]; then
+    BRANCH_NAME="cvtest"
+    INSTALL_CV=true
+    echo ""
+    echo "CV Benchmark mode selected"
+    echo "Estimated time: 45-90 minutes (dlib compilation)"
+else
+    BRANCH_NAME="main"
+    INSTALL_CV=false
+    echo ""
+    echo "Standard mode selected"
+    echo "Estimated time: 30-45 minutes"
+fi
+
 echo ""
 read -p "Press ENTER to start or Ctrl+C to cancel..."
 
@@ -55,6 +73,31 @@ sudo apt install -y \
     chromium-browser \
     x11-xserver-utils \
     unclutter
+
+# CV Benchmark additional dependencies (if selected)
+if [ "$INSTALL_CV" = true ]; then
+    echo ""
+    echo "Installing CV Benchmark build dependencies..."
+    sudo apt install -y \
+        build-essential \
+        cmake \
+        libopenblas-dev \
+        liblapack-dev \
+        libx11-dev \
+        libgtk-3-dev \
+        python3-dev \
+        libavcodec-dev \
+        libavformat-dev \
+        libswscale-dev \
+        libv4l-dev \
+        libxvidcore-dev \
+        libx264-dev \
+        libjpeg-dev \
+        libpng-dev \
+        libtiff-dev \
+        gfortran
+    echo "✓ CV dependencies installed"
+fi
 
 # ===================================
 # 3. SETUP POSTGRESQL
@@ -96,11 +139,16 @@ cd "$USER_HOME"
 if [ -d "tpt-rfid" ]; then
     echo "⚠ Directory exists, pulling latest changes..."
     cd tpt-rfid
-    git pull
+    git fetch --all
+    git checkout "$BRANCH_NAME"
+    git pull origin "$BRANCH_NAME"
 else
     git clone https://github.com/Naktekfis/tpt-rfid.git
     cd tpt-rfid
+    git checkout "$BRANCH_NAME"
 fi
+
+echo "✓ Using branch: $BRANCH_NAME"
 
 # ===================================
 # 5. PYTHON ENVIRONMENT
@@ -119,6 +167,36 @@ python3 -m venv venv
 source venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements.txt
+
+# Install CV Benchmark dependencies (if selected)
+if [ "$INSTALL_CV" = true ]; then
+    echo ""
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "Installing CV Benchmark Python packages..."
+    echo "⚠ This may take 20-30 minutes (compiling dlib)..."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    
+    # Increase swap if needed (RPi optimization)
+    if [ -f /proc/device-tree/model ] && grep -q "Raspberry Pi" /proc/device-tree/model; then
+        echo "Detected Raspberry Pi - checking swap space..."
+        CURRENT_SWAP=$(free -m | awk '/^Swap:/ {print $2}')
+        if [ "$CURRENT_SWAP" -lt 512 ]; then
+            echo "⚠ Increasing swap to 1024MB for compilation..."
+            sudo dphys-swapfile swapoff
+            sudo sed -i 's/CONF_SWAPSIZE=.*/CONF_SWAPSIZE=1024/' /etc/dphys-swapfile
+            sudo dphys-swapfile setup
+            sudo dphys-swapfile swapon
+            echo "✓ Swap increased"
+        fi
+    fi
+    
+    pip install opencv-python
+    pip install psutil
+    pip install dlib  # This takes the longest
+    pip install face-recognition
+    
+    echo "✓ CV Benchmark packages installed"
+fi
 
 # ===================================
 # 6. CONFIGURE ENVIRONMENT
@@ -313,10 +391,22 @@ echo "Service status:"
 sudo systemctl status tpt-rfid --no-pager -l
 echo ""
 echo "═══════════════════════════════════════════════════"
+echo "Branch: $BRANCH_NAME"
 echo "Next steps:"
 echo "  1. Application URL: http://$(hostname -I | awk '{print $1}'):5000"
 echo "  2. Credentials saved in: $USER_HOME/tpt-rfid-credentials.txt"
-echo "  3. Reboot to activate kiosk mode: sudo reboot"
+
+if [ "$INSTALL_CV" = true ]; then
+    echo "  3. CV Benchmark guide: $USER_HOME/tpt-rfid/QUICKSTART_CV_BENCHMARK.md"
+    echo "  4. Access CV Benchmark: http://localhost:5000 → Developer Tools"
+    echo ""
+    echo "Testing:"
+    echo "  - Read: cat $USER_HOME/tpt-rfid/QUICKSTART_CV_BENCHMARK.md"
+    echo "  - Team checklist: cat $USER_HOME/tpt-rfid/TESTING_CV_BENCHMARK.md"
+else
+    echo "  3. Reboot to activate kiosk mode: sudo reboot"
+fi
+
 echo ""
 echo "Commands:"
 echo "  - View logs:     sudo journalctl -u tpt-rfid -f"
