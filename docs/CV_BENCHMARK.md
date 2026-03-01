@@ -96,9 +96,15 @@ python3 -c "import psutil; print('psutil: OK')"
 
 1. Kamera otomatis terbuka saat halaman dimuat
 2. Stream video muncul dengan FPS counter di pojok kanan atas
-3. Sidebar menampilkan stats realtime (CPU, RAM, suhu)
-4. Ganti resolusi menggunakan tombol di top bar
-5. Kembali ke menu utama dengan tombol "← CV Benchmark"
+3. Sidebar menampilkan **3 panel dinamis yang terupdate setiap 1 detik:**
+   - **Panel Resolusi**: Tombol selector untuk mengubah resolusi (240p-1080p)
+   - **Panel Performa**: FPS real-time dan resolusi aktif
+   - **Panel Sistem**: Progress bars untuk CPU, RAM, dan Temperature dengan warnings otomatis
+4. Ganti resolusi dengan klik tombol di Panel Resolusi
+5. Monitor warnings:
+   - **CPU Warning**: Muncul jika CPU usage >90%
+   - **Temperature Warning**: Muncul jika suhu ≥70°C
+6. Kembali ke menu utama dengan tombol "Kembali" di bawah sidebar
 
 ### Face Recognition Workflow
 
@@ -149,6 +155,33 @@ Attempt 3: 0.60 → similarity ≥ 67% needed (lenient)
 **Rekomendasi:** 480p untuk balance antara akurasi dan performa.
 
 ## Troubleshooting
+
+### Stats panel tidak terupdate (menampilkan "—")
+
+**Gejala:** Panel Resolusi, Performa, atau Sistem di `/cv/live` menampilkan "—" dan tidak terupdate
+
+**Penyebab:**
+- JavaScript error atau blocked oleh browser
+- Endpoint `/cv/stats` tidak dapat diakses
+- Browser cache menyimpan versi lama
+
+**Solusi:**
+1. Hard refresh browser (Ctrl+Shift+R atau Cmd+Shift+R) untuk clear cache
+2. Buka Browser Console (F12) dan cek error JavaScript
+3. Test endpoint stats secara manual:
+   ```bash
+   curl http://localhost:5000/cv/stats
+   ```
+4. Jika endpoint gagal, restart service:
+   ```bash
+   sudo systemctl restart tpt-rfid.service
+   ```
+5. Pastikan tidak ada instance gunicorn lain yang menggunakan port 5000:
+   ```bash
+   ps aux | grep gunicorn
+   pkill -9 gunicorn  # Jika perlu
+   sudo systemctl start tpt-rfid.service
+   ```
 
 ### Kamera tidak terbuka
 

@@ -2,293 +2,345 @@
 {% block title %}Live Monitor — CV Benchmark{% endblock %}
 
 {% block content %}
-<style>body { background: #030712 !important; }</style>
-<div class="min-h-screen bg-gray-950 flex flex-col">
+<style>
+  /* Full-width layout without base container padding */
+  body > div > div.container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+</style>
 
-  <!-- Top bar -->
-  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-    <div class="flex items-center gap-3">
-      <a href="{{ url_for('cv.cv_index') }}"
-         class="text-gray-500 hover:text-white transition-colors text-sm">← CV Benchmark</a>
-      <span class="text-gray-700">/</span>
-      <span class="text-white font-semibold text-sm">Live Monitor</span>
+<!-- Main layout -->
+<div class="flex gap-4 p-4 pt-6" style="height: calc(100vh - 100px);">
+
+  <!-- Stream panel -->
+  <div
+    class="flex-1 relative bg-gray-900 rounded-2xl overflow-hidden border border-primary-100 shadow-lg flex items-center justify-center">
+    <img id="stream-img" src="{{ url_for('cv.stream_live') }}" class="w-full h-full object-contain"
+      onerror="showError()" alt="Live feed">
+
+    <!-- Loading -->
+    <div id="stream-placeholder"
+      class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary-50 via-white to-primary-100">
+      <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-100 border-t-primary-600"></div>
+      <p class="text-primary-600 text-sm font-medium">Membuka kamera...</p>
     </div>
 
+    <!-- Error -->
+    <div id="stream-error" class="absolute inset-0 hidden flex-col items-center justify-center gap-3 bg-red-50">
+      <svg class="w-12 h-12 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+      </svg>
+      <p class="text-red-600 text-sm font-semibold">Kamera tidak dapat dibuka</p>
+      <p class="text-primary-400 text-xs text-center max-w-[220px]">Pastikan kamera terhubung dan tidak dipakai aplikasi
+        lain.</p>
+      <button onclick="initCamera()"
+        class="mt-1 px-5 py-2 bg-primary-500 hover:bg-primary-600 text-white text-sm font-semibold rounded-lg transition-colors">
+        Coba lagi
+      </button>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="w-64 flex flex-col gap-3 shrink-0">
+    
     <!-- Resolution selector -->
-    <div class="flex items-center gap-3">
-      <span class="text-gray-500 text-xs">Resolusi:</span>
-      <div id="res-btns" class="flex gap-1">
-        <!-- Populated by JS after /cv/resolutions -->
-        <span class="text-gray-600 text-xs italic">Membuka kamera…</span>
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-4">
+      <p class="text-xs font-bold text-primary-400 uppercase tracking-widest mb-3">Resolusi</p>
+      <div id="res-btns" class="flex flex-wrap gap-1 mb-3"></div>
+      <div id="res-info" class="text-xs text-primary-600"></div>
+    </div>
+
+    <!-- FPS & Resolution Display -->
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-4">
+      <p class="text-xs font-bold text-primary-400 uppercase tracking-widest mb-3">Performa</p>
+      <div class="flex items-end gap-1 mb-2">
+        <span id="fps-val" class="text-4xl font-extrabold text-violet-600 tabular-nums leading-none">—</span>
+        <span class="text-primary-400 text-sm pb-0.5">FPS</span>
+      </div>
+      <div class="text-xs text-primary-600">
+        <span class="text-primary-700 font-semibold">Resolusi aktif:</span>
+        <span id="res-val" class="text-primary-900 font-mono font-bold ml-1">—</span>
       </div>
     </div>
-  </div>
 
-  <!-- Main content -->
-  <div class="flex flex-1 gap-4 p-6">
+    <!-- System Stats -->
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-4">
+      <p class="text-xs font-bold text-primary-400 uppercase tracking-widest mb-3">Sistem</p>
+      
+      <div class="space-y-3">
+        <!-- CPU -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-primary-700 font-semibold">CPU</span>
+            <span id="cpu-val" class="text-primary-900 font-mono font-bold">—%</span>
+          </div>
+          <div class="h-1.5 bg-primary-100 rounded-full overflow-hidden">
+            <div id="cpu-bar" class="h-full bg-violet-500 rounded-full transition-all duration-500" style="width:0%"></div>
+          </div>
+          <p id="cpu-warn" class="hidden text-xs text-red-600 font-semibold mt-1">⚠ CPU tinggi</p>
+        </div>
 
-    <!-- Stream panel -->
-    <div class="flex-1 relative bg-black rounded-2xl overflow-hidden border border-gray-800 flex items-center justify-center">
-      <!-- Camera stream — FPS overlay is baked into the MJPEG frame on server side -->
-      <img id="stream-img" src="{{ url_for('cv.stream_live') }}"
-           class="w-full h-full object-contain"
-           onerror="showError()"
-           alt="Live feed">
+        <!-- RAM -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-primary-700 font-semibold">RAM</span>
+            <span id="ram-val" class="text-primary-900 font-mono font-bold">—%</span>
+          </div>
+          <div class="h-1.5 bg-primary-100 rounded-full overflow-hidden">
+            <div id="ram-bar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width:0%"></div>
+          </div>
+        </div>
 
-      <!-- Overlay: loading state -->
-      <div id="stream-placeholder"
-           class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-950">
-        <div class="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-gray-500 text-sm">Membuka kamera...</p>
+        <!-- Temperature -->
+        <div>
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-primary-700 font-semibold">Suhu</span>
+            <span id="temp-val" class="text-primary-900 font-mono font-bold">—</span>
+          </div>
+          <div class="h-1.5 bg-primary-100 rounded-full overflow-hidden">
+            <div id="temp-bar" class="h-full bg-teal-500 rounded-full transition-all duration-500" style="width:0%"></div>
+          </div>
+          <p id="temp-warn" class="hidden text-xs text-orange-600 font-semibold mt-1">⚠ Suhu tinggi</p>
+        </div>
       </div>
+    </div>
 
-      <!-- Error state -->
-      <div id="stream-error" class="absolute inset-0 hidden flex-col items-center justify-center gap-3 bg-gray-950">
-        <svg class="w-12 h-12 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+    <!-- Back Button -->
+    <div class="mt-auto">
+      <a href="/" class="flex items-center justify-center gap-2 w-full py-3 bg-white hover:bg-primary-50 text-primary-700 border-2 border-primary-200 hover:border-primary-400 font-semibold rounded-xl transition-all text-sm shadow">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
         </svg>
-        <p class="text-red-400 text-sm font-medium">Kamera tidak dapat dibuka</p>
-        <p class="text-gray-600 text-xs text-center max-w-xs">
-          Pastikan kamera terhubung dan tidak dipakai aplikasi lain.
-        </p>
-        <button onclick="initCamera()" class="mt-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm rounded-lg transition-colors">
-          Coba lagi
-        </button>
-      </div>
+        <span>Kembali</span>
+      </a>
     </div>
 
-    <!-- Stats sidebar -->
-    <div class="w-56 flex flex-col gap-3">
-
-      <!-- FPS card (JS-polled from /cv/stats, supplements server-side overlay) -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-gray-500 text-xs uppercase tracking-widest mb-3">Performa Kamera</p>
-        <div class="flex items-end gap-1 mb-1">
-          <span id="fps-val" class="text-4xl font-bold text-violet-400 tabular-nums">—</span>
-          <span class="text-gray-500 text-sm mb-1">FPS</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-gray-500 text-xs">Resolusi:</span>
-          <span id="res-val" class="text-white text-xs font-mono">—</span>
-        </div>
-      </div>
-
-      <!-- System load -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-gray-500 text-xs uppercase tracking-widest mb-3">Load Sistem</p>
-
-        <div class="space-y-3">
-          <!-- CPU -->
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-400">CPU</span>
-              <span id="cpu-val" class="text-white tabular-nums font-mono">—%</span>
-            </div>
-            <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-              <div id="cpu-bar" class="h-full bg-violet-500 rounded-full transition-all duration-500" style="width:0%"></div>
-            </div>
-          </div>
-
-          <!-- RAM -->
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-400">RAM</span>
-              <span id="ram-val" class="text-white tabular-nums font-mono">—%</span>
-            </div>
-            <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-              <div id="ram-bar" class="h-full bg-blue-500 rounded-full transition-all duration-500" style="width:0%"></div>
-            </div>
-          </div>
-
-          <!-- Temp -->
-          <div>
-            <div class="flex justify-between text-xs mb-1">
-              <span class="text-gray-400">Suhu</span>
-              <span id="temp-val" class="text-white tabular-nums font-mono">—°C</span>
-            </div>
-            <div class="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-              <!-- 30°C = cool, 80°C = hot — bar scaled 0–80 -->
-              <div id="temp-bar" class="h-full bg-orange-500 rounded-full transition-all duration-500" style="width:0%"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Warning thresholds -->
-        <p id="temp-warn" class="mt-3 text-xs text-orange-400 hidden">Suhu tinggi</p>
-        <p id="cpu-warn"  class="mt-1 text-xs text-red-400 hidden">CPU overload</p>
-      </div>
-
-      <!-- Resolution info -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-gray-500 text-xs uppercase tracking-widest mb-2">Info Resolusi</p>
-        <div id="res-info" class="text-gray-400 text-xs space-y-1">
-          <p>— Pilih resolusi di atas —</p>
-        </div>
-      </div>
-
-    </div>
   </div>
-
 </div>
 
 <script>
-const RESOLUTION_DIMS = {};   // populated after /cv/resolutions
-let statsInterval = null;
-let cameraReady = false;
+  const RESOLUTION_DIMS = {};
+  let statsInterval = null;
+  let cameraReady = false;
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+  // ─── Camera initialization ──────────────────────────────────────────────────
 
-async function initCamera() {
-  showPlaceholder(true);
-  hideError();
-
-  const openRes = await fetch('/cv/camera/open', { method: 'POST' });
-  const openData = await openRes.json();
-
-  if (!openData.ok) {
-    showError();
-    return;
-  }
-
-  const resRes = await fetch('/cv/resolutions');
-  const resData = await resRes.json();
-
-  Object.assign(RESOLUTION_DIMS, resData.dims);
-  renderResButtons(resData.available, resData.current);
-  cameraReady = true;
-}
-
-// ── Resolution buttons ────────────────────────────────────────────────────────
-
-function renderResButtons(available, current) {
-  const container = document.getElementById('res-btns');
-  container.innerHTML = '';
-  const ALL = ['240p', '360p', '480p', '720p', '1080p'];
-
-  ALL.forEach(label => {
-    const btn = document.createElement('button');
-    btn.textContent = label;
-    btn.dataset.label = label;
-    btn.className = [
-      'px-2.5 py-1 rounded-md text-xs font-mono transition-all',
-      available.includes(label)
-        ? 'text-white bg-gray-800 hover:bg-violet-600 cursor-pointer'
-        : 'text-gray-700 bg-gray-900 cursor-not-allowed opacity-40 line-through'
-    ].join(' ');
-
-    if (label === current) btn.classList.add('!bg-violet-600', 'text-white');
-    if (!available.includes(label)) { btn.disabled = true; }
-
-    btn.addEventListener('click', () => setResolution(label));
-    container.appendChild(btn);
-  });
-
-  updateResInfo(current);
-}
-
-async function setResolution(label) {
-  const res = await fetch('/cv/resolution', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ resolution: label })
-  });
-  const data = await res.json();
-  if (data.ok) {
-    renderResButtons(data.available, data.applied);
-    // Force stream reconnect
-    const img = document.getElementById('stream-img');
-    img.src = '/cv/stream/live?t=' + Date.now();
-  }
-}
-
-function updateResInfo(label) {
-  const info = document.getElementById('res-info');
-  const dims = RESOLUTION_DIMS[label];
-  info.innerHTML = dims
-    ? `<p><span class="text-white font-mono">${label}</span></p>
-       <p>${dims[0]} × ${dims[1]} px</p>`
-    : '<p>—</p>';
-}
-
-// ── Stats polling ─────────────────────────────────────────────────────────────
-
-function startStats() {
-  updateStats();
-  statsInterval = setInterval(updateStats, 1200);
-}
-
-async function updateStats() {
-  try {
-    const res = await fetch('/cv/stats');
-    const d = await res.json();
-
-    // FPS
-    document.getElementById('fps-val').textContent = d.fps.toFixed(1);
-    document.getElementById('res-val').textContent = d.resolution || '—';
-
-    // CPU
-    setBar('cpu-bar', 'cpu-val', d.cpu, '%', d.cpu > 90 ? 'bg-red-500' : 'bg-violet-500');
-    document.getElementById('cpu-warn').classList.toggle('hidden', d.cpu <= 90);
-
-    // RAM
-    setBar('ram-bar', 'ram-val', d.ram, '%', 'bg-blue-500');
-
-    // Temp (display N/A if unavailable)
-    const tempVal = d.temp || 0;
-    const tempText = tempVal > 0 ? `${tempVal}°C` : 'N/A';
-    const tempPct = tempVal > 0 ? Math.min((tempVal / 80) * 100, 100) : 0;
-    setBarRaw('temp-bar', 'temp-val', tempPct, tempText,
-              tempVal >= 70 ? 'bg-red-500' : tempVal >= 60 ? 'bg-orange-500' : 'bg-teal-500');
-    document.getElementById('temp-warn').classList.toggle('hidden', tempVal < 70);
-
-    // Camera open → hide placeholder
-    if (d.camera_open && !cameraReady) {
+  async function initCamera() {
+    showPlaceholder(true); 
+    hideError();
+    
+    try {
+      const r = await fetch('/cv/camera/open', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index: 0 })
+      });
+      const d = await r.json();
+      
+      if (!d.ok) { 
+        showError(); 
+        return; 
+      }
+      
+      const r2 = await fetch('/cv/resolutions');
+      const d2 = await r2.json();
+      Object.assign(RESOLUTION_DIMS, d2.dims);
+      renderResButtons(d2.available, d2.current);
       cameraReady = true;
+      
+      console.log('Camera initialized:', d2);
+    } catch (e) {
+      console.error('Camera init failed:', e);
+      showError();
     }
-    if (d.camera_open) showPlaceholder(false);
+  }
 
-  } catch(e) { /* silent */ }
-}
+  // ─── Resolution controls ────────────────────────────────────────────────────
 
-function setBar(barId, valId, pct, unit, colorClass) {
-  setBarRaw(barId, valId, pct, pct.toFixed(1) + unit, colorClass);
-}
+  function renderResButtons(available, current) {
+    const c = document.getElementById('res-btns');
+    if (!c) return;
+    
+    c.innerHTML = '';
+    ['240p', '360p', '480p', '720p', '1080p'].forEach(label => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.disabled = !available.includes(label);
+      b.className = [
+        'px-2.5 py-1 rounded-md text-xs font-mono font-semibold transition-all',
+        b.disabled
+          ? 'text-primary-300 bg-primary-50 cursor-not-allowed line-through'
+          : label === current
+            ? 'bg-violet-600 text-white shadow-sm'
+            : 'bg-primary-100 text-primary-700 hover:bg-violet-600 hover:text-white cursor-pointer'
+      ].join(' ');
+      
+      if (!b.disabled) {
+        b.addEventListener('click', () => setResolution(label));
+      }
+      c.appendChild(b);
+    });
+    
+    updateResInfo(current);
+  }
 
-function setBarRaw(barId, valId, pct, label, colorClass) {
-  const bar = document.getElementById(barId);
-  bar.style.width = Math.min(pct, 100) + '%';
-  // Reset color classes
-  bar.className = `h-full rounded-full transition-all duration-500 ${colorClass}`;
-  document.getElementById(valId).textContent = label;
-}
+  async function setResolution(label) {
+    try {
+      const r = await fetch('/cv/resolution', {
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resolution: label })
+      });
+      const d = await r.json();
+      
+      renderResButtons(d.available || [], d.applied || d.current || label);
+      
+      if (d.ok) {
+        document.getElementById('stream-img').src = '/cv/stream/live?t=' + Date.now();
+      }
+    } catch (e) {
+      console.error('Resolution change failed:', e);
+    }
+  }
 
-// ── Stream load detection ─────────────────────────────────────────────────────
+  function updateResInfo(label) {
+    const el = document.getElementById('res-info');
+    if (!el) return;
+    
+    const dims = RESOLUTION_DIMS[label];
+    el.innerHTML = dims
+      ? `<p><span class="text-primary-900 font-mono font-bold">${label}</span></p>
+         <p class="mt-0.5">${dims[0]} × ${dims[1]} px</p>`
+      : '<p>—</p>';
+  }
 
-document.getElementById('stream-img').addEventListener('load', () => {
-  showPlaceholder(false);
-});
+  // ─── System stats monitoring ────────────────────────────────────────────────
 
-function showPlaceholder(visible) {
-  document.getElementById('stream-placeholder').style.display = visible ? 'flex' : 'none';
-}
+  function startStats() { 
+    updateStats(); 
+    statsInterval = setInterval(updateStats, 1000); // Update every 1 second
+  }
 
-function showError() {
-  document.getElementById('stream-error').style.display = 'flex';
-  showPlaceholder(false);
-}
+  async function updateStats() {
+    try {
+      const r = await fetch('/cv/stats?_t=' + Date.now());
+      if (!r.ok) throw new Error('Stats fetch failed');
+      
+      const d = await r.json();
+      console.log('Stats received:', d); // DEBUG
+      
+      // Update FPS
+      const fpsEl = document.getElementById('fps-val');
+      if (fpsEl) {
+        fpsEl.textContent = typeof d.fps === 'number' ? d.fps.toFixed(1) : '—';
+        console.log('FPS updated:', fpsEl.textContent);
+      } else {
+        console.error('fps-val element not found!');
+      }
+      
+      // Update resolution
+      const resEl = document.getElementById('res-val');
+      if (resEl) {
+        resEl.textContent = d.resolution || '—';
+        console.log('Resolution updated:', resEl.textContent);
+      } else {
+        console.error('res-val element not found!');
+      }
+      
+      // Update CPU
+      if (typeof d.cpu === 'number') {
+        setBar('cpu-bar', 'cpu-val', d.cpu, '%', d.cpu > 90 ? 'bg-red-500' : 'bg-violet-500');
+        console.log('CPU updated:', d.cpu);
+        const cpuWarn = document.getElementById('cpu-warn');
+        if (cpuWarn) cpuWarn.classList.toggle('hidden', d.cpu <= 90);
+      }
+      
+      // Update RAM
+      if (typeof d.ram === 'number') {
+        setBar('ram-bar', 'ram-val', d.ram, '%', 'bg-blue-500');
+        console.log('RAM updated:', d.ram);
+      }
+      
+      // Update Temperature
+      const tv = d.temp || 0;
+      const tt = tv > 0 ? `${tv.toFixed(1)}°C` : 'N/A';
+      const tp = tv > 0 ? Math.min((tv / 80) * 100, 100) : 0;
+      const tempColor = tv >= 70 ? 'bg-red-500' : tv >= 60 ? 'bg-orange-500' : 'bg-teal-500';
+      setBarRaw('temp-bar', 'temp-val', tp, tt, tempColor);
+      console.log('Temperature updated:', tt, 'width:', tp + '%');
+      
+      const tempWarn = document.getElementById('temp-warn');
+      if (tempWarn) tempWarn.classList.toggle('hidden', tv < 70);
+      
+      // Hide placeholder when camera is ready
+      if (d.camera_open) {
+        showPlaceholder(false);
+      }
+      
+    } catch (e) {
+      console.error('Stats update failed:', e);
+    }
+  }
 
-function hideError() {
-  document.getElementById('stream-error').style.display = 'none';
-}
+  function setBar(barId, valId, percent, unit, colorClass) { 
+    setBarRaw(barId, valId, percent, percent.toFixed(1) + unit, colorClass); 
+  }
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
-initCamera();
-startStats();
+  function setBarRaw(barId, valId, percent, labelText, colorClass) {
+    const barEl = document.getElementById(barId);
+    const valEl = document.getElementById(valId);
+    
+    if (barEl) {
+      barEl.style.width = Math.min(Math.max(percent, 0), 100) + '%';
+      barEl.className = 'h-full rounded-full transition-all duration-500 ' + colorClass;
+    }
+    
+    if (valEl) {
+      valEl.textContent = labelText;
+    }
+  }
 
-// Release camera when navigating away
-window.addEventListener('beforeunload', () => {
-  fetch('/cv/camera/close', { method: 'POST', keepalive: true });
-});
+  // ─── UI helpers ─────────────────────────────────────────────────────────────
+
+  function showPlaceholder(visible) { 
+    const el = document.getElementById('stream-placeholder');
+    if (el) el.style.display = visible ? 'flex' : 'none'; 
+  }
+
+  function showError() { 
+    const errEl = document.getElementById('stream-error');
+    if (errEl) errEl.style.display = 'flex'; 
+    showPlaceholder(false); 
+  }
+
+  function hideError() { 
+    const errEl = document.getElementById('stream-error');
+    if (errEl) errEl.style.display = 'none'; 
+  }
+
+  // ─── Event listeners ────────────────────────────────────────────────────────
+
+  document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM loaded, initializing CV Live page...');
+    
+    const streamImg = document.getElementById('stream-img');
+    if (streamImg) {
+      streamImg.addEventListener('load', () => showPlaceholder(false));
+    }
+    
+    // Initialize after DOM is ready
+    initCamera(); 
+    startStats();
+    
+    console.log('Initialization complete');
+  });
+
+  window.addEventListener('beforeunload', () => { 
+    if (statsInterval) clearInterval(statsInterval);
+    fetch('/cv/camera/close', { method: 'POST', keepalive: true }); 
+  });
 </script>
 {% endblock %}

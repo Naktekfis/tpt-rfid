@@ -51,9 +51,13 @@ git checkout cvtest
 ### Apa itu CV Benchmark?
 
 Modul testing mandiri untuk mengevaluasi performa Computer Vision (face recognition) pada Raspberry Pi:
-- **Live Monitor**: Stream kamera dengan FPS counter dan system stats (CPU, RAM, suhu)
+- **Live Monitor**: Stream kamera dengan dynamic sidebar panels
+  - Panel Resolusi: Selector untuk mengubah resolusi (240p-1080p) dengan status available/disabled
+  - Panel Performa: FPS counter real-time dan resolusi aktif
+  - Panel Sistem: Progress bars untuk CPU, RAM, Temperature dengan auto warnings (CPU >90%, Temp ≥70°C)
 - **Face Recognition**: Capture foto referensi + live matching realtime (dlib HOG + ResNet)
-- **Multi-resolution**: Test dari 240p sampai 1080p
+- **Multi-resolution**: Test dari 240p sampai 1080p dengan auto-probing saat kamera dibuka
+- **Real-time Stats**: Semua metrics terupdate setiap 1 detik via polling `/cv/stats` endpoint
 
 ### Quick Start (Laptop Testing)
 

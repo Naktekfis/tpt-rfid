@@ -2,482 +2,476 @@
 {% block title %}Face Recognition — CV Benchmark{% endblock %}
 
 {% block content %}
-<style>body { background: #030712 !important; }</style>
-<div class="min-h-screen bg-gray-950 flex flex-col">
+<style>
+  /* Full-width layout without base container padding */
+  body > div > div.container {
+    max-width: 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+</style>
 
-  <!-- Top bar -->
-  <div class="flex items-center justify-between px-6 py-4 border-b border-gray-800">
-    <div class="flex items-center gap-3">
-      <a href="{{ url_for('cv.cv_index') }}"
-         class="text-gray-500 hover:text-white transition-colors text-sm">← CV Benchmark</a>
-      <span class="text-gray-700">/</span>
-      <span class="text-white font-semibold text-sm">Face Recognition</span>
+<!-- ══ CAPTURE PHASE ══════════════════════════════════════════════════════ -->
+<div id="phase-capture" class="flex gap-4 p-4 pt-6" style="height: calc(100vh - 100px);">
+
+  <!-- Stream panel (same style as Live Monitor) -->
+  <div
+    class="flex-1 relative bg-gray-900 rounded-2xl overflow-hidden border border-primary-100 shadow-lg flex items-center justify-center">
+    <img id="capture-stream" src="{{ url_for('cv.stream_live') }}" class="w-full h-full object-cover"
+      alt="Preview kamera">
+
+    <!-- Loading -->
+    <div id="capture-placeholder"
+      class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary-50 via-white to-primary-100">
+      <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary-100 border-t-emerald-500"></div>
+      <p class="text-primary-600 text-sm font-medium">Membuka kamera...</p>
     </div>
 
-    <!-- Attempt indicator (hidden until recognition phase) -->
-    <div id="attempt-bar" class="hidden items-center gap-3">
-      <span class="text-gray-500 text-xs">Percobaan:</span>
-      <div class="flex gap-1">
-        <span id="dot-1" class="w-2.5 h-2.5 rounded-full bg-violet-600"></span>
-        <span id="dot-2" class="w-2.5 h-2.5 rounded-full bg-gray-700"></span>
-        <span id="dot-3" class="w-2.5 h-2.5 rounded-full bg-gray-700"></span>
-      </div>
-      <span id="threshold-label" class="text-xs text-gray-500 font-mono">threshold: 0.50</span>
+    <!-- Face guide overlay -->
+    <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+      <div class="w-48 h-56 border-2 border-emerald-400/60 rounded-full"
+        style="box-shadow: 0 0 0 9999px rgba(0,0,0,0.2);"></div>
     </div>
+
+    <!-- FPS badge -->
+    <div id="capture-fps"
+      class="absolute top-3 left-3 bg-black/60 text-emerald-400 text-xs font-mono px-2 py-1 rounded hidden">— FPS</div>
   </div>
 
-  <!-- ══ STEP 1: Capture phase ══════════════════════════════════════════════════ -->
-  <div id="phase-capture" class="flex flex-1 flex-col items-center justify-center gap-8 p-6">
+  <!-- Sidebar (capture) -->
+  <div class="w-56 flex flex-col gap-3 shrink-0">
 
-    <!-- Camera preview for capture -->
-    <div class="relative w-full max-w-2xl aspect-video bg-black rounded-2xl overflow-hidden border border-gray-800">
-      <img id="capture-stream" src="{{ url_for('cv.stream_live') }}"
-           class="w-full h-full object-cover"
-           alt="Preview kamera">
-
-      <!-- Placeholder -->
-      <div id="capture-placeholder"
-           class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gray-950">
-        <div class="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-gray-500 text-sm">Membuka kamera...</p>
-      </div>
-
-      <!-- Face guide overlay (crosshair) -->
-      <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
-        <div class="w-48 h-56 border-2 border-emerald-400/60 rounded-full"></div>
-      </div>
-
-      <!-- FPS corner -->
-      <div id="capture-fps" class="absolute top-3 left-3 bg-black/60 text-emerald-400 text-xs font-mono px-2 py-1 rounded hidden">
-        — FPS
+    <!-- Instructions card -->
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-5">
+      <p class="text-xs font-bold text-primary-400 uppercase tracking-widest mb-3">Panduan</p>
+      <div class="space-y-3">
+        <div class="flex items-start gap-2.5">
+          <span class="text-emerald-500 text-lg shrink-0">1️⃣</span>
+          <p class="text-xs text-primary-700 leading-relaxed">Posisikan wajah Anda dalam oval guide</p>
+        </div>
+        <div class="flex items-start gap-2.5">
+          <span class="text-emerald-500 text-lg shrink-0">2️⃣</span>
+          <p class="text-xs text-primary-700 leading-relaxed">Pastikan pencahayaan cukup</p>
+        </div>
+        <div class="flex items-start gap-2.5">
+          <span class="text-emerald-500 text-lg shrink-0">3️⃣</span>
+          <p class="text-xs text-primary-700 leading-relaxed">Klik tombol untuk capture</p>
+        </div>
       </div>
     </div>
 
-    <!-- Instructions + capture button -->
-    <div class="text-center space-y-3">
-      <p class="text-gray-400 text-sm">Posisikan wajah di dalam lingkaran panduan, lalu tekan tombol.</p>
-      <button id="btn-capture"
-              onclick="captureReference()"
-              class="px-8 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 disabled:opacity-40
-                     disabled:cursor-not-allowed text-white font-semibold rounded-xl
-                     transition-all duration-150 text-base">
-        Ambil Foto Referensi
+    <!-- Capture button -->
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-4">
+      <button id="btn-capture" onclick="captureReference()"
+        class="w-full py-3 bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-all text-sm shadow-lg">
+        📸 Ambil Foto Referensi
       </button>
-      <p id="capture-msg" class="text-red-400 text-sm hidden">—</p>
+      <p id="capture-msg" class="hidden mt-2 text-red-500 text-xs text-center font-medium">—</p>
+    </div>
+
+    <!-- Back Button -->
+    <div class="mt-auto">
+      <a href="/" class="flex items-center justify-center gap-2 w-full py-3 bg-white hover:bg-primary-50 text-primary-700 border-2 border-primary-200 hover:border-primary-400 font-semibold rounded-xl transition-all text-sm shadow">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        <span>Kembali</span>
+      </a>
     </div>
 
   </div>
+</div>
 
-  <!-- ══ STEP 2: Recognition phase ══════════════════════════════════════════════ -->
-  <div id="phase-recognition" class="hidden flex-1 flex gap-4 p-6">
+<!-- ══ RECOGNITION PHASE ═════════════════════════════════════════════════ -->
+<div id="phase-recognition" class="hidden gap-4 p-4 pt-6" style="height: calc(100vh - 100px);">
 
-    <!-- Stream -->
-    <div class="flex-1 relative bg-black rounded-2xl overflow-hidden border border-gray-800 flex items-center justify-center">
-      <img id="rec-stream" src=""   {# set dynamically #}
-           class="w-full h-full object-contain"
-           alt="Live recognition">
+  <!-- Stream panel -->
+  <div
+    class="flex-1 relative bg-gray-900 rounded-2xl overflow-hidden border border-primary-100 shadow-lg flex items-center justify-center">
+    <img id="rec-stream" src="" class="w-full h-full object-contain" alt="Live recognition">
 
-      <!-- Match result overlay — flashes on match/no-match -->
-      <div id="result-overlay"
-           class="absolute inset-0 hidden items-center justify-center pointer-events-none">
-        <div id="result-badge"
-             class="px-8 py-4 rounded-2xl text-2xl font-bold shadow-2xl text-white">
-          —
+    <!-- Match result overlay -->
+    <div id="result-overlay" class="absolute inset-0 hidden items-center justify-center pointer-events-none">
+      <div id="result-badge" class="px-8 py-4 rounded-2xl text-2xl font-extrabold text-white shadow-2xl">—</div>
+    </div>
+
+    <!-- Attempt indicator (top-right) -->
+    <div id="attempt-bar" class="hidden absolute top-3 right-3 bg-black/70 backdrop-blur-sm px-3 py-2 rounded-lg">
+      <div class="flex items-center gap-2">
+        <span class="text-white text-xs font-semibold">Percobaan:</span>
+        <div class="flex gap-1">
+          <div id="dot-1" class="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+          <div id="dot-2" class="w-2.5 h-2.5 rounded-full bg-primary-200"></div>
+          <div id="dot-3" class="w-2.5 h-2.5 rounded-full bg-primary-200"></div>
         </div>
+      </div>
+      <p id="threshold-label" class="text-emerald-400 text-xs font-mono font-bold mt-0.5">threshold: 0.50</p>
+    </div>
+  </div>
+
+  <!-- Sidebar (recognition) -->
+  <div class="w-56 flex flex-col gap-3 shrink-0">
+
+    <!-- Resolution selector -->
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-4">
+      <p class="text-xs font-bold text-primary-400 uppercase tracking-widest mb-3">Resolusi Live</p>
+      <div id="rec-res-btns" class="flex flex-wrap gap-1"></div>
+    </div>
+
+    <!-- FPS + Similarity -->
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-4">
+      <p class="text-xs font-bold text-primary-400 uppercase tracking-widest mb-3">Performa</p>
+      <div class="flex items-end gap-1 mb-3">
+        <span id="rec-fps" class="text-4xl font-extrabold text-emerald-600 tabular-nums leading-none">—</span>
+        <span class="text-primary-400 text-sm pb-0.5">FPS</span>
+      </div>
+
+      <!-- Similarity bar -->
+      <div class="mb-2">
+        <div class="flex justify-between text-xs mb-1">
+          <span class="text-primary-700 font-semibold">Kemiripan</span>
+          <span id="sim-val" class="text-primary-900 font-mono font-bold">—%</span>
+        </div>
+        <div class="h-1.5 bg-primary-100 rounded-full overflow-hidden">
+          <div id="sim-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width:0%">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-between text-xs mb-2">
+        <span class="text-primary-700 font-semibold">Threshold</span>
+        <span id="rec-threshold" class="text-violet-600 font-mono font-bold">—</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-primary-700 font-semibold">Status:</span>
+        <span id="match-badge"
+          class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-primary-100 text-primary-500">Scanning…</span>
       </div>
     </div>
 
-    <!-- Sidebar -->
-    <div class="w-60 flex flex-col gap-3">
-
-      <!-- Resolution selector -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4">
-        <p class="text-gray-500 text-xs uppercase tracking-widest mb-3">Resolusi Live</p>
-        <div id="rec-res-btns" class="flex flex-wrap gap-1">
-          <!-- Populated by JS -->
-        </div>
-      </div>
-
-      <!-- FPS + Recognition stats -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
-        <p class="text-gray-500 text-xs uppercase tracking-widest">Performa</p>
-        <div class="flex items-end gap-1">
-          <span id="rec-fps" class="text-4xl font-bold text-emerald-400 tabular-nums">—</span>
-          <span class="text-gray-500 text-sm mb-1">FPS</span>
-        </div>
+    <!-- System load -->
+    <div class="bg-white rounded-2xl border border-primary-100 shadow p-4">
+      <p class="text-xs font-bold text-primary-400 uppercase tracking-widest mb-3">Load Sistem</p>
+      <div class="space-y-2.5">
         <div>
           <div class="flex justify-between text-xs mb-1">
-            <span class="text-gray-400">Kemiripan</span>
-            <span id="sim-val" class="text-white font-mono">—%</span>
+            <span class="text-primary-700 font-semibold">CPU</span>
+            <span id="r-cpu-val" class="text-primary-900 font-mono font-bold">—%</span>
           </div>
-          <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div id="sim-bar" class="h-full bg-emerald-500 rounded-full transition-all duration-300" style="width:0%"></div>
-          </div>
-        </div>
-        <div class="flex items-center justify-between text-xs">
-          <span class="text-gray-400">Threshold saat ini</span>
-          <span id="rec-threshold" class="text-violet-400 font-mono">—</span>
-        </div>
-        <div class="flex items-center gap-2 pt-1">
-          <span class="text-gray-400 text-xs">Status:</span>
-          <span id="match-badge"
-                class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-800 text-gray-500">
-            Scanning…
-          </span>
-        </div>
-      </div>
-
-      <!-- System load -->
-      <div class="bg-gray-900 border border-gray-800 rounded-xl p-4 space-y-3">
-        <p class="text-gray-500 text-xs uppercase tracking-widest">Load Sistem</p>
-
-        <div>
-          <div class="flex justify-between text-xs mb-1">
-            <span class="text-gray-400">CPU</span>
-            <span id="r-cpu-val" class="text-white font-mono">—%</span>
-          </div>
-          <div class="h-1.5 bg-gray-800 rounded-full">
+          <div class="h-1.5 bg-primary-100 rounded-full overflow-hidden">
             <div id="r-cpu-bar" class="h-full bg-violet-500 rounded-full transition-all" style="width:0%"></div>
           </div>
         </div>
         <div>
           <div class="flex justify-between text-xs mb-1">
-            <span class="text-gray-400">RAM</span>
-            <span id="r-ram-val" class="text-white font-mono">—%</span>
+            <span class="text-primary-700 font-semibold">RAM</span>
+            <span id="r-ram-val" class="text-primary-900 font-mono font-bold">—%</span>
           </div>
-          <div class="h-1.5 bg-gray-800 rounded-full">
+          <div class="h-1.5 bg-primary-100 rounded-full overflow-hidden">
             <div id="r-ram-bar" class="h-full bg-blue-500 rounded-full transition-all" style="width:0%"></div>
           </div>
         </div>
         <div>
           <div class="flex justify-between text-xs mb-1">
-            <span class="text-gray-400">Suhu</span>
-            <span id="r-temp-val" class="text-white font-mono">—°C</span>
+            <span class="text-primary-700 font-semibold">Suhu</span>
+            <span id="r-temp-val" class="text-primary-900 font-mono font-bold">—°C</span>
           </div>
-          <div class="h-1.5 bg-gray-800 rounded-full">
+          <div class="h-1.5 bg-primary-100 rounded-full overflow-hidden">
             <div id="r-temp-bar" class="h-full bg-orange-500 rounded-full transition-all" style="width:0%"></div>
           </div>
         </div>
       </div>
-
-      <!-- Actions -->
-      <div class="flex flex-col gap-2 mt-auto">
-        <button id="btn-retry" onclick="retryRecognition()"
-                class="w-full py-2.5 bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-600/40
-                       text-yellow-400 text-sm font-semibold rounded-xl transition-all hidden">
-          🔄 Retry (threshold lebih longgar)
-        </button>
-        <button onclick="resetToCapture()"
-                class="w-full py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm
-                       rounded-xl transition-all">
-          ↩ Ambil Foto Baru
-        </button>
-      </div>
-
     </div>
-  </div>
 
+    <!-- Actions -->
+    <div class="flex flex-col gap-2">
+      <button id="btn-retry" onclick="retryRecognition()"
+        class="hidden w-full py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-700 text-sm font-bold rounded-xl transition-all">
+        🔄 Retry (threshold lebih longgar)
+      </button>
+      <button onclick="resetToCapture()"
+        class="w-full py-2.5 bg-primary-100 hover:bg-primary-200 text-primary-700 text-sm font-semibold rounded-xl transition-all">
+        ↩ Ambil Foto Baru
+      </button>
+    </div>
+
+    <!-- Back Button -->
+    <div class="mt-auto pt-2">
+      <a href="/" class="flex items-center justify-center gap-2 w-full py-3 bg-white hover:bg-primary-50 text-primary-700 border-2 border-primary-200 hover:border-primary-400 font-semibold rounded-xl transition-all text-sm shadow">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        <span>Kembali</span>
+      </a>
+    </div>
+
+  </div>
 </div>
 
 <script>
-// ── State ─────────────────────────────────────────────────────────────────────
-let phase = 'capture';          // 'capture' | 'recognition'
-let statsInterval = null;
-let matchLoopInterval = null;
-let currentAttempt = 1;
-let consecutiveMatches = 0;
-const MATCH_FRAMES_NEEDED = 3;  // must match N consecutive frames to confirm
+  // ── State ────────────────────────────────────────────────────────────────────
+  let phase = 'capture';
+  let statsInterval = null;
+  let matchLoopInterval = null;
+  let currentAttempt = 1;
+  let consecutiveMatches = 0;
+  const MATCH_FRAMES_NEEDED = 3;
 
-// ── Phase management ─────────────────────────────────────────────────────────
+  // ── Phase management ─────────────────────────────────────────────────────────
 
-async function initCamera() {
-  const res = await fetch('/cv/camera/open', { method: 'POST' });
-  const d = await res.json();
-  if (d.ok) {
-    document.getElementById('capture-placeholder').style.display = 'none';
-    startCaptureStats();
-  }
-}
-
-function showPhase(p) {
-  phase = p;
-  document.getElementById('phase-capture').style.display     = p === 'capture'     ? 'flex' : 'none';
-  document.getElementById('phase-recognition').style.display = p === 'recognition' ? 'flex' : 'none';
-  document.getElementById('attempt-bar').classList.toggle('hidden', p !== 'recognition');
-}
-
-// ── Capture ───────────────────────────────────────────────────────────────────
-
-async function captureReference() {
-  const btn = document.getElementById('btn-capture');
-  const msg = document.getElementById('capture-msg');
-
-  btn.disabled = true;
-  btn.textContent = 'Mengambil foto...';
-  msg.classList.add('hidden');
-
-  const res = await fetch('/cv/capture', { method: 'POST' });
-  const d = await res.json();
-
-  if (d.ok) {
-    enterRecognitionPhase();
-  } else {
-    msg.textContent = d.message;
-    msg.classList.remove('hidden');
-    btn.disabled = false;
-    btn.textContent = 'Ambil Foto Referensi';
-  }
-}
-
-// ── Recognition phase ─────────────────────────────────────────────────────────
-
-async function enterRecognitionPhase() {
-  // Load resolutions
-  const resRes = await fetch('/cv/resolutions');
-  const resData = await resRes.json();
-  renderRecResButtons(resData.available, resData.current);
-
-  // Start stream
-  const img = document.getElementById('rec-stream');
-  img.src = '/cv/stream/recognition?t=' + Date.now();
-
-  showPhase('recognition');
-  clearInterval(statsInterval);
-  startRecStats();
-  startMatchLoop();
-  updateAttemptUI(1, 0.50);
-}
-
-// ── Match polling loop ────────────────────────────────────────────────────────
-// We poll /cv/stats every 800ms. The server does the recognition per-frame.
-// Client accumulates N consecutive positives before declaring COCOK.
-
-function startMatchLoop() {
-  consecutiveMatches = 0;
-  clearInterval(matchLoopInterval);
-  matchLoopInterval = setInterval(checkMatch, 800);
-}
-
-let lastMatchPoll = null;
-
-async function checkMatch() {
-  try {
-    const res = await fetch('/cv/stats');
-    const d = await res.json();
-    if (!d.has_reference) return;
-
-    updateRecStats(d);
-
-    if (d.last_match) {
-      consecutiveMatches++;
-      if (consecutiveMatches >= MATCH_FRAMES_NEEDED) {
-        clearInterval(matchLoopInterval);
-        showMatchResult(true, d.last_similarity);
-      }
-    } else {
-      consecutiveMatches = 0;
+  async function initCamera() {
+    const r = await fetch('/cv/camera/open', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('capture-placeholder').style.display = 'none';
+      startCaptureStats();
     }
-  } catch(e) {}
-}
+  }
 
-// ── Retry logic ───────────────────────────────────────────────────────────────
+  function showPhase(p) {
+    phase = p;
+    document.getElementById('phase-capture').style.display = p === 'capture' ? 'flex' : 'none';
+    document.getElementById('phase-recognition').style.display = p === 'recognition' ? 'flex' : 'none';
+    document.getElementById('attempt-bar').classList.toggle('hidden', p !== 'recognition');
+    if (p === 'recognition') document.getElementById('attempt-bar').classList.add('flex');
+  }
 
-let noMatchTimeout = null;
+  // ── Capture ──────────────────────────────────────────────────────────────────
 
-function scheduleRetryPrompt() {
-  // After 8 seconds of no confirmed match, show retry button
-  clearTimeout(noMatchTimeout);
-  noMatchTimeout = setTimeout(() => {
-    if (phase === 'recognition' && currentAttempt <= 3) {
+  async function captureReference() {
+    const btn = document.getElementById('btn-capture');
+    const msg = document.getElementById('capture-msg');
+    btn.disabled = true;
+    btn.textContent = 'Mengambil foto...';
+    msg.classList.add('hidden');
+
+    const r = await fetch('/cv/capture', { method: 'POST' });
+    const d = await r.json();
+
+    if (d.ok) {
+      enterRecognitionPhase();
+    } else {
+      msg.textContent = d.message;
+      msg.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = '📸 Ambil Foto Referensi';
+    }
+  }
+
+  // ── Recognition phase ────────────────────────────────────────────────────────
+
+  async function enterRecognitionPhase() {
+    const r = await fetch('/cv/resolutions');
+    const d = await r.json();
+    renderRecResButtons(d.available, d.current);
+
+    document.getElementById('rec-stream').src = '/cv/stream/recognition?t=' + Date.now();
+    showPhase('recognition');
+    clearInterval(statsInterval);
+    startRecStats();
+    startMatchLoop();
+    updateAttemptUI(1, 0.50);
+  }
+
+  // ── Match polling ────────────────────────────────────────────────────────────
+
+  function startMatchLoop() {
+    consecutiveMatches = 0;
+    clearInterval(matchLoopInterval);
+    matchLoopInterval = setInterval(checkMatch, 800);
+  }
+
+  async function checkMatch() {
+    try {
+      const r = await fetch('/cv/stats');
+      const d = await r.json();
+      if (!d.has_reference) return;
+      updateRecStats(d);
+      if (d.last_match) {
+        consecutiveMatches++;
+        if (consecutiveMatches >= MATCH_FRAMES_NEEDED) {
+          clearInterval(matchLoopInterval);
+          showMatchResult(true, d.last_similarity);
+        }
+      } else { consecutiveMatches = 0; }
+    } catch (e) { }
+  }
+
+  // ── Retry logic ──────────────────────────────────────────────────────────────
+
+  let noMatchTimeout = null;
+
+  function scheduleRetryPrompt() {
+    clearTimeout(noMatchTimeout);
+    noMatchTimeout = setTimeout(() => {
+      if (phase === 'recognition' && currentAttempt <= 3) {
+        document.getElementById('btn-retry').classList.remove('hidden');
+      }
+    }, 8000);
+  }
+
+  async function retryRecognition() {
+    if (currentAttempt >= 3) return;
+    const r = await fetch('/cv/retry', { method: 'POST' });
+    const d = await r.json();
+    currentAttempt = d.attempt;
+    consecutiveMatches = 0;
+
+    updateAttemptUI(d.attempt, d.threshold);
+    document.getElementById('btn-retry').classList.add('hidden');
+    document.getElementById('match-badge').textContent = 'Scanning…';
+    document.getElementById('match-badge').className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-primary-100 text-primary-500';
+
+    if (currentAttempt >= 3) {
+      document.getElementById('btn-retry').disabled = true;
+      document.getElementById('btn-retry').textContent = '(Percobaan terakhir)';
       document.getElementById('btn-retry').classList.remove('hidden');
     }
-  }, 8000);
-}
 
-async function retryRecognition() {
-  if (currentAttempt >= 3) {
-    // Max retries reached, force final check
-    return;
-  }
-  const res = await fetch('/cv/retry', { method: 'POST' });
-  const d = await res.json();
-  currentAttempt = d.attempt;
-  consecutiveMatches = 0;
-
-  updateAttemptUI(d.attempt, d.threshold);
-  document.getElementById('btn-retry').classList.add('hidden');
-  document.getElementById('match-badge').textContent = 'Scanning…';
-  document.getElementById('match-badge').className =
-    'text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-800 text-gray-500';
-
-  if (currentAttempt >= 3) {
-    // Last attempt: disable retry button permanently
-    document.getElementById('btn-retry').disabled = true;
-    document.getElementById('btn-retry').textContent = '(Percobaan terakhir)';
-    document.getElementById('btn-retry').classList.remove('hidden');
+    clearInterval(matchLoopInterval);
+    startMatchLoop();
+    scheduleRetryPrompt();
   }
 
-  clearInterval(matchLoopInterval);
-  startMatchLoop();
-  scheduleRetryPrompt();
-}
+  function showMatchResult(matched, similarity) {
+    clearTimeout(noMatchTimeout);
+    document.getElementById('btn-retry').classList.add('hidden');
+    const overlay = document.getElementById('result-overlay');
+    const badge = document.getElementById('result-badge');
+    const chip = document.getElementById('match-badge');
 
-function showMatchResult(matched, similarity) {
-  clearTimeout(noMatchTimeout);
-  document.getElementById('btn-retry').classList.add('hidden');
-
-  const overlay = document.getElementById('result-overlay');
-  const badge   = document.getElementById('result-badge');
-
-  if (matched) {
-    badge.className = 'px-8 py-4 rounded-2xl text-2xl font-bold shadow-2xl text-white bg-emerald-600/90';
-    badge.textContent = `MATCH  ${(similarity*100).toFixed(0)}%`;
-    document.getElementById('match-badge').textContent = 'MATCH';
-    document.getElementById('match-badge').className =
-      'text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-900 text-emerald-400';
-  } else {
-    badge.className = 'px-8 py-4 rounded-2xl text-2xl font-bold shadow-2xl text-white bg-red-700/90';
-    badge.textContent = 'NO MATCH';
-    document.getElementById('match-badge').textContent = 'NO MATCH';
-    document.getElementById('match-badge').className =
-      'text-xs font-semibold px-2 py-0.5 rounded-full bg-red-900 text-red-400';
+    if (matched) {
+      badge.className = 'px-8 py-4 rounded-2xl text-2xl font-extrabold text-white shadow-2xl bg-emerald-500';
+      badge.textContent = `MATCH  ${(similarity * 100).toFixed(0)}%`;
+      chip.textContent = 'MATCH ✓';
+      chip.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-600';
+    } else {
+      badge.className = 'px-8 py-4 rounded-2xl text-2xl font-extrabold text-white shadow-2xl bg-red-500';
+      badge.textContent = 'NO MATCH';
+      chip.textContent = 'NO MATCH';
+      chip.className = 'text-xs font-bold px-2.5 py-0.5 rounded-full bg-red-100 text-red-600';
+    }
+    overlay.style.display = 'flex';
+    setTimeout(() => overlay.style.display = 'none', 2500);
   }
 
-  overlay.style.display = 'flex';
-  setTimeout(() => overlay.style.display = 'none', 2500);
-}
+  // ── Attempt UI ───────────────────────────────────────────────────────────────
 
-// ── Attempt UI ────────────────────────────────────────────────────────────────
-
-function updateAttemptUI(attempt, threshold) {
-  currentAttempt = attempt;
-  [1, 2, 3].forEach(i => {
-    const dot = document.getElementById('dot-' + i);
-    dot.className = i <= attempt
-      ? 'w-2.5 h-2.5 rounded-full bg-violet-500'
-      : 'w-2.5 h-2.5 rounded-full bg-gray-700';
-  });
-  document.getElementById('threshold-label').textContent = `threshold: ${threshold.toFixed(2)}`;
-  document.getElementById('rec-threshold').textContent = threshold.toFixed(2);
-}
-
-// ── Resolution buttons (recognition phase) ────────────────────────────────────
-
-function renderRecResButtons(available, current) {
-  const container = document.getElementById('rec-res-btns');
-  container.innerHTML = '';
-  ['240p','360p','480p','720p','1080p'].forEach(label => {
-    const btn = document.createElement('button');
-    btn.textContent = label;
-    btn.className = [
-      'px-2 py-1 rounded text-xs font-mono transition-all',
-      available.includes(label)
-        ? 'text-white bg-gray-800 hover:bg-emerald-700'
-        : 'text-gray-700 bg-gray-900 cursor-not-allowed opacity-40 line-through'
-    ].join(' ');
-    if (label === current) btn.classList.add('!bg-emerald-700', 'text-white');
-    if (!available.includes(label)) btn.disabled = true;
-    btn.addEventListener('click', async () => {
-      const res = await fetch('/cv/resolution', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resolution: label })
-      });
-      const d = await res.json();
-      if (d.ok) {
-        renderRecResButtons(d.available, d.applied);
-        // Force stream reconnect
-        const img = document.getElementById('rec-stream');
-        img.src = '/cv/stream/recognition?t=' + Date.now();
-      }
+  function updateAttemptUI(attempt, threshold) {
+    currentAttempt = attempt;
+    [1, 2, 3].forEach(i => {
+      document.getElementById('dot-' + i).className =
+        'w-2.5 h-2.5 rounded-full ' + (i <= attempt ? 'bg-emerald-500' : 'bg-primary-200');
     });
-    container.appendChild(btn);
-  });
-}
-
-// ── Stats ─────────────────────────────────────────────────────────────────────
-
-function startCaptureStats() {
-  statsInterval = setInterval(async () => {
-    try {
-      const res = await fetch('/cv/stats');
-      const d = await res.json();
-      const el = document.getElementById('capture-fps');
-      el.textContent = d.fps.toFixed(1) + ' FPS';
-      el.classList.remove('hidden');
-    } catch(e) {}
-  }, 1000);
-}
-
-function startRecStats() {
-  statsInterval = setInterval(updateRecStats, 1200);
-  scheduleRetryPrompt();
-}
-
-function updateRecStats(d_override) {
-  async function _update(d) {
-    document.getElementById('rec-fps').textContent = d.fps.toFixed(1);
-
-    const sim = d.last_similarity;
-    document.getElementById('sim-val').textContent = sim.toFixed(1) + '%';
-    const simBar = document.getElementById('sim-bar');
-    simBar.style.width = sim + '%';
-    simBar.className = `h-full rounded-full transition-all duration-300 ${
-      sim >= 70 ? 'bg-emerald-500' : sim >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-    }`;
-
-    // System
-    setBar2('r-cpu-bar','r-cpu-val', d.cpu,'%', d.cpu>90?'bg-red-500':'bg-violet-500');
-    setBar2('r-ram-bar','r-ram-val', d.ram,'%','bg-blue-500');
-    const tempPct = Math.min((d.temp/80)*100,100);
-    setBar2raw('r-temp-bar','r-temp-val', tempPct, d.temp+'°C',
-               d.temp>=70?'bg-red-500':d.temp>=60?'bg-orange-500':'bg-teal-500');
+    document.getElementById('threshold-label').textContent = `threshold: ${threshold.toFixed(2)}`;
+    document.getElementById('rec-threshold').textContent = threshold.toFixed(2);
   }
 
-  if (d_override) { _update(d_override); return; }
-  fetch('/cv/stats').then(r => r.json()).then(_update).catch(()=>{});
-}
+  // ── Resolution buttons ───────────────────────────────────────────────────────
 
-function setBar2(barId, valId, pct, unit, cls) {
-  setBar2raw(barId, valId, pct, pct.toFixed(1)+unit, cls);
-}
-function setBar2raw(barId, valId, pct, label, cls) {
-  document.getElementById(barId).style.width = Math.min(pct,100)+'%';
-  document.getElementById(barId).className = `h-full rounded-full transition-all ${cls}`;
-  document.getElementById(valId).textContent = label;
-}
+  function renderRecResButtons(available, current) {
+    const c = document.getElementById('rec-res-btns');
+    c.innerHTML = '';
+    ['240p', '360p', '480p', '720p', '1080p'].forEach(label => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.disabled = !available.includes(label);
+      b.className = [
+        'px-2.5 py-1 rounded-md text-xs font-mono font-semibold transition-all',
+        b.disabled
+          ? 'text-primary-300 bg-primary-50 cursor-not-allowed line-through'
+          : label === current
+            ? 'bg-emerald-600 text-white shadow-sm'
+            : 'bg-primary-100 text-primary-700 hover:bg-emerald-600 hover:text-white cursor-pointer'
+      ].join(' ');
+      b.addEventListener('click', () => setRecResolution(label));
+      c.appendChild(b);
+    });
+  }
 
-// ── Reset ─────────────────────────────────────────────────────────────────────
+  async function setRecResolution(label) {
+    const r = await fetch('/cv/resolution', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolution: label })
+    });
+    const d = await r.json();
+    renderRecResButtons(d.available || [], d.applied || d.current || label);
+    if (d.ok) document.getElementById('rec-stream').src = '/cv/stream/recognition?t=' + Date.now();
+  }
 
-async function resetToCapture() {
-  clearInterval(matchLoopInterval);
-  clearInterval(statsInterval);
-  clearTimeout(noMatchTimeout);
+  // ── Stats ────────────────────────────────────────────────────────────────────
 
-  await fetch('/cv/reset', { method: 'POST' });
+  function startCaptureStats() {
+    statsInterval = setInterval(async () => {
+      try {
+        const r = await fetch('/cv/stats'); const d = await r.json();
+        const el = document.getElementById('capture-fps');
+        el.textContent = d.fps.toFixed(1) + ' FPS';
+        el.classList.remove('hidden');
+      } catch (e) { }
+    }, 1000);
+  }
 
-  // Restart capture stream
-  document.getElementById('capture-stream').src = '/cv/stream/live?t=' + Date.now();
-  document.getElementById('capture-placeholder').style.display = 'none';
-  document.getElementById('capture-msg').classList.add('hidden');
-  document.getElementById('btn-capture').disabled = false;
-  document.getElementById('btn-capture').textContent = '📸 Ambil Foto Referensi';
-  document.getElementById('btn-retry').classList.add('hidden');
-  document.getElementById('btn-retry').disabled = false;
+  function startRecStats() {
+    statsInterval = setInterval(updateRecStats, 1200);
+    scheduleRetryPrompt();
+  }
 
-  currentAttempt = 1;
-  consecutiveMatches = 0;
+  function updateRecStats(d_override) {
+    function _update(d) {
+      document.getElementById('rec-fps').textContent = d.fps.toFixed(1);
+      const sim = d.last_similarity;
+      document.getElementById('sim-val').textContent = sim.toFixed(1) + '%';
+      const sb = document.getElementById('sim-bar');
+      sb.style.width = sim + '%';
+      sb.className = 'h-full rounded-full transition-all duration-300 ' +
+        (sim >= 70 ? 'bg-emerald-500' : sim >= 50 ? 'bg-yellow-500' : 'bg-red-500');
+
+      setBar('r-cpu-bar', 'r-cpu-val', d.cpu, '%', d.cpu > 90 ? 'bg-red-500' : 'bg-violet-500');
+      setBar('r-ram-bar', 'r-ram-val', d.ram, '%', 'bg-blue-500');
+      const tp = Math.min((d.temp / 80) * 100, 100);
+      setBarRaw('r-temp-bar', 'r-temp-val', tp, d.temp + '°C', d.temp >= 70 ? 'bg-red-500' : d.temp >= 60 ? 'bg-orange-500' : 'bg-teal-500');
+    }
+    if (d_override) { _update(d_override); return; }
+    fetch('/cv/stats').then(r => r.json()).then(_update).catch(() => { });
+  }
+
+  function setBar(b, v, p, u, c) { setBarRaw(b, v, p, p.toFixed(1) + u, c); }
+  function setBarRaw(b, v, p, l, c) {
+    const el = document.getElementById(b);
+    el.style.width = Math.min(p, 100) + '%';
+    el.className = 'h-full rounded-full transition-all ' + c;
+    document.getElementById(v).textContent = l;
+  }
+
+  // ── Reset ────────────────────────────────────────────────────────────────────
+
+  async function resetToCapture() {
+    clearInterval(matchLoopInterval);
+    clearInterval(statsInterval);
+    clearTimeout(noMatchTimeout);
+    await fetch('/cv/reset', { method: 'POST' });
+
+    document.getElementById('capture-stream').src = '/cv/stream/live?t=' + Date.now();
+    document.getElementById('capture-placeholder').style.display = 'none';
+    document.getElementById('capture-msg').classList.add('hidden');
+    document.getElementById('btn-capture').disabled = false;
+    document.getElementById('btn-capture').textContent = '📸 Ambil Foto Referensi';
+    document.getElementById('btn-retry').classList.add('hidden');
+    document.getElementById('btn-retry').disabled = false;
+    currentAttempt = 1;
+    consecutiveMatches = 0;
+    showPhase('capture');
+    startCaptureStats();
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────────
   showPhase('capture');
-  startCaptureStats();
-}
-
-// ── Boot ──────────────────────────────────────────────────────────────────────
-showPhase('capture');
-initCamera();
-
-window.addEventListener('beforeunload', () => {
-  fetch('/cv/reset',        { method: 'POST', keepalive: true });
-  fetch('/cv/camera/close', { method: 'POST', keepalive: true });
-});
+  initCamera();
+  window.addEventListener('beforeunload', () => {
+    fetch('/cv/reset', { method: 'POST', keepalive: true });
+    fetch('/cv/camera/close', { method: 'POST', keepalive: true });
+  });
 </script>
 {% endblock %}
