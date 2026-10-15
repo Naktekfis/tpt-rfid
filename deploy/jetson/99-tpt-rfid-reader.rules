@@ -1,0 +1,6 @@
+# HW-VX6336 USB UHF reader -> stable name /dev/rfid-reader
+# The vendor bundle ships both CP210x and CH340 drivers, so match either
+# bridge. Check the real one with `lsusb` and delete the other line.
+# Note: any other CP210x/CH340 device on this board would match too.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="rfid-reader", GROUP="dialout", MODE="0660"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="rfid-reader", GROUP="dialout", MODE="0660"

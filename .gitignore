@@ -80,3 +80,6 @@ RFID HW/
 *.db
 *.db-wal
 *.db-shm
+
+# deploy/jetson/install.sh DRY_RUN output
+build/

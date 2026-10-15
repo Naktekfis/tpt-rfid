@@ -8,7 +8,7 @@
 - `app.py` is a monolith: it builds the app at import time (config, Mail, CSRF, rate limiter, DB, MQTT/WebSocket clients) and holds every page and `/api/*` route. `config.py` (`get_config()`) reads `.env`.
 - `utils/`: `models.py` (`Student`, `Tool`, `Transaction`; student photos are stored as bytes in the DB), `database_handler.py` (`DatabaseHandler`, all queries), `mqtt_client.py` / `websocket_handler.py` (Mock and Real classes behind `create_*` factories), `vx6336.py` (pure reader protocol: frames, CRC, inventory parsing), `rfid_reader.py` (`RFIDReaderMock` / `VX6336Reader` serial thread with debounce behind `create_rfid_reader`; pages poll its current UID via `/api/check_rfid`, `RFID_READER_ENABLED`/`RFID_READER_PORT` in `.env`), `helpers.py` (validation, WIB time helpers), `cv_handler.py` (camera + face recognition).
 - `routes/cv_routes.py` is the only blueprint (`cv_bp`, `/cv`): the experimental CV benchmark on branch `cvtest`. It is registered only if its imports succeed, and it is CSRF-exempt.
-- `templates/<page>.html` pairs with `static/js/<page>.js`. `docs/` holds deployment/MQTT/ESP32 guides; `scripts/` holds Mosquitto and DB shell tooling. `migrations/` (Alembic) exists locally but is gitignored.
+- `templates/<page>.html` pairs with `static/js/<page>.js`. `deploy/jetson/` holds the Jetson bring-up (`install.sh` with `DRY_RUN=1`, systemd units, udev rule, kiosk autostart, `backup_db.py`); `docs/` holds older deployment/MQTT/ESP32 guides; `scripts/` holds Mosquitto and DB shell tooling. `migrations/` (Alembic) exists locally but is gitignored.
 
 ## Commands
 - Run (dev): `.venv/bin/python app.py` (port 5000). `start-app.sh` uses `.venv/` if present, else `venv/` (the installer's).

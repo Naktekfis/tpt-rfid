@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily TPT RFID database backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+# Run at the next boot if the kiosk was off at 03:00.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

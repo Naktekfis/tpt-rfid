@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=TPT RFID Kiosk
+Exec=@APP_DIR@/deploy/jetson/kiosk.sh
+X-GNOME-Autostart-enabled=true

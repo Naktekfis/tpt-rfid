@@ -1,0 +1,18 @@
+# Rendered by deploy/jetson/install.sh (@USER@, @APP_DIR@ are replaced).
+[Unit]
+Description=TPT RFID tool borrowing kiosk (Flask)
+After=network.target
+
+[Service]
+Type=simple
+User=@USER@
+SupplementaryGroups=dialout
+WorkingDirectory=@APP_DIR@
+# The app reads .env itself (python-dotenv).
+ExecStart=@APP_DIR@/.venv/bin/gunicorn --workers 1 --threads 4 --timeout 60 --bind @BIND@ app:app
+# One worker only: SQLite plus the reader thread must live in one process.
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

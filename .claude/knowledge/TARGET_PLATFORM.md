@@ -14,6 +14,9 @@ Lines marked *(verify on device)* come from general knowledge of JetPack 4.6.x a
 ## App shell (desktop wrapper)
 The user wants something light: a web app, possibly wrapped. Recommendation for this board: **run Flask locally and open it in a browser in kiosk mode** (`chromium-browser --kiosk http://127.0.0.1:5000` or Firefox kiosk). It adds no extra runtime. Electron bundles its own Chromium (hundreds of MB of RAM), and recent releases may not support glibc 2.27 *(verify)*. Tauri v2 needs webkit2gtk-4.1, which Ubuntu 18.04 does not ship *(verify)*. Revisit a wrapper only if kiosk mode lacks something concrete.
 
+## Bring-up files
+`deploy/jetson/` (see its README): installer, systemd service + daily backup timer, udev rule, kiosk autostart. Written before the device was available; its README lists what still needs checking on the device.
+
 ## Device checks to run first
 ```bash
 cat /etc/nv_tegra_release; uname -a; lsb_release -a
