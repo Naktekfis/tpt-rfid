@@ -7,9 +7,13 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Check if venv exists
-if [ ! -d "venv" ]; then
-    echo "❌ Virtual environment not found!"
+# Use .venv (dev) if present, else venv (installer/setup.sh)
+if [ -d ".venv" ]; then
+    VENV_DIR=".venv"
+elif [ -d "venv" ]; then
+    VENV_DIR="venv"
+else
+    echo "❌ Virtual environment not found (.venv or venv)!"
     echo "Please run tpt-rfid-installer.sh first"
     exit 1
 fi
@@ -22,7 +26,7 @@ if [ ! -f ".env" ]; then
 fi
 
 # Activate venv
-source venv/bin/activate
+source "$VENV_DIR/bin/activate"
 
 # Check which branch
 CURRENT_BRANCH=$(git branch --show-current)

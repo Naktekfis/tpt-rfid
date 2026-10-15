@@ -11,7 +11,7 @@
 - `templates/<page>.html` pairs with `static/js/<page>.js`. `docs/` holds deployment/MQTT/ESP32 guides; `scripts/` holds Mosquitto and DB shell tooling. `migrations/` (Alembic) exists locally but is gitignored.
 
 ## Commands
-- Run (dev): `.venv/bin/python app.py` (port 5000). `start-app.sh` expects `venv/`, not `.venv/`.
+- Run (dev): `.venv/bin/python app.py` (port 5000). `start-app.sh` uses `.venv/` if present, else `venv/` (the installer's).
 - Quick check after Python edits: `ruff check .` and `.venv/bin/python -m py_compile app.py config.py utils/*.py routes/*.py`
 - Tests: .venv/bin/python -m pytest -q (tests/, SQLite in-memory, CSRF+limiter off). Full check: scripts/check.sh; `PY38=<py38 python> scripts/check.sh` also runs tests on 3.8. scripts/test_mqtt_*.{py,sh} are manual broker checks.
 
@@ -24,6 +24,6 @@
 ## Runtime Gotchas
 - `MQTT_ENABLED` / `WEBSOCKET_ENABLED` default to false, which selects the mock classes; MQTT needs `requirements-mqtt.txt`.
 - CSRF is on for all POSTs except `cv_bp`; JS must send the token.
-- The rate limiter is in-memory and per IP (200/day, 50/hour); a kiosk is a single IP.
+- The rate limiter is in-memory and per IP with no global default (a kiosk is one IP that polls every second); only routes with an explicit `@limiter.limit` are limited.
 - `face_recognition` (dlib) is imported lazily because it takes seconds to load; CV deps are optional.
 - Timestamps are stored in UTC and shown in WIB through `utils/helpers.py`.

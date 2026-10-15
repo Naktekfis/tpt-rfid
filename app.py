@@ -70,11 +70,13 @@ logger.info(f"Flask-Mail configured with server: {app.config['MAIL_SERVER']}")
 csrf = CSRFProtect(app)
 logger.info("CSRF Protection enabled")
 
-# Initialize rate limiter (defaults: 200/day, 50/hour per IP)
+# Rate limiter: no global default. A kiosk is a single IP that polls
+# /api/check_rfid every second (and /cv/* faster), so a per-IP default
+# limit would lock the UI within a minute. Only the routes with an
+# explicit @limiter.limit (login, register, borrow/return, email) are limited.
 limiter = Limiter(
     get_remote_address,
     app=app,
-    default_limits=["200 per day", "50 per hour"],
     storage_uri="memory://",
 )
 
