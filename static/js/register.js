@@ -5,6 +5,20 @@
 
 let rfidPollInterval;
 let currentRFID = null;
+let rfidBusy = false;     // a card lookup is in flight
+let submitting = false;
+
+function postJSON(url, body) {
+    return fetchJSON(url, {
+        method: 'POST',
+        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body)
+    });
+}
+
+function clearRFIDState() {
+    return postJSON('/api/rfid/clear', {});
+}
 
 document.addEventListener('DOMContentLoaded', function () {
     console.log('Registration page loaded');
@@ -43,8 +57,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Start RFID polling
-    startRFIDPolling();
+    // Start from a clean reader state so a card or tag from a previous page
+    // is not pre-filled, then poll.
+    clearRFIDState().catch(() => {}).finally(startRFIDPolling);
 
     // Form submission
     form.addEventListener('submit', function (e) {
@@ -99,8 +114,8 @@ function stopRFIDPolling() {
  * Check for RFID card
  */
 function checkRFID() {
-    fetch('/api/check_rfid')
-        .then(response => response.json())
+    if (rfidBusy || submitting) return;
+    fetchJSON('/api/check_rfid')
         .then(data => {
             if (data.success && data.detected && data.uid) {
                 // Card detected
@@ -116,60 +131,66 @@ function checkRFID() {
 }
 
 /**
- * Handle RFID card detected
+ * Handle a tapped card. A card that already belongs to a student or a tool is
+ * rejected right away instead of after the whole form is typed. Tapping
+ * another card replaces the UID.
  */
-function onRFIDDetected(uid) {
-    const rfidIndicator = document.getElementById('rfid-indicator');
-    const rfidStatus = document.getElementById('rfid-status');
-    const rfidIcon = document.getElementById('rfid-icon');
-    const rfidUidDisplay = document.getElementById('rfid-uid-display');
-    const rfidUidText = document.getElementById('rfid-uid-text');
-    const rfidUidInput = document.getElementById('rfid_uid');
-
-    // Update UI only if UID changed
-    if (currentRFID !== uid) {
-        currentRFID = uid;
-
-        // Update indicator
-        rfidIndicator.classList.remove('border-gray-300');
-        rfidIndicator.classList.add('border-blue-500', 'bg-blue-50');
-
-        // Update icon color
-        rfidIcon.classList.remove('text-gray-400');
-        rfidIcon.classList.add('text-blue-500');
-
-        // Update status
-        rfidStatus.textContent = 'Kartu terdeteksi!';
-        rfidStatus.classList.remove('text-gray-600');
-        rfidStatus.classList.add('text-blue-600');
-
-        // Show UID
-        rfidUidDisplay.classList.remove('hidden');
-        rfidUidText.textContent = uid;
-        rfidUidInput.value = uid;
-
-        // Check form validity
-        checkFormValidity();
-
-        console.log('RFID detected:', uid);
+async function onRFIDDetected(uid) {
+    if (uid === currentRFID) return;
+    rfidBusy = true;
+    try {
+        const [studentRes, toolRes] = await Promise.all([
+            postJSON('/api/scan_student', { rfid_uid: uid }),
+            postJSON('/api/scan_tool', { rfid_uid: uid }),
+        ]);
+        if (studentRes.success) {
+            setRFIDStatus('Kartu ini sudah terdaftar. Gunakan kartu lain atau langsung pinjam alat.', 'error');
+        } else if (toolRes.success) {
+            setRFIDStatus('Ini tag alat, bukan KTM. Tap KTM Anda.', 'error');
+        } else {
+            acceptRFID(uid);
+        }
+        // Handled: clear so the next tap is a new event.
+        await clearRFIDState().catch(() => {});
+    } catch (error) {
+        console.error('Error checking card:', error);
+        setRFIDStatus('Gagal memeriksa kartu. Coba tap lagi.', 'error');
+    } finally {
+        rfidBusy = false;
     }
 }
 
-/**
- * Handle RFID card removed
- * Once an RFID UID has been detected for registration, we keep the UID value
- * so the user can continue filling the form. Only the visual indicator updates.
- */
-function onRFIDRemoved() {
-    // If no RFID was ever detected, nothing to do
-    if (currentRFID === null) return;
-
-    // Keep currentRFID and rfid_uid input intact — the user is filling the form.
-    // Only update the visual indicator to show the card was physically removed,
-    // but do NOT clear the UID or disable the submit button.
+function setRFIDStatus(message, type) {
     const rfidStatus = document.getElementById('rfid-status');
-    rfidStatus.textContent = 'Kartu tercatat (boleh dilepas)';
+    rfidStatus.textContent = message;
+    rfidStatus.classList.remove('text-gray-600', 'text-primary-700', 'text-blue-600', 'text-red-600');
+    rfidStatus.classList.add(type === 'error' ? 'text-red-600' : 'text-blue-600');
 }
+
+function acceptRFID(uid) {
+    const rfidIndicator = document.getElementById('rfid-indicator');
+    const rfidIcon = document.getElementById('rfid-icon');
+
+    currentRFID = uid;
+
+    rfidIndicator.classList.remove('border-gray-300');
+    rfidIndicator.classList.add('border-blue-500', 'bg-blue-50');
+    rfidIcon.classList.remove('text-gray-400');
+    rfidIcon.classList.add('text-blue-500');
+
+    setRFIDStatus('Kartu tercatat (boleh dilepas). Tap kartu lain untuk mengganti.', 'ok');
+    document.getElementById('rfid-uid-display').classList.remove('hidden');
+    document.getElementById('rfid-uid-text').textContent = uid;
+    document.getElementById('rfid_uid').value = uid;
+
+    checkFormValidity();
+}
+
+/**
+ * No card on the reader. The UID is kept once accepted (the user is filling
+ * the form), so there is nothing to do.
+ */
+function onRFIDRemoved() {}
 
 /**
  * Check if form is valid and enable/disable submit button
@@ -184,61 +205,69 @@ function checkFormValidity() {
         currentRFID !== null &&
         photoInput.files.length > 0;
 
-    submitBtn.disabled = !isValid;
+    submitBtn.disabled = !isValid || submitting;
 }
 
 /**
- * Submit registration form
+ * Submit registration form. The button stays disabled while the request runs;
+ * errors are shown in #form-status and scrolled into view.
  */
 function submitRegistration() {
+    if (submitting) return;
     const form = document.getElementById('registration-form');
     const formData = new FormData(form);
+    const submitBtn = document.getElementById('submit-btn');
 
-    // Show loading
+    submitting = true;
+    submitBtn.disabled = true;
     showLoading();
 
-    // Submit via AJAX
-    fetch('/api/register', {
+    fetchJSON('/api/register', {
         method: 'POST',
         headers: {
             'X-CSRFToken': getCSRFToken()
         },
         body: formData
     })
-        .then(response => response.json())
         .then(data => {
-            hideLoading();
-
             if (data.success) {
-                showToast(data.message, 'success');
-
-                // Show success message
-                document.getElementById('form-status').innerHTML =
-                    `<div class="p-4 bg-blue-100 text-blue-800 rounded-lg">
-                    <p class="font-semibold">Registrasi berhasil!</p>
-                    <p>Nama: ${data.student.name}</p>
-                    <p>NIM: ${data.student.nim}</p>
-                </div>`;
-
-                // Redirect after 3 seconds
+                showFormStatus(
+                    ['Registrasi berhasil!', `Nama: ${data.student.name}`, `NIM: ${data.student.nim}`],
+                    'success'
+                );
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 3000);
             } else {
-                showToast(data.error, 'error');
-
-                // Show error message
-                document.getElementById('form-status').innerHTML =
-                    `<div class="p-4 bg-red-100 text-red-800 rounded-lg">
-                    <p class="font-semibold">Error: ${data.error}</p>
-                </div>`;
+                submitting = false;
+                showFormStatus([`Gagal: ${data.error}`], 'error');
+                checkFormValidity();
             }
         })
         .catch(error => {
-            hideLoading();
             console.error('Error submitting registration:', error);
-            showToast('Terjadi kesalahan saat registrasi', 'error');
-        });
+            submitting = false;
+            showFormStatus(['Gagal menghubungi server. Data belum tersimpan, coba lagi.'], 'error');
+            checkFormValidity();
+        })
+        .finally(hideLoading);
+}
+
+function showFormStatus(lines, type) {
+    const status = document.getElementById('form-status');
+    const box = document.createElement('div');
+    box.className = type === 'success'
+        ? 'p-4 bg-blue-100 text-blue-800 rounded-lg'
+        : 'p-4 bg-red-100 text-red-800 rounded-lg';
+    box.setAttribute('role', type === 'success' ? 'status' : 'alert');
+    lines.forEach((text, i) => {
+        const p = document.createElement('p');
+        p.textContent = text;
+        if (i === 0) p.className = 'font-semibold';
+        box.appendChild(p);
+    });
+    status.replaceChildren(box);
+    status.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // Listen for form field changes to update submit button

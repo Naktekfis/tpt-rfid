@@ -83,3 +83,19 @@ def test_transactions_listing(client, student, tool):
 
 def test_tools_status_empty(client):
     assert client.get("/api/tools_status").get_json() == {"success": True, "tools": []}
+
+
+def test_return_by_other_student_explains_why(client, database, student, tool):
+    other = database.create_student(
+        {
+            "name": "Ani",
+            "nim": "87654321",
+            "email": "ani@example.com",
+            "phone": "08111111111",
+            "rfid_uid": "STU-002",
+        }
+    )
+    assert _borrow(client, student, tool).status_code == 200
+    resp = _return(client, other, tool)
+    assert resp.status_code == 400
+    assert "mahasiswa lain" in resp.get_json()["error"]

@@ -559,7 +559,15 @@ class DatabaseHandler:
             ).first()
 
             if not borrow_txn:
-                raise ValueError("Tidak ada peminjaman aktif untuk tool ini")
+                other = Transaction.query.filter_by(
+                    tool_id=int(tool_id), status="borrowed"
+                ).first()
+                if other:
+                    raise ValueError(
+                        "Alat ini dipinjam mahasiswa lain. "
+                        "Hanya peminjam yang bisa mengembalikan."
+                    )
+                raise ValueError("Alat ini tidak sedang dipinjam")
 
             # Update transaction to returned
             borrow_txn.return_time = datetime.utcnow()

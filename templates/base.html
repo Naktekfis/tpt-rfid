@@ -61,6 +61,20 @@
                 ...additionalHeaders
             };
         }
+
+        // fetch() that always resolves to {success, error, ...} (also for 429/500
+        // HTML pages). Rejects only on network failure.
+        async function fetchJSON(url, options = {}) {
+            const response = await fetch(url, options);
+            try {
+                return await response.json();
+            } catch (e) {
+                if (response.status === 429) {
+                    return { success: false, error: 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.' };
+                }
+                return { success: false, error: `Terjadi kesalahan server (HTTP ${response.status})` };
+            }
+        }
     </script>
 
     {% block extra_head %}{% endblock %}

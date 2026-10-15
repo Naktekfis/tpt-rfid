@@ -40,7 +40,12 @@ def test_register_duplicate_nim_and_uid(client, student):
 
 def test_check_rfid_idle_and_detected(client):
     body = client.get("/api/check_rfid").get_json()
-    assert body == {"success": True, "uid": None, "detected": False}
+    assert body == {
+        "success": True,
+        "uid": None,
+        "detected": False,
+        "reader_connected": True,
+    }
 
     app_module.rfid_reader.simulate_scan("ABC123")
     try:

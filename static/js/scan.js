@@ -1,40 +1,72 @@
 /**
  * Scan Page Logic
- * Handles two-step workflow: scan student card → scan tool tag → confirm transaction
+ * Two-step workflow: scan student card -> scan tool tag -> confirm transaction.
+ *
+ * One reader reads both card types. Each tap is handled once: after a lookup
+ * the server-side UID is cleared, so the next tap (even of the same card)
+ * arrives as a new event.
  */
 
-// State management
+const POLL_MS = 1000;
+const IDLE_TIMEOUT_S = 30;      // walk-away reset for steps 2 and 3
+const IDLE_WARN_S = 10;         // show the countdown for the last N seconds
+const POLL_FAILS_BEFORE_BANNER = 3;
+const SUCCESS_RESET_MS = 5000;
+
+// State
 let currentStep = 1; // 1: scan student, 2: scan tool, 3: confirm
 let studentData = null;
 let toolData = null;
-let rfidPollInterval = null;
+let busy = false;        // a lookup or transaction request is in flight
+let done = false;        // transaction succeeded, waiting for auto-reset
+let lastActivity = Date.now();
+let pollFailures = 0;
+let pollTimer = null;
+let idleTimer = null;
 
 function clearRFIDState() {
-    return fetch('/api/rfid/clear', {
+    return fetchJSON('/api/rfid/clear', {
         method: 'POST',
         headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({})
-    }).then(response => response.json());
+    });
+}
+
+function postJSON(url, body) {
+    return fetchJSON(url, {
+        method: 'POST',
+        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(body)
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('Scan page loaded');
-
-    // Initialize
-    initializeWorkflow();
-
-    // Setup event listeners
-    document.getElementById('reset-btn').addEventListener('click', resetWorkflow);
+    document.getElementById('reset-btn').addEventListener('click', () => resetWorkflow());
     document.getElementById('confirm-btn').addEventListener('click', confirmTransaction);
+    document.getElementById('alert-retry').addEventListener('click', confirmTransaction);
+    document.getElementById('alert-cancel').addEventListener('click', () => resetWorkflow());
 
-    // Start RFID polling
-    startRFIDPolling();
+    // Any touch on the page counts as activity for the idle timer.
+    document.addEventListener('pointerdown', markActivity);
 
-    // Clean up on page unload
+    // Start from a clean reader state so a tag from another page is not reused.
+    clearRFIDState().catch(() => {}).finally(() => {
+        initializeWorkflow();
+        pollTimer = setInterval(checkRFID, POLL_MS);
+        idleTimer = setInterval(checkIdle, 1000);
+        checkRFID();
+    });
+
     window.addEventListener('beforeunload', function () {
-        stopRFIDPolling();
+        clearInterval(pollTimer);
+        clearInterval(idleTimer);
     });
 });
+
+function markActivity() {
+    lastActivity = Date.now();
+    hideIdleCountdown();
+}
 
 /**
  * Initialize workflow to step 1
@@ -43,35 +75,38 @@ function initializeWorkflow() {
     currentStep = 1;
     studentData = null;
     toolData = null;
+    busy = false;
+    done = false;
+    markActivity();
+    hideAlert();
 
     updateStepIndicator();
-    updateStatusMessage('Silakan scan kartu mahasiswa Anda');
 
-    // Hide everything except student scanner
     document.getElementById('student-info').classList.add('hidden');
     document.getElementById('tool-info').classList.add('hidden');
     document.getElementById('action-container').classList.add('hidden');
 
-    // Reset student scanner to waiting state
     document.getElementById('student-scanner-waiting').classList.remove('hidden');
     document.getElementById('student-scanner-scanned').classList.add('hidden');
+    document.getElementById('student-photo').src = document.getElementById('student-photo').dataset.placeholder;
 
     document.getElementById('tool-scanner-container').classList.add('hidden');
+    document.getElementById('tool-scanner-waiting').classList.remove('hidden');
+    document.getElementById('tool-scanner-scanned').classList.add('hidden');
+
+    const confirmBtn = document.getElementById('confirm-btn');
+    confirmBtn.disabled = false;
 }
 
 /**
- * Reset workflow
+ * Reset workflow (Reset/Batal button, idle timeout, after success)
  */
-function resetWorkflow() {
-    // Clear RFID state
+function resetWorkflow(message) {
     clearRFIDState()
-        .then(() => {
+        .catch(error => console.error('Error clearing RFID:', error))
+        .finally(() => {
             initializeWorkflow();
-            showToast('Reset berhasil', 'info');
-        })
-        .catch(error => {
-            console.error('Error clearing RFID:', error);
-            initializeWorkflow();
+            if (message) showAlert(message, 'info');
         });
 }
 
@@ -86,15 +121,12 @@ function updateStepIndicator() {
         const stepNum = index + 1;
 
         if (stepNum === currentStep) {
-            // Active step
             stepEl.classList.remove('bg-primary-100', 'text-primary-600', 'bg-blue-500', 'from-blue-500', 'to-blue-600');
             stepEl.classList.add('bg-gradient-to-r', 'from-blue-500', 'to-blue-600', 'text-white');
         } else if (stepNum < currentStep) {
-            // Completed step
             stepEl.classList.remove('bg-primary-100', 'text-primary-600', 'from-blue-500', 'to-blue-600', 'bg-gradient-to-r');
             stepEl.classList.add('bg-blue-500', 'text-white');
         } else {
-            // Future step
             stepEl.classList.remove('from-blue-500', 'to-blue-600', 'text-white', 'bg-blue-500', 'bg-gradient-to-r');
             stepEl.classList.add('bg-primary-100', 'text-primary-600');
         }
@@ -102,205 +134,176 @@ function updateStepIndicator() {
 }
 
 /**
- * Update status message
+ * In-page alert that stays until the next state change (toasts vanish in 5 s).
+ * type: 'error' | 'warning' | 'success' | 'info'. withActions shows Coba lagi / Batal.
  */
-function updateStatusMessage(message, type = 'info') {
-    const statusEl = document.getElementById('status-message');
+const ALERT_STYLES = {
+    error: ['bg-red-50', 'border-red-300', 'text-red-900'],
+    warning: ['bg-amber-50', 'border-amber-300', 'text-amber-900'],
+    success: ['bg-green-50', 'border-green-300', 'text-green-900'],
+    info: ['bg-primary-50', 'border-primary-300', 'text-primary-900'],
+};
 
-    // Status message box was removed from UI, this function is now a no-op
-    // Keeping it for backward compatibility with existing code
-    if (!statusEl) return;
+function showAlert(message, type = 'error', withActions = false) {
+    const box = document.getElementById('scan-alert');
+    Object.values(ALERT_STYLES).flat().forEach(c => box.classList.remove(c));
+    box.classList.add(...ALERT_STYLES[type]);
+    document.getElementById('scan-alert-text').textContent = message;
+    document.getElementById('scan-alert-actions').classList.toggle('hidden', !withActions);
+    box.classList.remove('hidden');
+}
 
-    // Remove all type classes
-    statusEl.classList.remove('bg-blue-50', 'text-blue-800', 'bg-green-50', 'text-green-800',
-        'bg-yellow-50', 'text-yellow-800', 'bg-red-50', 'text-red-800');
+function hideAlert() {
+    document.getElementById('scan-alert').classList.add('hidden');
+}
 
-    // Add appropriate class
-    if (type === 'success') {
-        statusEl.classList.add('bg-gradient-to-br', 'from-blue-50', 'to-blue-100', 'border-blue-200', 'text-blue-900');
-    } else if (type === 'error') {
-        statusEl.classList.add('bg-gradient-to-br', 'from-red-50', 'to-red-100', 'border-red-200', 'text-red-900');
-    } else if (type === 'warning') {
-        statusEl.classList.add('bg-gradient-to-br', 'from-yellow-50', 'to-yellow-100', 'border-yellow-200', 'text-yellow-900');
-    } else {
-        statusEl.classList.add('bg-gradient-to-br', 'from-primary-50', 'to-primary-100', 'border-primary-200', 'text-primary-900');
+/**
+ * Idle timeout: a student who walks away must not leave their session open
+ * for the next person's tap.
+ */
+function checkIdle() {
+    if (currentStep === 1 || busy || done) {
+        hideIdleCountdown();
+        return;
     }
-
-    statusEl.innerHTML = `<p class="font-semibold">${message}</p>`;
-}
-
-/**
- * Start RFID polling
- */
-function startRFIDPolling() {
-    console.log('Starting RFID polling');
-
-    // Poll every 1 second for responsive feedback
-    rfidPollInterval = setInterval(checkRFID, 1000);
-
-    // Initial check
-    checkRFID();
-}
-
-/**
- * Stop RFID polling
- */
-function stopRFIDPolling() {
-    if (rfidPollInterval) {
-        clearInterval(rfidPollInterval);
-        rfidPollInterval = null;
+    const left = IDLE_TIMEOUT_S - Math.floor((Date.now() - lastActivity) / 1000);
+    if (left <= 0) {
+        hideIdleCountdown();
+        resetWorkflow('Sesi direset karena tidak ada aktivitas. Silakan scan KTM lagi.');
+    } else if (left <= IDLE_WARN_S) {
+        const el = document.getElementById('idle-countdown');
+        el.textContent = `Tidak ada aktivitas, kembali ke awal dalam ${left} detik. Sentuh layar untuk lanjut.`;
+        el.classList.remove('hidden');
     }
 }
 
+function hideIdleCountdown() {
+    document.getElementById('idle-countdown').classList.add('hidden');
+}
+
 /**
- * Check for RFID card/tag
+ * Poll the reader. Shows a banner when the server or the reader is unreachable.
  */
 function checkRFID() {
-    fetch('/api/check_rfid')
-        .then(response => response.json())
+    if (busy || done) return;
+
+    fetchJSON('/api/check_rfid')
         .then(data => {
-            if (data.success && data.detected && data.uid) {
-                handleRFIDDetected(data.uid);
-            } else {
-                handleRFIDRemoved();
+            if (!data.success) throw new Error(data.error);
+            pollFailures = 0;
+            setReaderBanner(data.reader_connected === false
+                ? 'Reader RFID tidak terhubung. Hubungi petugas lab.'
+                : null);
+            if (data.detected && data.uid && !busy && !done) {
+                handleTap(data.uid);
             }
         })
         .catch(error => {
+            pollFailures += 1;
             console.error('Error checking RFID:', error);
+            if (pollFailures >= POLL_FAILS_BEFORE_BANNER) {
+                setReaderBanner('Tidak terhubung ke server. Mencoba lagi...');
+            }
         });
 }
 
-/**
- * Handle RFID detected
- */
-function handleRFIDDetected(uid) {
-    if (currentStep === 1) {
-        // Scan student card
-        fetchStudentData(uid);
-    } else if (currentStep === 2) {
-        // Scan tool tag
-        fetchToolData(uid);
+function setReaderBanner(message) {
+    const banner = document.getElementById('reader-banner');
+    if (message) {
+        banner.textContent = message;
+        banner.classList.remove('hidden');
+    } else {
+        banner.classList.add('hidden');
     }
 }
 
 /**
- * Handle RFID removed
+ * Handle one tap. Looks the UID up as student and as tool, then decides by
+ * step, so a card tapped at the wrong step gets a clear message.
  */
-function handleRFIDRemoved() {
-    // No action needed - we keep the displayed state
+async function handleTap(uid) {
+    busy = true;
+    markActivity();
+    try {
+        const [studentRes, toolRes] = await Promise.all([
+            postJSON('/api/scan_student', { rfid_uid: uid }),
+            postJSON('/api/scan_tool', { rfid_uid: uid }),
+        ]);
+        const student = studentRes.success ? studentRes.student : null;
+        const tool = toolRes.success ? toolRes.tool : null;
+
+        if (currentStep === 1) {
+            if (student) {
+                acceptStudent(student);
+            } else if (tool) {
+                showAlert(`Ini tag alat (${tool.name}). Tap KTM Anda terlebih dahulu.`, 'warning');
+            } else {
+                showAlert('Kartu tidak terdaftar. Daftar dulu lewat menu Registrasi.', 'error');
+            }
+        } else {
+            // Steps 2 and 3: a tool tap sets (or replaces) the tool.
+            if (tool) {
+                acceptTool(tool);
+            } else if (student && studentData && student.student_id === studentData.student_id) {
+                showAlert('KTM Anda sudah terbaca. Sekarang tap tag alat.', 'info');
+            } else if (student) {
+                showAlert(`Ini KTM ${student.name}. Tap tag alat, atau tekan Reset untuk ganti mahasiswa.`, 'warning');
+            } else {
+                showAlert('Tag tidak terdaftar sebagai alat.', 'error');
+            }
+        }
+        // Handled: clear so the next tap of the same tag is a new event.
+        await clearRFIDState().catch(() => {});
+    } catch (error) {
+        // Network error: leave the UID on the server so the next poll retries.
+        console.error('Error handling tap:', error);
+        showAlert('Gagal menghubungi server. Coba tap lagi.', 'error');
+    } finally {
+        busy = false;
+    }
 }
 
-// Scanner status update removed - now using direct show/hide of scanner states
+function acceptStudent(student) {
+    studentData = student;
+    hideAlert();
+    displayStudentData();
 
-/**
- * Fetch student data by RFID UID
- */
-let lastStudentUID = null;
-function fetchStudentData(uid) {
-    // Prevent duplicate requests
-    if (lastStudentUID === uid && studentData) return;
-    lastStudentUID = uid;
+    currentStep = 2;
+    updateStepIndicator();
+    document.getElementById('tool-scanner-container').classList.remove('hidden');
+}
 
-    fetch('/api/scan_student', {
-        method: 'POST',
-        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ rfid_uid: uid })
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                studentData = data.student;
-                displayStudentData();
+function acceptTool(tool) {
+    toolData = tool;
+    hideAlert();
 
-                // Move to step 2
-                currentStep = 2;
-                updateStepIndicator();
-                updateStatusMessage('Mahasiswa terdeteksi. Silakan scan tag alat', 'success');
+    document.getElementById('tool-scanner-waiting').classList.add('hidden');
+    document.getElementById('tool-scanner-scanned').classList.remove('hidden');
+    displayToolData();
 
-                // Clear the RFID reader so the student UID doesn't get
-                // picked up again as a tool scan in step 2
-                clearRFIDState().catch(err => console.error('Error clearing RFID:', err));
-
-                // Show tool scanner
-                document.getElementById('tool-scanner-container').classList.remove('hidden');
-
-            } else {
-                showToast(data.error, 'error');
-                updateStatusMessage(data.error, 'error');
-                lastStudentUID = null; // Allow retry
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching student:', error);
-            showToast('Gagal mengambil data mahasiswa', 'error');
-            lastStudentUID = null;
-        });
+    currentStep = 3;
+    updateStepIndicator();
+    prepareConfirmation();
 }
 
 /**
  * Display student data
  */
 function displayStudentData() {
-    // Main display in transaction section (text only, no photo)
     document.getElementById('student-info').classList.remove('hidden');
     document.getElementById('student-name-main').textContent = studentData.name;
     document.getElementById('student-nim-main').textContent = `NIM: ${studentData.nim}`;
 
-    // Add email to main display
     const emailElement = document.getElementById('student-email-main');
     if (emailElement) {
         emailElement.textContent = studentData.email || '-';
     }
 
-    // Side display: Hide waiting state, show scanned state with photo
     document.getElementById('student-scanner-waiting').classList.add('hidden');
     document.getElementById('student-scanner-scanned').classList.remove('hidden');
     if (studentData.photo_url) {
         document.getElementById('student-photo').src = studentData.photo_url;
     }
-}
-
-/**
- * Fetch tool data by RFID UID
- */
-let lastToolUID = null;
-function fetchToolData(uid) {
-    // Prevent duplicate requests
-    if (lastToolUID === uid && toolData) return;
-    lastToolUID = uid;
-
-    fetch('/api/scan_tool', {
-        method: 'POST',
-        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ rfid_uid: uid })
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                toolData = data.tool;
-
-                // Hide waiting state, show scanned state
-                document.getElementById('tool-scanner-waiting').classList.add('hidden');
-                document.getElementById('tool-scanner-scanned').classList.remove('hidden');
-
-                displayToolData();
-
-                // Move to step 3
-                currentStep = 3;
-                updateStepIndicator();
-                prepareConfirmation();
-
-            } else {
-                showToast(data.error, 'error');
-                updateStatusMessage(data.error, 'error');
-                lastToolUID = null;
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching tool:', error);
-            showToast('Gagal mengambil data alat', 'error');
-            lastToolUID = null;
-        });
 }
 
 /**
@@ -311,7 +314,6 @@ function displayToolData() {
     document.getElementById('tool-name').textContent = toolData.name;
     document.getElementById('tool-category').textContent = `Kategori: ${toolData.category}`;
 
-    // Status badge
     const statusBadge = document.getElementById('tool-status-badge');
     if (toolData.status === 'available') {
         statusBadge.innerHTML = '<span class="px-4 py-2 rounded-full text-sm font-semibold bg-blue-200 text-blue-800">Tersedia</span>';
@@ -325,67 +327,49 @@ function displayToolData() {
  */
 function prepareConfirmation() {
     const confirmBtn = document.getElementById('confirm-btn');
-    const actionContainer = document.getElementById('action-container');
-
-    // Show action button
-    actionContainer.classList.remove('hidden');
-
-    // Determine action type
-    if (toolData.status === 'available') {
-        // Borrow action
-        confirmBtn.textContent = 'Confirm Pinjam';
-        updateStatusMessage('Klik "Confirm Pinjam" untuk meminjam alat', 'success');
-    } else {
-        // Return action
-        confirmBtn.textContent = 'Confirm Kembalikan';
-        updateStatusMessage('Klik "Confirm Kembalikan" untuk mengembalikan alat', 'success');
-    }
+    document.getElementById('action-container').classList.remove('hidden');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = toolData.status === 'available' ? 'Confirm Pinjam' : 'Confirm Kembalikan';
 }
 
 /**
- * Confirm transaction
+ * Confirm transaction. The button is disabled while the request runs and
+ * after success, so a double tap cannot submit twice.
  */
 function confirmTransaction() {
+    if (busy || done) return;
     if (!studentData || !toolData) {
-        showToast('Data tidak lengkap', 'error');
+        showAlert('Data tidak lengkap. Scan KTM dan tag alat dulu.', 'error');
         return;
     }
 
+    const confirmBtn = document.getElementById('confirm-btn');
+    busy = true;
+    confirmBtn.disabled = true;
+    markActivity();
+    hideAlert();
     showLoading();
 
-    // Determine endpoint
     const endpoint = toolData.status === 'available' ? '/api/borrow_tool' : '/api/return_tool';
 
-    fetch(endpoint, {
-        method: 'POST',
-        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-            student_id: studentData.student_id,
-            tool_id: toolData.tool_id
-        })
-    })
-        .then(response => response.json())
+    postJSON(endpoint, { student_id: studentData.student_id, tool_id: toolData.tool_id })
         .then(data => {
-            hideLoading();
-
             if (data.success) {
-                showToast(data.message, 'success');
-                updateStatusMessage(data.message, 'success');
-
-                // Auto-reset after 5 seconds
-                setTimeout(() => {
-                    resetWorkflow();
-                }, 5000);
+                done = true;
+                showAlert(`${data.message} Kembali ke awal dalam ${SUCCESS_RESET_MS / 1000} detik.`, 'success');
+                setTimeout(() => resetWorkflow(), SUCCESS_RESET_MS);
             } else {
-                showToast(data.error, 'error');
-                updateStatusMessage(data.error, 'error');
+                confirmBtn.disabled = false;
+                showAlert(data.error || 'Transaksi gagal.', 'error', true);
             }
         })
         .catch(error => {
-            hideLoading();
             console.error('Error confirming transaction:', error);
-            showToast('Terjadi kesalahan', 'error');
+            confirmBtn.disabled = false;
+            showAlert('Gagal menghubungi server. Transaksi belum tersimpan.', 'error', true);
+        })
+        .finally(() => {
+            busy = false;
+            hideLoading();
         });
 }
-
-// Transaction history removed - not needed in this view

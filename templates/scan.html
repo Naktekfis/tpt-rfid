@@ -4,6 +4,10 @@
 
 {% block content %}
 <div class="max-w-7xl mx-auto">
+    <!-- Reader/server connection problem (set by scan.js) -->
+    <div id="reader-banner" role="alert"
+        class="hidden mb-4 p-4 rounded-xl bg-red-600 text-white text-lg font-semibold text-center shadow-lg"></div>
+
     <!-- Header with Step Indicator -->
     <div class="text-center mb-6">
         <h1 class="text-3xl font-bold text-primary-900 mb-1">Peminjaman & Pengembalian Alat</h1>
@@ -40,6 +44,22 @@
             <div class="bg-white rounded-2xl shadow-lg p-6 border border-primary-100">
                 <h3 class="text-xl font-bold text-primary-900 mb-5">Data Transaksi</h3>
 
+                <!-- Persistent status/error for the current step (set by scan.js) -->
+                <div id="scan-alert" role="status" aria-live="polite"
+                    class="hidden mb-5 p-5 rounded-xl border-2">
+                    <p id="scan-alert-text" class="text-lg font-semibold"></p>
+                    <div id="scan-alert-actions" class="hidden mt-4 flex space-x-3">
+                        <button id="alert-retry" type="button"
+                            class="flex-1 bg-blue-600 active:bg-blue-700 text-white font-bold py-4 rounded-xl text-lg">
+                            Coba lagi
+                        </button>
+                        <button id="alert-cancel" type="button"
+                            class="flex-1 bg-white active:bg-primary-50 text-primary-700 border-2 border-primary-300 font-bold py-4 rounded-xl text-lg">
+                            Batal
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Student Info (No Photo) -->
                 <div id="student-info"
                     class="mb-5 p-5 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl border border-primary-200 hidden">
@@ -68,7 +88,7 @@
                 <!-- Action Button -->
                 <div id="action-container" class="hidden">
                     <button id="confirm-btn"
-                        class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-5 px-8 rounded-xl text-xl shadow-lg transition-all transform hover:scale-[1.02]">
+                        class="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-bold py-5 px-8 rounded-xl text-xl shadow-lg transition-all transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100">
                         Confirm Pinjam
                     </button>
                 </div>
@@ -84,6 +104,8 @@
                         Reset
                     </button>
                 </div>
+                <p id="idle-countdown" role="status" aria-live="polite"
+                    class="hidden mt-4 p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 font-semibold text-center"></p>
             </div>
         </div>
 
@@ -117,6 +139,7 @@
                         <img id="student-photo"
                             class="mx-auto h-40 w-40 rounded-2xl object-cover border-4 border-white shadow-lg"
                             src="{{ url_for('static', filename='assets/placeholder_profile.png') }}"
+                            data-placeholder="{{ url_for('static', filename='assets/placeholder_profile.png') }}"
                             alt="Student Photo">
                     </div>
                 </div>

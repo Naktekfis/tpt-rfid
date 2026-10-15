@@ -148,3 +148,12 @@ def test_check_rfid_returns_reported_uid(client):
         assert client.get("/api/check_rfid").get_json()["uid"] == EPC_A
     finally:
         app_module.rfid_reader.clear()
+
+
+def test_check_rfid_reports_disconnected_reader(client, monkeypatch):
+    import app as app_module
+
+    monkeypatch.setattr(
+        app_module.rfid_reader, "status", lambda: {"mode": "vx6336", "connected": False}
+    )
+    assert client.get("/api/check_rfid").get_json()["reader_connected"] is False

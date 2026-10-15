@@ -266,11 +266,17 @@ def check_rfid():
     """
     try:
         uid = rfid_reader.get_current_uid()
+        # The mock has no connection to lose.
+        reader_connected = rfid_reader.status().get("connected", True)
 
-        if uid:
-            return jsonify({"success": True, "uid": uid, "detected": True})
-        else:
-            return jsonify({"success": True, "uid": None, "detected": False})
+        return jsonify(
+            {
+                "success": True,
+                "uid": uid,
+                "detected": bool(uid),
+                "reader_connected": reader_connected,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error checking RFID: {str(e)}")
