@@ -495,7 +495,18 @@ class DatabaseHandler:
             if existing:
                 raise ValueError("Anda sudah meminjam tool ini")
 
-            # All checks passed -- create transaction and update tool
+            # Claim the tool with a conditional UPDATE. SQLite ignores FOR UPDATE,
+            # so this WHERE clause is what stops two concurrent borrows.
+            claimed = db.session.execute(
+                db.update(Tool)
+                .where(Tool.id == tool.id, Tool.status == "available")
+                .values(status="borrowed")
+                .execution_options(synchronize_session=False)
+            ).rowcount
+            if claimed != 1:
+                raise ValueError("Tool sedang dipinjam")
+
+            # All checks passed -- create transaction
             now = datetime.utcnow()
             transaction = Transaction(
                 student_id=student.id,
@@ -506,8 +517,6 @@ class DatabaseHandler:
                 return_time=None,
                 status="borrowed",
             )
-            tool.status = "borrowed"
-
             db.session.add(transaction)
             db.session.commit()
 

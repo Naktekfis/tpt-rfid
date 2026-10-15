@@ -1,6 +1,5 @@
 import threading
 
-import pytest
 from flask import Flask
 from sqlalchemy import text
 
@@ -29,12 +28,6 @@ def test_pragmas_active(tmp_path):
     assert handler is not None
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="borrow_tool_atomic relies on with_for_update(), which SQLite ignores: "
-    "two students can borrow the same tool concurrently (no BEGIN IMMEDIATE / "
-    "conditional UPDATE)",
-)
 def test_concurrent_borrow_single_winner(tmp_path):
     rounds = 25
     flask_app = _make_app(tmp_path / "race.db")
