@@ -13,7 +13,7 @@ One borrow of one Tool by one Student, closed when the Tool is returned. Keeps c
 _Avoid_: loan record, history entry
 
 **RFID UID**:
-The tag/card identifier read by the ESP32 reader; unique across Students and across Tools.
+The tag/card identifier read by the USB UHF reader (EPC as uppercase hex); unique across Students and across Tools.
 _Avoid_: card number, tag ID
 
 **Admin**:

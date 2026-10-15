@@ -43,8 +43,8 @@ Status `0x00` = success and `0xFB` = no tag. The full status and tag error table
 Never send these from app code without explicit approval: Write Data `0x03`, Write EPC `0x04`, **Kill Tag `0x05` (permanent)**, Lock `0x06`, Block Erase `0x07`, ReadProtect `0x08–0x0B`, EAS `0x0C`, Block Lock `0x0E` (permanent), Block Write `0x10`, Set Region `0x22`, Set Address `0x24`, Set Baud Rate `0x28`, Set Power `0x2F`. Several of these permanently change tags or reader settings.
 
 ## Integration notes
-- The tag ID used by the app is the EPC bytes as an uppercase hex string. This replaces the current `rfid_uid` values. Check what format existing rows and the ESP32 path use before switching.
-- Pure protocol code (frame build/parse, CRC) goes in its own module with unit tests built from the vectors above. The serial loop sits behind the same Mock/Real factory pattern as `utils/mqtt_client.py`, so the app still runs without a reader.
+- The tag ID used by the app is the EPC bytes as an uppercase hex string. This replaces the current `rfid_uid` values. Check what format existing rows and the old ESP32 path use before switching.
+- Pure protocol code (frame build/parse, CRC) goes in its own module with unit tests built from the vectors above. The serial loop sits behind a Mock/Real factory, so the app still runs without a reader.
 - Debounce: one tap produces several inventory hits while the tag is in range, so report a given EPC once per presence window.
 - Implemented (step 4): `utils/vx6336.py` (protocol, only the safe commands can be built) and `utils/rfid_reader.py` (`VX6336Reader` thread polls Inventory `0x01`, `ScanDebouncer` with `RFID_ABSENT_TIMEOUT`, reconnects every 3 s if the port is missing). `GET /api/rfid/status` shows mode/connection. Buzzer `0x33` is not used yet (its data layout was not checked).
 - Working assumption (user, 2026-10-15): student cards are UHF too and are read on the **same reader**. `clear()` does not reset the debouncer, so a card left on the reader is not re-reported as the next scan.

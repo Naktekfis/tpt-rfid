@@ -27,5 +27,5 @@ Done. Next:
   .venv/bin/python app.py              # http://localhost:5000
   .venv/bin/python seed_database.py    # optional sample data
   scripts/check.sh                     # ruff + tests
-Optional extras: requirements-mqtt.txt (ESP32/MQTT), requirements-cv.txt (CV benchmark).
+Optional extra: requirements-cv.txt (CV benchmark).
 MSG

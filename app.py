@@ -37,8 +37,6 @@ from utils import (
     validate_nim,
     sanitize_input,
     validate_record_id,
-    create_mqtt_client,
-    create_websocket_handler,
     create_rfid_reader,
 )
 
@@ -101,43 +99,6 @@ except ImportError as e:
         "To enable CV Benchmark: pip install opencv-python face-recognition psutil"
     )
 
-# Initialize MQTT client (mock or real based on MQTT_ENABLED)
-
-mqtt_client = create_mqtt_client(
-    enabled=app.config.get("MQTT_ENABLED", False),
-    broker_host=app.config.get("MQTT_BROKER_HOST", "localhost"),
-    broker_port=app.config.get("MQTT_BROKER_PORT", 1883),
-    client_id=app.config.get("MQTT_CLIENT_ID", "tpt-rfid-server"),
-    username=app.config.get("MQTT_USERNAME"),
-    password=app.config.get("MQTT_PASSWORD"),
-)
-
-# Initialize WebSocket handler (mock or real based on WEBSOCKET_ENABLED)
-ws_handler = create_websocket_handler(
-    enabled=app.config.get("WEBSOCKET_ENABLED", False), app=app
-)
-
-# Connect MQTT client if enabled
-if app.config.get("MQTT_ENABLED", False):
-    try:
-        mqtt_client.connect()
-        logger.info("MQTT client connected successfully")
-
-        # Subscribe to relevant topics
-        mqtt_client.subscribe(
-            app.config.get("MQTT_TOPIC_RFID_SCAN", "rfid/scan"),
-            lambda topic, payload: handle_mqtt_rfid_scan(topic, payload),
-            qos=app.config.get("MQTT_QOS_CRITICAL", 1),
-        )
-        logger.info("Subscribed to MQTT topics")
-    except Exception as e:
-        logger.error(f"Failed to connect MQTT client: {e}")
-else:
-    logger.info("MQTT disabled - using mock mode")
-
-if not app.config.get("WEBSOCKET_ENABLED", False):
-    logger.info("WebSocket disabled - using mock mode")
-
 # RFID reader (USB HW-VX6336, or mock). Pages poll its current UID via
 # /api/check_rfid; student cards and tool tags come through the same reader.
 rfid_reader = create_rfid_reader(
@@ -191,70 +152,6 @@ def admin_required(f):
         return jsonify({"success": False, "error": "Unauthorized"}), 401
 
     return decorated
-
-
-# ==================== MQTT Message Handlers ====================
-
-
-def handle_mqtt_rfid_scan(topic: str, payload: dict):
-    """
-    Handle RFID scan messages from MQTT broker
-
-    Expected payload format:
-    {
-        "rfid_uid": "1234567890",
-        "reader_id": "esp32_01",
-        "timestamp": "2024-01-01T12:00:00Z"  # Optional
-    }
-    """
-    try:
-        rfid_uid = payload.get("rfid_uid")
-        reader_id = payload.get("reader_id", "unknown")
-
-        if not rfid_uid:
-            logger.error(f"Invalid MQTT payload - missing rfid_uid: {payload}")
-            return
-
-        logger.info(f"MQTT RFID scan received: {rfid_uid} from {reader_id}")
-
-        # Look up student by RFID
-        student_data = database.get_student_by_uid(rfid_uid)
-
-        if not student_data:
-            logger.warning(f"Unknown RFID scanned: {rfid_uid}")
-            # Broadcast unknown RFID event to WebSocket clients
-            from utils import broadcast_rfid_scan
-
-            broadcast_rfid_scan(
-                ws_handler,
-                {"rfid_uid": rfid_uid, "status": "unknown", "reader_id": reader_id},
-            )
-            return
-
-        logger.info(
-            f"Student identified: {student_data.get('name')} (NIM: {student_data.get('nim')})"
-        )
-
-        # Broadcast successful scan to WebSocket clients
-        from utils import broadcast_rfid_scan
-
-        broadcast_rfid_scan(
-            ws_handler,
-            {
-                "rfid_uid": rfid_uid,
-                "student_id": student_data.get("id"),
-                "student_name": student_data.get("name"),
-                "student_nim": student_data.get("nim"),
-                "status": "success",
-                "reader_id": reader_id,
-            },
-        )
-
-        # Note: Actual borrow/return logic happens in the web interface
-        # This just notifies about the RFID scan event
-
-    except Exception as e:
-        logger.error(f"Error handling MQTT RFID scan: {e}")
 
 
 def _serialize_borrow_timestamps(tools_data):
@@ -1356,12 +1253,6 @@ def cleanup():
     """Cleanup resources on application shutdown"""
     logger.info("Shutting down application...")
     rfid_reader.stop()
-    if app.config.get("MQTT_ENABLED", False):
-        try:
-            mqtt_client.disconnect()
-            logger.info("MQTT client disconnected")
-        except Exception as e:
-            logger.error(f"Error disconnecting MQTT: {e}")
 
 
 atexit.register(cleanup)

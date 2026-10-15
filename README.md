@@ -10,7 +10,7 @@ Kiosk layar sentuh untuk peminjaman alat workshop dengan kartu/tag RFID, Lab Fab
 - **Pinjam / kembalikan alat**: tap kartu mahasiswa, lalu tap tag alat, lalu konfirmasi. Kartu dan tag dibaca di reader yang sama.
 - **Monitor** (`/monitor`): status semua alat.
 - **Admin** (`/admin`): info peminjam, tambah alat, riwayat dan ekspor, email peringatan.
-- **Mock mode**: tanpa reader, MQTT, atau kamera, aplikasi tetap jalan.
+- **Mock mode**: tanpa reader atau kamera, aplikasi tetap jalan.
 - **CV Benchmark** (eksperimen, `/cv`): uji face recognition. Butuh `requirements-cv.txt`; lihat [docs/CV_BENCHMARK.md](docs/CV_BENCHMARK.md).
 
 ## Development di laptop
@@ -48,7 +48,6 @@ Lihat [deploy/jetson/README.md](deploy/jetson/README.md). Isinya `install.sh` (b
 | `RFID_READER_ENABLED` | `false` | `true` = baca reader VX6336 lewat serial |
 | `RFID_READER_PORT` | `/dev/ttyUSB0` | `/dev/rfid-reader` di Jetson |
 | `RFID_ABSENT_TIMEOUT` | `2.5` | Detik tag harus menjauh sebelum dianggap tap baru |
-| `MQTT_ENABLED`, `WEBSOCKET_ENABLED` | `false` | Jalur ESP32 lama; lihat [docs/MQTT_SETUP.md](docs/MQTT_SETUP.md) |
 | `MAIL_*` | Gmail SMTP | Untuk email peringatan dan ekspor dari admin |
 
 **PIN admin:** jalankan `.venv/bin/python scripts/set_admin_pin.py`. Yang disimpan di `.env` hanya hash-nya (`ADMIN_PIN_HASH`). Tanpa itu, login admin ditolak.
@@ -61,13 +60,13 @@ Lihat [deploy/jetson/README.md](deploy/jetson/README.md). Isinya `install.sh` (b
 app.py              semua route halaman dan /api/* (monolit)
 config.py           konfigurasi dari .env
 utils/              models, database_handler, vx6336 (protokol reader),
-                    rfid_reader (mock/real + debounce), mqtt_client,
-                    websocket_handler, helpers, cv_handler
+                    rfid_reader (mock/real + debounce), helpers,
+                    cv_handler
 routes/cv_routes.py blueprint /cv (eksperimen)
 templates/, static/ halaman Jinja + JS per halaman
 deploy/jetson/      file bring-up perangkat
 tests/              pytest (SQLite in-memory)
-docs/               panduan hardware, MQTT/ESP32, dan dokumen lama (RPi + Postgres)
+docs/               manual hardware reader, dokumen CV, dokumen lama (RPi + Postgres)
 ```
 
 ## Lisensi

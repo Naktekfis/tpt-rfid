@@ -47,37 +47,12 @@ class Config:
     SESSION_COOKIE_SAMESITE = "Lax"  # CSRF protection
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)  # 8 hour session timeout for admin
 
-    # MQTT Configuration
-    MQTT_ENABLED = os.getenv("MQTT_ENABLED", "false").lower() == "true"
-    MQTT_BROKER_HOST = os.getenv("MQTT_BROKER_HOST", "localhost")
-    MQTT_BROKER_PORT = int(os.getenv("MQTT_BROKER_PORT", "1883"))
-    MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID", "tpt-rfid-server")
-    MQTT_USERNAME = os.getenv("MQTT_USERNAME")  # Optional
-    MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")  # Optional
-    MQTT_KEEPALIVE = int(os.getenv("MQTT_KEEPALIVE", "60"))
-    MQTT_QOS_CRITICAL = int(
-        os.getenv("MQTT_QOS_CRITICAL", "1")
-    )  # For RFID scans, transactions
-    MQTT_QOS_NORMAL = int(os.getenv("MQTT_QOS_NORMAL", "0"))  # For sensor data
-
     # USB UHF reader (HW-VX6336). Disabled = mock reader (debug routes only).
     RFID_READER_ENABLED = os.getenv("RFID_READER_ENABLED", "false").lower() == "true"
     RFID_READER_PORT = os.getenv("RFID_READER_PORT", "/dev/ttyUSB0")
     RFID_READER_ADDR = int(os.getenv("RFID_READER_ADDR", "0"), 0)
     # A tag must be away this long (s) before the same tag is reported again.
     RFID_ABSENT_TIMEOUT = float(os.getenv("RFID_ABSENT_TIMEOUT", "2.5"))
-
-    # WebSocket Configuration
-    WEBSOCKET_ENABLED = os.getenv("WEBSOCKET_ENABLED", "false").lower() == "true"
-    WEBSOCKET_CORS_ORIGINS = os.getenv(
-        "WEBSOCKET_CORS_ORIGINS", "*"
-    )  # Change for production
-
-    # MQTT Topics
-    MQTT_TOPIC_RFID_SCAN = "rfid/scan"
-    MQTT_TOPIC_TRANSACTION_UPDATE = "transaction/update"
-    MQTT_TOPIC_TOOL_STATUS = "tool/status"
-    MQTT_TOPIC_SENSOR_PREFIX = "sensor/"  # sensor/temperature, sensor/humidity, etc.
 
 
 class DevelopmentConfig(Config):

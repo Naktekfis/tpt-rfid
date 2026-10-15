@@ -77,8 +77,6 @@ FLASK_ENV=production
 SECRET_KEY=$secret
 RFID_READER_ENABLED=true
 RFID_READER_PORT=/dev/rfid-reader
-MQTT_ENABLED=false
-WEBSOCKET_ENABLED=false
 EOF
     umask 022
     echo "Created .env (mode 600). Add MAIL_* settings by hand if email is needed."

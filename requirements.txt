@@ -1,6 +1,6 @@
 # Core dependencies: always install.
 #   pip install -r requirements.txt
-# Optional extras: requirements-mqtt.txt (MQTT/WebSocket), requirements-cv.txt (face recognition).
+# Optional extras: requirements-cv.txt (face recognition).
 Flask==3.0.0
 flask-limiter==3.5.0
 Flask-SQLAlchemy==3.1.1

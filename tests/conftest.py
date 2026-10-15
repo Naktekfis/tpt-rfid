@@ -4,8 +4,6 @@ import os
 # load_dotenv does not override variables that are already set).
 os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["FLASK_ENV"] = "development"
-os.environ["MQTT_ENABLED"] = "false"
-os.environ["WEBSOCKET_ENABLED"] = "false"
 os.environ["SECRET_KEY"] = "test"
 
 import pytest  # noqa: E402
