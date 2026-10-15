@@ -51,7 +51,7 @@ Lihat [deploy/jetson/README.md](deploy/jetson/README.md). Isinya `install.sh` (b
 | `MQTT_ENABLED`, `WEBSOCKET_ENABLED` | `false` | Jalur ESP32 lama; lihat [docs/MQTT_SETUP.md](docs/MQTT_SETUP.md) |
 | `MAIL_*` | Gmail SMTP | Untuk email peringatan dan ekspor dari admin |
 
-`ADMIN_PIN` di `.env.example` **tidak dipakai**: hash PIN admin masih tertulis langsung di `app.py`.
+**PIN admin:** jalankan `.venv/bin/python scripts/set_admin_pin.py`. Yang disimpan di `.env` hanya hash-nya (`ADMIN_PIN_HASH`). Tanpa itu, login admin ditolak.
 
 ## Data contoh
 `seed_database.py` menambahkan 5 mahasiswa (UID `STUDENT001`–`STUDENT005`) dan 10 alat (`TOOL001`–`TOOL010`). Aman dijalankan berulang.

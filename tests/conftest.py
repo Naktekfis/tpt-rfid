@@ -19,6 +19,7 @@ app_module.app.config["WTF_CSRF_ENABLED"] = False
 app_module.limiter.enabled = False
 
 TEST_PIN = "424242"
+app_module.ADMIN_PIN_HASH = generate_password_hash(TEST_PIN)
 
 
 @pytest.fixture()

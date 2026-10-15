@@ -160,9 +160,14 @@ if not _reloader_parent:
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-# Admin authentication via hardcoded hashed PIN
-# PIN: 133133 (hashed with werkzeug scrypt)
-ADMIN_PIN_HASH = "scrypt:32768:8:1$v6unCJMhmE1m6btB$6cff2d6ce01facfb3b8c13ce4c248175507f02b1ef3d442013ccc2b79d0ae1f12c6aa48ee2051e706e096c05fa2279bccfd4b2e40099f742742fedbb6bc41097"
+# Admin PIN: werkzeug hash from .env (set it with scripts/set_admin_pin.py).
+# Without it, admin login is refused.
+ADMIN_PIN_HASH = app.config.get("ADMIN_PIN_HASH")
+if not ADMIN_PIN_HASH:
+    logger.warning(
+        "ADMIN_PIN_HASH is not set: admin login disabled. "
+        "Run: .venv/bin/python scripts/set_admin_pin.py"
+    )
 
 
 def admin_required(f):
@@ -689,7 +694,12 @@ def api_admin_login():
             return jsonify({"success": False, "error": "Payload JSON tidak valid"}), 400
         pin = data.get("pin", "")
 
-        if check_password_hash(ADMIN_PIN_HASH, pin):
+        if not ADMIN_PIN_HASH:
+            return jsonify(
+                {"success": False, "error": "PIN admin belum diatur di perangkat"}
+            ), 503
+
+        if isinstance(pin, str) and check_password_hash(ADMIN_PIN_HASH, pin):
             session["admin_logged_in"] = True
             session.permanent = (
                 True  # Uses config PERMANENT_SESSION_LIFETIME (default 31 days)
