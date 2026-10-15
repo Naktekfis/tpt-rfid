@@ -13,7 +13,7 @@
 ## Commands
 - Run (dev): `.venv/bin/python app.py` (port 5000). `start-app.sh` expects `venv/`, not `.venv/`.
 - Quick check after Python edits: `ruff check .` and `.venv/bin/python -m py_compile app.py config.py utils/*.py routes/*.py`
-- Tests: none yet. `scripts/test_mqtt_integration.py` and `scripts/test_mqtt.sh` are manual checks against a broker.
+- Tests: .venv/bin/python -m pytest -q (tests/, SQLite in-memory, CSRF+limiter off). Full check: scripts/check.sh. scripts/test_mqtt_*.{py,sh} are manual broker checks.
 
 ## Code Direction
 - New logic goes in `utils/` modules or a blueprint under `routes/`, not into `app.py`.
