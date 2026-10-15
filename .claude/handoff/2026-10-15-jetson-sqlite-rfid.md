@@ -2,6 +2,14 @@
 
 Written 2026-10-15 by the previous session. Branch `cvtest`. Start by reading this file, then `AGENTS.md` (auto-loaded), `.claude/knowledge/TARGET_PLATFORM.md`, and `.claude/knowledge/RFID_VX6336.md`.
 
+## Next session: start here (updated 2026-10-15, second session)
+- Steps 1-3 are done (commits 79524b8..a431b94). Next is **step 4 (reader driver)**. The protocol module needs real judgement, so the lead does it on Opus. The serial thread, Mock/Real factory and debounce can go to `build-bugfix` on Sonnet. The student-card question is still open, so the driver only reports EPCs.
+- Uncommitted: only `file-baru/`, which duplicates the CV files. The user has not yet said to delete it.
+- Checks: `scripts/check.sh` runs ruff on the whole repo plus pytest (31 tests). For Python 3.8, build a throwaway venv outside the repo with `uv venv --python 3.8 <dir> && uv pip install --python <dir>/bin/python -r requirements.txt -r requirements-dev.txt`, then run `PY38=<dir>/bin/python scripts/check.sh`.
+- The local `.env` still sets `DATABASE_URL=postgresql://...`; the user needs to remove that line to use SQLite.
+- Auto mode once refused `git commit` of the user's own edits. The user then approved it and it went through.
+- The "State at handoff" section below is from the first session and is outdated. The step entries below carry DONE markers.
+
 ## Goal (user's words, condensed)
 The app will run on a **Jetson Nano 4GB (P3450, JetPack 4.6.1, Ubuntu 18.04, aarch64)** with a local **SQLite** database and the **HW-VX6336 USB UHF reader** from `RFID HW/`. It should end up as a light app (web app in a kiosk browser; Electron/Tauri only if needed). **Priority: make it functionally correct first. UI/UX comes later.** There are no tests yet, and the user wants a sensible testing setup. Big scope/design refactors are expected; it is the user's personal repo, so breaking changes are fine.
 
