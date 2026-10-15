@@ -3,10 +3,11 @@ MQTT Client for TPT-RFID System
 Provides abstraction layer with mock mode support
 """
 
+from __future__ import annotations
+
 import logging
 import json
 from typing import Callable, Dict, Optional, Any
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -171,11 +172,11 @@ class MQTTClientReal:
         """
         try:
             import paho.mqtt.client as mqtt
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "paho-mqtt is required for real MQTT client. "
                 "Install with: pip install -r requirements-mqtt.txt"
-            )
+            ) from err
 
         self.broker_host = broker_host
         self.broker_port = broker_port

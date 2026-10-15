@@ -2,7 +2,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# Lint only the new test files for now: the rest of the repo has known
-# pre-existing ruff issues that are fixed in a later step.
-ruff check --target-version py38 tests
+# TEMP: user's uncommitted edits; drop once committed.
+ruff check . --extend-exclude app.py,utils/helpers.py
 .venv/bin/python -m pytest -q
+# Optional: also run tests on another interpreter, e.g. PY38=/path/to/venv38/bin/python
+if [ -n "${PY38:-}" ]; then
+  "$PY38" -m pytest -q
+fi

@@ -3,8 +3,7 @@ CV Handler — TPT-RFID Computer Vision Benchmark
 Handles camera management, face recognition pipeline, and system stats.
 
 Dependencies:
-    pip install opencv-python face_recognition psutil
-    (on RPi: pip install opencv-python face_recognition psutil --break-system-packages)
+    pip install -r requirements-cv.txt
 
 Face Recognition stack:
     face_recognition (ageitgey) → dlib HOG detector + 128-dim ResNet embedding
@@ -12,6 +11,8 @@ Face Recognition stack:
     Matching: Euclidean distance on embeddings, threshold-based binary result
     Similarity score: (1.0 - distance) * 100, displayed as percentage
 """
+
+from __future__ import annotations
 
 import cv2
 import threading

@@ -157,6 +157,7 @@ tpt-rfid/
 ├── setup.sh                   # Script setup otomatis
 ├── requirements.txt           # Dependensi Python (base)
 ├── requirements-mqtt.txt      # Dependensi MQTT (optional)
+├── requirements-cv.txt        # Dependensi CV benchmark (optional)
 ├── .env                       # Environment variables
 ├── .env.example               # Template environment variables
 │

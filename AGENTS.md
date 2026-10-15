@@ -13,12 +13,12 @@
 ## Commands
 - Run (dev): `.venv/bin/python app.py` (port 5000). `start-app.sh` expects `venv/`, not `.venv/`.
 - Quick check after Python edits: `ruff check .` and `.venv/bin/python -m py_compile app.py config.py utils/*.py routes/*.py`
-- Tests: .venv/bin/python -m pytest -q (tests/, SQLite in-memory, CSRF+limiter off). Full check: scripts/check.sh. scripts/test_mqtt_*.{py,sh} are manual broker checks.
+- Tests: .venv/bin/python -m pytest -q (tests/, SQLite in-memory, CSRF+limiter off). Full check: scripts/check.sh; `PY38=<py38 python> scripts/check.sh` also runs tests on 3.8. scripts/test_mqtt_*.{py,sh} are manual broker checks.
 
 ## Code Direction
 - New logic goes in `utils/` modules or a blueprint under `routes/`, not into `app.py`.
 - Keep hardware and network behind the Mock/Real factories so the app runs without an ESP32, broker, or camera.
-- Code must run on Python 3.8 (the target's floor): `ruff check --target-version py38`.
+- Code must run on Python 3.8 (the target's floor); ruff targets py38 via `pyproject.toml` and flags missing `from __future__ import annotations` (FA).
 - Catch the narrowest exception you can; broad catches only at request/MQTT callback boundaries, and they must log.
 
 ## Runtime Gotchas
