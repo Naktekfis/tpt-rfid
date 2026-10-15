@@ -3,7 +3,7 @@ flask-limiter==3.5.0
 Flask-SQLAlchemy==3.1.1
 Flask-Migrate==4.0.5
 Flask-WTF==1.2.2
-psycopg2-binary==2.9.9
+# PostgreSQL is optional: pip install psycopg2-binary and set DATABASE_URL
 python-dotenv==1.0.0
 Pillow==10.1.0
 pyserial==3.5

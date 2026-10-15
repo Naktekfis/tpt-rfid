@@ -26,8 +26,13 @@ class Config:
             sys.exit(1)
         SECRET_KEY = "dev-secret-key-change-in-production"
 
+    # Default: SQLite file under <repo>/instance. Set DATABASE_URL to override
+    # (e.g. postgresql://... if psycopg2 is installed manually).
+    _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    _INSTANCE_DIR = os.path.join(_BASE_DIR, "instance")
+    os.makedirs(_INSTANCE_DIR, exist_ok=True)
     SQLALCHEMY_DATABASE_URI = os.getenv(
-        "DATABASE_URL", "postgresql://localhost/tpt_rfid"
+        "DATABASE_URL", "sqlite:///" + os.path.join(_INSTANCE_DIR, "tpt_rfid.db")
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     UPLOAD_FOLDER = "uploads"

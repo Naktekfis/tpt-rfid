@@ -75,3 +75,8 @@ cookies.txt
 
 # Vendor RFID bundle (Windows SDKs/drivers); PDFs are copied to docs/hardware/vx6336/
 RFID HW/
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm

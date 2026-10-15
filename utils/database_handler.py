@@ -1,11 +1,15 @@
 """
-PostgreSQL database handler for RFID Workshop Tool Monitoring System
+Database handler for RFID Workshop Tool Monitoring System
 Handles all database operations using SQLAlchemy
 """
 
 import logging
+import sqlite3
 from datetime import datetime
 from typing import Dict, List, Optional
+
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from .models import db, Student, Tool, Transaction
 from .helpers import utc_to_wib
@@ -13,8 +17,23 @@ from .helpers import utc_to_wib
 logger = logging.getLogger(__name__)
 
 
+@event.listens_for(Engine, "connect")
+def _set_sqlite_pragmas(dbapi_conn, connection_record):
+    """Apply SQLite pragmas on every new connection (no-op for other DBs)."""
+    if not isinstance(dbapi_conn, sqlite3.Connection):
+        return
+    cursor = dbapi_conn.cursor()
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
+
+
 class DatabaseHandler:
-    """Handler for PostgreSQL database operations via SQLAlchemy"""
+    """Handler for database operations via SQLAlchemy"""
 
     def __init__(self, app=None):
         """Initialize database handler, optionally with a Flask app"""
@@ -24,10 +43,12 @@ class DatabaseHandler:
     def init_app(self, app):
         """Initialize with Flask app (for factory pattern support)"""
         db.init_app(app)
-        logger.info("PostgreSQL database handler initialized")
+        with app.app_context():
+            db.create_all()
+        logger.info("Database handler initialized")
 
     def create_tables(self, app):
-        """Create all tables (use flask db upgrade in production instead)"""
+        """Create all tables (also called on startup by init_app)"""
         with app.app_context():
             db.create_all()
         logger.info("Database tables created")
