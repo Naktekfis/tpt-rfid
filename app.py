@@ -146,9 +146,15 @@ rfid_reader = create_rfid_reader(
     addr=app.config.get("RFID_READER_ADDR", 0),
     absent_timeout=app.config.get("RFID_ABSENT_TIMEOUT", 2.5),
 )
-# Under the debug reloader this module is imported twice; only the child
-# process (WERKZEUG_RUN_MAIN) may own the serial port.
-if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+# `python app.py` with debug runs a reloader parent that only watches files
+# and a child (WERKZEUG_RUN_MAIN) that serves; only the child may own the
+# serial port. gunicorn imports this module as "app" and always starts it.
+_reloader_parent = (
+    __name__ == "__main__"
+    and app.debug
+    and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
+)
+if not _reloader_parent:
     rfid_reader.start()
 
 # Ensure upload folder exists
