@@ -21,7 +21,7 @@ Kiosk layar sentuh untuk peminjaman alat workshop dengan kartu/tag RFID, Lab Fab
 ```
 Database default adalah SQLite di `instance/tpt_rfid.db`. Tabel dibuat otomatis saat app start. Jangan isi `DATABASE_URL` kecuali memang mau database lain.
 
-**Simulasi scan tanpa reader** (hanya `FLASK_ENV=development`):
+**Simulasi scan tanpa reader** (hanya `FLASK_ENV=development`): di console browser `simulateRFID('STUDENT001')`, atau lewat URL:
 ```
 http://localhost:5000/debug/scan?uid=STUDENT001
 http://localhost:5000/debug/clear
