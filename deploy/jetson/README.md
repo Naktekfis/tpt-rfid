@@ -1,6 +1,6 @@
 # Jetson Nano bring-up
 
-Files for running tpt-rfid on the Jetson Nano 4GB (JetPack 4.6.x, Ubuntu 18.04). Background: `.claude/knowledge/TARGET_PLATFORM.md`. For this target, use these files instead of `tpt-rfid-installer.sh` and `setup.sh`, which still assume Postgres on a Raspberry Pi.
+Files for running tpt-rfid on the Jetson Nano 4GB (JetPack 4.6.x, Ubuntu 18.04). Background: `.claude/knowledge/TARGET_PLATFORM.md`. `setup.sh` in the repo root is the laptop dev setup; the old Raspberry Pi + Postgres installer was removed (see git history before this commit).
 
 | File | Installed to | Does |
 |---|---|---|

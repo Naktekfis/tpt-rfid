@@ -7,21 +7,21 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Use .venv (dev) if present, else venv (installer/setup.sh)
+# Use .venv if present, else an older venv/
 if [ -d ".venv" ]; then
     VENV_DIR=".venv"
 elif [ -d "venv" ]; then
     VENV_DIR="venv"
 else
     echo "❌ Virtual environment not found (.venv or venv)!"
-    echo "Please run tpt-rfid-installer.sh first"
+    echo "Run ./setup.sh (laptop) or deploy/jetson/install.sh (Jetson) first"
     exit 1
 fi
 
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo "❌ .env file not found!"
-    echo "Please run tpt-rfid-installer.sh first"
+    echo "Run ./setup.sh (laptop) or deploy/jetson/install.sh (Jetson) first"
     exit 1
 fi
 

@@ -1,5 +1,7 @@
 # Troubleshooting Guide - TPT RFID System
 
+> **Legacy:** this guide is for the old Raspberry Pi + PostgreSQL + ESP32 setup. For the Jetson Nano + SQLite + USB reader, see [deploy/jetson/README.md](../deploy/jetson/README.md).
+
 Panduan lengkap troubleshooting untuk mengatasi masalah yang umum terjadi pada sistem TPT RFID.
 
 ## Daftar Isi

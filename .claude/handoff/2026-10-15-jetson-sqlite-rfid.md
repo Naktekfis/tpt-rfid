@@ -35,7 +35,7 @@ The app will run on a **Jetson Nano 4GB (P3450, JetPack 4.6.1, Ubuntu 18.04, aar
 5. `face-recognition` is in the main `requirements.txt` although the code treats CV as optional. It cannot be installed casually on the Jetson.
 6. [FIXED] Bare `except:` at `app.py:917` and `app.py:1232`.
 7. Python 3.8 breakers: `utils/cv_handler.py:63` (`list[str]`) and `:165` (`str | None`).
-8. `file-baru/` holds CV files, but every one of them differs from the repo version (checked 2026-10-15), plus `INTEGRATION.py` (a patch note). Not a plain duplicate: compare before deleting.
+8. [DONE] `file-baru/` was the original CV drop (identical to 93f5c87); deleted with the user's OK.
 9. [FIX READY in deploy/jetson, applies when install.sh runs] `~/.config/autostart/tpt-rfid-kiosk.desktop` points to `/home/ahmad/tpt-rfid-kiosk.sh`, which does not exist.
 
 ## Proposed plan (each step its own small commit; tests from step 1 on)
@@ -45,6 +45,7 @@ The app will run on a **Jetson Nano 4GB (P3450, JetPack 4.6.1, Ubuntu 18.04, aar
 4. **[DONE]** `utils/vx6336.py` + `utils/rfid_reader.py`, wired into `app.py` (`rfid_reader`, start guarded for the debug reloader, `GET /api/rfid/status`). `utils/rfid_mock.py` removed. Config: `RFID_READER_ENABLED`, `RFID_READER_PORT`, `RFID_READER_ADDR`, `RFID_ABSENT_TIMEOUT`. 61 tests pass on 3.10 and 3.8. Student cards assumed on the same reader (user). Not yet run against real hardware. Original step text: **Reader driver.** Add a pure protocol module (frame build/parse, CRC, inventory response parsing) with unit tests using the vectors in `RFID_VX6336.md`. Add a serial reader thread behind a Mock/Real factory, with debounce. Feed scans into the same path that `/api/scan_*` and MQTT use now. **Open question for the user/hardware team:** are student cards UHF too (same reader), or is there a second reader?
 5. **[DONE]** Item 1: global default limits removed (confirmed: the 51st `/api/check_rfid` poll got a 429, so the scan page broke after ~50 s); per-route limits stay, tests in `tests/test_rate_limit.py`. Item 3: `start-app.sh` picks `.venv` or `venv`. Item 6 was already fixed. Original: **Fix audit items 1, 3, 6.**
 6. **Device bring-up** (files prepared in `deploy/jetson/`; step-4 bug fixed on the way: the reader thread never started under gunicorn when DEBUG was on) (gated: the user runs it or approves it): run the checks in `TARGET_PLATFORM.md`, set up the Python 3.8 venv, a udev rule for the reader, a systemd service for Flask, and a kiosk browser autostart (fix item 9). Record the real device output in `TARGET_PLATFORM.md`.
+6b. **[DONE] Docs/setup cleanup**: README rewritten for SQLite + Jetson + USB reader; `setup.sh` is now the laptop dev setup (.venv); `tpt-rfid-installer.sh` and `INSTALLER_GUIDE.md` removed (superseded by `deploy/jetson/`); `docs/DEPLOYMENT.md` and `docs/TROUBLESHOOTING.md` carry a legacy banner. Still open: the admin PIN hash is hardcoded in `app.py` (with the PIN in a comment) and `.env` `ADMIN_PIN` is ignored (gated: auth).
 7. Later: UI/UX pass (`/ui-audit` first), CV on device, and the ESP32/MQTT path (keep or drop?).
 
 ## Questions to raise with the user
