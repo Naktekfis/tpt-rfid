@@ -56,3 +56,22 @@ Thumbs.db
 
 # Logs
 *.log
+
+# >>> agent-kit
+.claude/settings.local.json
+.claude/evidence/
+.claude/worktrees/
+.codebase-memory/
+**/.codebase-memory/
+.env
+.env.*
+!.env.example
+*.secret
+*.secrets
+*.pem
+*.key
+cookies.txt
+# <<< agent-kit
+
+# Vendor RFID bundle (Windows SDKs/drivers); PDFs are copied to docs/hardware/vx6336/
+RFID HW/
