@@ -48,6 +48,7 @@ fi
 # Run database migration
 echo ""
 echo "[6/6] Running database migration..."
+export FLASK_APP=app.py
 if [ -d "migrations" ]; then
     flask db upgrade
     echo "  Database tables created/updated."
@@ -64,7 +65,8 @@ echo " Setup complete!"
 echo "================================================"
 echo ""
 echo "Next steps:"
-echo "  1. Edit .env and set DATABASE_URL, SECRET_KEY, ADMIN_PIN"
+echo "  1. Edit .env and set DATABASE_URL and SECRET_KEY"
+echo "     (Admin PIN is currently hardcoded in app.py, .env ADMIN_PIN is ignored)"
 echo "  2. (Optional) Seed sample data:  python seed_database.py"
 echo "  3. Run the application:          python app.py"
 echo "  4. Open browser:                 http://localhost:5000"

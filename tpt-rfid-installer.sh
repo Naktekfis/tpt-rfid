@@ -209,7 +209,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # Generate SECRET_KEY
 SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
 
-# ADMIN_PIN is hardcoded (hashed) in app.py as '133133'
+# Admin PIN is hardcoded (hashed) in app.py as '133133'
 ADMIN_PIN="133133"
 
 # Create .env file
@@ -218,7 +218,7 @@ FLASK_ENV=production
 DEBUG=False
 SECRET_KEY=$SECRET_KEY
 DATABASE_URL=postgresql://$CURRENT_USER:$DB_PASSWORD@localhost/tpt_rfid
-ADMIN_PIN=133133  # hardcoded in app.py (hashed)
+ADMIN_PIN=133133  # ignored at runtime; PIN hash is hardcoded in app.py
 
 # Email (optional - configure later if needed)
 MAIL_SERVER=smtp.gmail.com
@@ -271,6 +271,7 @@ if [ ! -d "migrations" ]; then
     flask db migrate -m "initial migration"
 fi
 
+export FLASK_APP=app.py
 flask db upgrade
 
 # Seed sample data

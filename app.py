@@ -666,7 +666,9 @@ else:
 def api_admin_login():
     """Verify admin PIN and create session"""
     try:
-        data = request.json
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Payload JSON tidak valid"}), 400
         pin = data.get("pin", "")
 
         if check_password_hash(ADMIN_PIN_HASH, pin):
@@ -708,7 +710,9 @@ def get_admin_tools_status():
 def send_warning_email():
     """Send warning email to student about tool return"""
     try:
-        data = request.json
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Payload JSON tidak valid"}), 400
 
         # Validate required fields
         required_fields = ["student_name", "student_email", "tool_name", "borrow_date"]
@@ -791,7 +795,9 @@ def send_export_email():
     MAX_EXPORT_RECORDS = 10000
 
     try:
-        data = request.json
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"success": False, "error": "Payload JSON tidak valid"}), 400
 
         # Validate required fields
         if not data or "email" not in data:
@@ -981,7 +987,15 @@ Email ini dikirim secara otomatis oleh sistem monitoring Lab Fabrikasi.
 def add_tool():
     """Add new tool"""
     try:
-        data = request.json or request.form
+        if request.is_json:
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict):
+                return (
+                    jsonify({"success": False, "error": "Payload JSON tidak valid"}),
+                    400,
+                )
+        else:
+            data = request.form
 
         name = sanitize_input(data.get("name", ""))
         rfid_uid = data.get("rfid_uid", "")
@@ -1034,6 +1048,17 @@ def add_tool():
         return jsonify(
             {"success": False, "error": "Terjadi kesalahan saat menambah alat"}
         ), 500
+
+
+@app.route("/api/rfid/clear", methods=["POST"])
+def clear_rfid_state():
+    """Clear RFID reader state for scan workflow."""
+    try:
+        rfid_reader.clear()
+        return jsonify({"success": True, "message": "RFID state cleared"})
+    except Exception as e:
+        logger.error(f"Error clearing RFID state: {str(e)}")
+        return jsonify({"success": False, "error": "Terjadi kesalahan"}), 500
 
 
 @app.route("/api/admin/transactions", methods=["GET"])

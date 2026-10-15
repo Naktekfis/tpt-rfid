@@ -9,6 +9,14 @@ let studentData = null;
 let toolData = null;
 let rfidPollInterval = null;
 
+function clearRFIDState() {
+    return fetch('/api/rfid/clear', {
+        method: 'POST',
+        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({})
+    }).then(response => response.json());
+}
+
 document.addEventListener('DOMContentLoaded', function () {
     console.log('Scan page loaded');
 
@@ -55,14 +63,15 @@ function initializeWorkflow() {
  * Reset workflow
  */
 function resetWorkflow() {
-    // Clear RFID
-    fetch('/debug/clear')
+    // Clear RFID state
+    clearRFIDState()
         .then(() => {
             initializeWorkflow();
             showToast('Reset berhasil', 'info');
         })
         .catch(error => {
             console.error('Error clearing RFID:', error);
+            initializeWorkflow();
         });
 }
 
@@ -210,7 +219,7 @@ function fetchStudentData(uid) {
 
                 // Clear the RFID reader so the student UID doesn't get
                 // picked up again as a tool scan in step 2
-                fetch('/debug/clear').catch(err => console.error('Error clearing RFID:', err));
+                clearRFIDState().catch(err => console.error('Error clearing RFID:', err));
 
                 // Show tool scanner
                 document.getElementById('tool-scanner-container').classList.remove('hidden');

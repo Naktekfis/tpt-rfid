@@ -109,7 +109,12 @@ def stats():
 
 @cv_bp.route("/camera/open", methods=["POST"])
 def camera_open():
-    index = request.json.get("index", 0) if request.is_json else 0
+    payload = request.get_json(silent=True) if request.is_json else {}
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "reason": "invalid_json"}), 400
+    index = payload.get("index", 0)
     ok = camera.open(index)
     return jsonify(
         {
@@ -133,7 +138,10 @@ def camera_close():
 def set_resolution():
     if not request.is_json:
         return jsonify({"ok": False, "reason": "no_json"}), 400
-    label = request.json.get("resolution")
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return jsonify({"ok": False, "reason": "invalid_json"}), 400
+    label = payload.get("resolution")
     if not label:
         return jsonify({"ok": False, "reason": "missing_field"}), 400
     result = camera.set_resolution(label)

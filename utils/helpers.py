@@ -19,7 +19,7 @@ def get_wib_time():
     Returns:
         datetime: Current time in WIB timezone
     """
-    return datetime.now(timezone.utc) + WIB_OFFSET
+    return datetime.now(timezone(WIB_OFFSET)).replace(tzinfo=None)
 
 
 def utc_to_wib(utc_datetime):
