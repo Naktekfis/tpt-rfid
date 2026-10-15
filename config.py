@@ -57,6 +57,13 @@ class Config:
     )  # For RFID scans, transactions
     MQTT_QOS_NORMAL = int(os.getenv("MQTT_QOS_NORMAL", "0"))  # For sensor data
 
+    # USB UHF reader (HW-VX6336). Disabled = mock reader (debug routes only).
+    RFID_READER_ENABLED = os.getenv("RFID_READER_ENABLED", "false").lower() == "true"
+    RFID_READER_PORT = os.getenv("RFID_READER_PORT", "/dev/ttyUSB0")
+    RFID_READER_ADDR = int(os.getenv("RFID_READER_ADDR", "0"), 0)
+    # A tag must be away this long (s) before the same tag is reported again.
+    RFID_ABSENT_TIMEOUT = float(os.getenv("RFID_ABSENT_TIMEOUT", "2.5"))
+
     # WebSocket Configuration
     WEBSOCKET_ENABLED = os.getenv("WEBSOCKET_ENABLED", "false").lower() == "true"
     WEBSOCKET_CORS_ORIGINS = os.getenv(

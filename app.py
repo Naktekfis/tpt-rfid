@@ -39,8 +39,8 @@ from utils import (
     validate_record_id,
     create_mqtt_client,
     create_websocket_handler,
+    create_rfid_reader,
 )
-from utils.rfid_mock import rfid_reader
 
 # Configure logging
 logging.basicConfig(
@@ -135,6 +135,19 @@ else:
 
 if not app.config.get("WEBSOCKET_ENABLED", False):
     logger.info("WebSocket disabled - using mock mode")
+
+# RFID reader (USB HW-VX6336, or mock). Pages poll its current UID via
+# /api/check_rfid; student cards and tool tags come through the same reader.
+rfid_reader = create_rfid_reader(
+    enabled=app.config.get("RFID_READER_ENABLED", False),
+    port=app.config.get("RFID_READER_PORT", "/dev/ttyUSB0"),
+    addr=app.config.get("RFID_READER_ADDR", 0),
+    absent_timeout=app.config.get("RFID_ABSENT_TIMEOUT", 2.5),
+)
+# Under the debug reloader this module is imported twice; only the child
+# process (WERKZEUG_RUN_MAIN) may own the serial port.
+if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+    rfid_reader.start()
 
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -1043,6 +1056,12 @@ def add_tool():
         ), 500
 
 
+@app.route("/api/rfid/status", methods=["GET"])
+def rfid_status():
+    """Reader mode and connection state (for bring-up and health checks)."""
+    return jsonify({"success": True, **rfid_reader.status()})
+
+
 @app.route("/api/rfid/clear", methods=["POST"])
 def clear_rfid_state():
     """Clear RFID reader state for scan workflow."""
@@ -1318,6 +1337,7 @@ def internal_error(error):
 def cleanup():
     """Cleanup resources on application shutdown"""
     logger.info("Shutting down application...")
+    rfid_reader.stop()
     if app.config.get("MQTT_ENABLED", False):
         try:
             mqtt_client.disconnect()

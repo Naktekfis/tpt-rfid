@@ -46,4 +46,6 @@ Never send these from app code without explicit approval: Write Data `0x03`, Wri
 - The tag ID used by the app is the EPC bytes as an uppercase hex string. This replaces the current `rfid_uid` values. Check what format existing rows and the ESP32 path use before switching.
 - Pure protocol code (frame build/parse, CRC) goes in its own module with unit tests built from the vectors above. The serial loop sits behind the same Mock/Real factory pattern as `utils/mqtt_client.py`, so the app still runs without a reader.
 - Debounce: one tap produces several inventory hits while the tag is in range, so report a given EPC once per presence window.
-- **Open question**: there is one short-range UHF reader. The current flow scans a student card *and* a tool tag. Are student cards UHF EPC too, or do they use a different reader (13.56 MHz)? Confirm with the hardware team.
+- Implemented (step 4): `utils/vx6336.py` (protocol, only the safe commands can be built) and `utils/rfid_reader.py` (`VX6336Reader` thread polls Inventory `0x01`, `ScanDebouncer` with `RFID_ABSENT_TIMEOUT`, reconnects every 3 s if the port is missing). `GET /api/rfid/status` shows mode/connection. Buzzer `0x33` is not used yet (its data layout was not checked).
+- Working assumption (user, 2026-10-15): student cards are UHF too and are read on the **same reader**. `clear()` does not reset the debouncer, so a card left on the reader is not re-reported as the next scan.
+- Not yet tested against the real reader: response timing, multi-frame `0x03`, and EPC format of the actual cards.

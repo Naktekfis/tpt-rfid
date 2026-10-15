@@ -182,7 +182,8 @@ tpt-rfid/
 │   ├── database_handler.py    # Operasi CRUD PostgreSQL
 │   ├── mqtt_client.py         # MQTT client (Mock + Real)
 │   ├── websocket_handler.py   # WebSocket handler (Mock + Real)
-│   ├── rfid_mock.py           # Simulasi RFID reader
+│   ├── vx6336.py              # Protokol serial reader UHF HW-VX6336
+│   ├── rfid_reader.py         # Reader RFID (mock / USB VX6336)
 │   └── helpers.py             # Fungsi utilitas
 │
 ├── scripts/
