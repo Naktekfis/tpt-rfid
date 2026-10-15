@@ -93,11 +93,11 @@ class WebSocketHandlerReal:
             self._emit = emit
             self._join_room = join_room
             self._leave_room = leave_room
-        except ImportError:
+        except ImportError as err:
             raise ImportError(
                 "flask-socketio is required for real WebSocket handler. "
                 "Install with: pip install -r requirements-mqtt.txt"
-            )
+            ) from err
 
         self.socketio = None
         self.app = app

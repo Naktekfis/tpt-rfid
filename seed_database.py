@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from flask import Flask
 from config import get_config
-from utils import DatabaseHandler, db
+from utils import DatabaseHandler
 from utils.models import Student, Tool
 
 
@@ -87,7 +87,7 @@ def seed_students(app, database):
                     )
                     continue
 
-                student = database.create_student(student_data)
+                database.create_student(student_data)
                 print(
                     f"  OK   Created: {student_data['name']} (NIM: {student_data['nim']}, UID: {student_data['rfid_uid']})"
                 )
@@ -187,7 +187,7 @@ def seed_tools(app, database):
                     )
                     continue
 
-                tool = database.create_tool(tool_data)
+                database.create_tool(tool_data)
                 print(
                     f"  OK   Created: {tool_data['name']} (Category: {tool_data['category']}, UID: {tool_data['rfid_uid']})"
                 )

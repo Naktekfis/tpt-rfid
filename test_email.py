@@ -31,7 +31,7 @@ def send_test_email():
     
     recipient = "adrian.rachman.rustandi@gmail.com"
     
-    print(f"🚀 Sending test email...")
+    print("🚀 Sending test email...")
     print(f"   From: {app.config['MAIL_DEFAULT_SENDER']}")
     print(f"   To: {recipient}")
     print(f"   Server: {app.config['MAIL_SERVER']}:{app.config['MAIL_PORT']}")

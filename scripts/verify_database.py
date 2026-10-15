@@ -16,8 +16,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 load_dotenv()
 
 # Import database models
-from utils.models import db, Student, Tool, Transaction
-from config import get_config
+from utils.models import db, Student, Tool, Transaction  # noqa: E402
+from config import get_config  # noqa: E402
 
 
 # Colors for terminal output
