@@ -4,13 +4,12 @@ A touchscreen kiosk application for workshop tool borrowing using RFID cards
 """
 
 import os
-import sys
 import logging
 import functools
-import secrets
 import csv
 import io
-from datetime import datetime, timedelta
+import atexit
+from datetime import datetime
 import openpyxl
 from flask import (
     Flask,
@@ -28,17 +27,18 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
-from werkzeug.utils import secure_filename
+from werkzeug.security import check_password_hash
 
 from config import get_config
 from utils import (
     DatabaseHandler,
     db,
     allowed_file,
-    generate_unique_filename,
     validate_nim,
     sanitize_input,
     validate_record_id,
+    create_mqtt_client,
+    create_websocket_handler,
 )
 from utils.rfid_mock import rfid_reader
 
@@ -100,7 +100,6 @@ except ImportError as e:
     )
 
 # Initialize MQTT client (mock or real based on MQTT_ENABLED)
-from utils import create_mqtt_client, create_websocket_handler
 
 mqtt_client = create_mqtt_client(
     enabled=app.config.get("MQTT_ENABLED", False),
@@ -142,8 +141,6 @@ os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
 # Admin authentication via hardcoded hashed PIN
 # PIN: 133133 (hashed with werkzeug scrypt)
-from werkzeug.security import check_password_hash
-
 ADMIN_PIN_HASH = "scrypt:32768:8:1$v6unCJMhmE1m6btB$6cff2d6ce01facfb3b8c13ce4c248175507f02b1ef3d442013ccc2b79d0ae1f12c6aa48ee2051e706e096c05fa2279bccfd4b2e40099f742742fedbb6bc41097"
 
 
@@ -911,11 +908,7 @@ def send_export_email():
             max_length = 0
             column = [cell for cell in column]
             for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
+                max_length = max(max_length, len(str(cell.value)))
             adjusted_width = max_length + 2
             ws.column_dimensions[column[0].column_letter].width = adjusted_width
 
@@ -1226,11 +1219,7 @@ def export_history():
                 max_length = 0
                 column = [cell for cell in column]
                 for cell in column:
-                    try:
-                        if len(str(cell.value)) > max_length:
-                            max_length = len(str(cell.value))
-                    except:
-                        pass
+                    max_length = max(max_length, len(str(cell.value)))
                 adjusted_width = max_length + 2
                 ws.column_dimensions[column[0].column_letter].width = adjusted_width
 
@@ -1324,7 +1313,6 @@ def internal_error(error):
 # ==================== Main ====================
 
 # Cleanup handler for graceful shutdown
-import atexit
 
 
 def cleanup():

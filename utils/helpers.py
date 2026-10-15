@@ -2,7 +2,6 @@
 Helper utility functions for the RFID Workshop Tool Monitoring System
 """
 
-import os
 import uuid
 import html
 from datetime import datetime, timezone, timedelta
