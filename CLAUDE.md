@@ -32,6 +32,7 @@ The main session is `lead`: it owns scope, integration, risk calls, and the fina
   Verify: <exact commands>
   Report: decisions + files changed + check results, ~15 lines, no pasted diff
   ```
-- Model per call: `build-bugfix` Opus; `explore-plan`, `test-review`, `ui-review`, `docs-knowledge` Sonnet (Opus for architecture or anything in GATES.md); Haiku only for mechanical search/log summaries.
+- Model per call: Opus only for high-judgement work (architecture, diagnosis of unknown causes, anything in GATES.md). When the brief already fixes the decisions (tests, mechanical edits, scripted changes), run `build-bugfix` on Sonnet. `explore-plan`, `test-review`, `ui-review`, `docs-knowledge` Sonnet by default; Haiku only for mechanical search/log summaries.
+- If the lead runs on Opus and what is left is routine, or the chat is getting long, stop and write a handoff in `.claude/handoff/` instead of continuing.
 - Light review by default: `test-review` reads the diff, reports only breaking findings, and does not re-run checks the implementer already reported green. Full review only when asked or gated.
 - Run the full check command once at the end, by one agent. Read code by line ranges, pipe long output through `tail`.
