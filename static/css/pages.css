@@ -761,3 +761,34 @@ input[type="date"].input {
 .tool-form .lead {
   font-size: var(--fs-md);
 }
+
+/* ---------- Riwayat ---------- */
+
+.history-filter {
+  margin-bottom: var(--sp-5);
+}
+.quick-ranges {
+  display: flex;
+  gap: var(--sp-5);
+  align-self: center;
+  padding-left: var(--sp-4);
+  margin-top: var(--sp-5);
+  border-left: var(--hairline);
+}
+.quick-ranges .linkbtn[aria-pressed="true"] {
+  color: var(--c-ink);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.3em;
+}
+.history-count {
+  margin-left: auto;
+  align-self: flex-end;
+  padding-bottom: var(--sp-2);
+}
+.history-table td {
+  vertical-align: top;
+}
+.table .sub.status--warn {
+  color: var(--c-warn);
+}

@@ -1,374 +1,191 @@
-document.addEventListener('DOMContentLoaded', function () {
-    const startDateInput = document.getElementById('start-date');
-    const endDateInput = document.getElementById('end-date');
-    const applyBtn = document.getElementById('btn-apply-filter');
-    const tableBody = document.getElementById('transactions-body');
-    const emptyState = document.getElementById('empty-state');
-    const filterBtns = document.querySelectorAll('.filter-btn');
+/*
+ * /admin/history: transactions for a date range (/api/admin/transactions),
+ * export as CSV / Excel (/api/admin/export, fetched so errors show as a
+ * toast) or by email (/api/admin/send_export_email).
+ */
+(function () {
+    'use strict';
 
-    const exportCsvBtn = document.getElementById('btn-export-csv');
-    const exportXlsxBtn = document.getElementById('btn-export-xlsx');
-    const emailExportBtn = document.getElementById('btn-email-export');
-    
-    // Email modal elements
-    const emailModal = document.getElementById('email-modal');
-    const emailModalBackdrop = document.getElementById('email-modal-backdrop');
-    const closeModalBtn = document.getElementById('close-modal');
-    const cancelEmailBtn = document.getElementById('cancel-email');
-    const submitEmailBtn = document.getElementById('submit-email');
-    const emailInput = document.getElementById('email-input');
-    const emailError = document.getElementById('email-error');
+    const UI = window.UI;
+    const h = UI.h;
+    const $ = function (id) { return document.getElementById(id); };
 
-    // Initialize with "1 Bulan"
-    setQuickFilter('month');
+    let range = '30';
 
-    // Quick Filter Logic
-    filterBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const range = btn.dataset.range;
-            setActiveFilterBtn(btn);
-            setQuickFilter(range);
-            loadData();
+    // YYYY-MM-DD of today minus `days` in WIB.
+    function wibDate(daysAgo) {
+        const d = new Date(Date.now() + 7 * 3600 * 1000 - (daysAgo || 0) * 24 * 3600 * 1000);
+        return d.toISOString().slice(0, 10);
+    }
+
+    function setRange(r) {
+        range = r;
+        $('end-date').value = wibDate(0);
+        $('start-date').value = r === 'all' ? '' : wibDate(+r);
+        document.querySelectorAll('[data-range]').forEach(function (b) {
+            b.setAttribute('aria-pressed', String(b.getAttribute('data-range') === r));
         });
-    });
+    }
 
-    // Manual Filter Logic
-    applyBtn.addEventListener('click', () => {
-        // Clear active state from quick filters if manual
-        filterBtns.forEach(b => b.classList.remove('active'));
-        loadData();
-    });
-    
-    // Export Button Click Handlers with Loading State
-    exportCsvBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        handleExport(this, 'csv');
-    });
-    
-    exportXlsxBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        handleExport(this, 'xlsx');
-    });
-    
-    // Email Export Modal Handlers
-    emailExportBtn.addEventListener('click', function() {
-        openEmailModal();
-    });
-    
-    closeModalBtn.addEventListener('click', function() {
-        closeEmailModal();
-    });
-    
-    cancelEmailBtn.addEventListener('click', function() {
-        closeEmailModal();
-    });
-    
-    // Close modal when clicking backdrop
-    emailModalBackdrop.addEventListener('click', function() {
-        closeEmailModal();
-    });
-    
-    // Email input validation on input
-    emailInput.addEventListener('input', function() {
-        if (emailError.classList.contains('hidden') === false) {
-            emailError.classList.add('hidden');
+    function query() {
+        const q = [];
+        if ($('start-date').value) q.push('start_date=' + $('start-date').value);
+        if ($('end-date').value) q.push('end_date=' + $('end-date').value);
+        return q.join('&');
+    }
+
+    function rangeText() {
+        const s = $('start-date').value;
+        const e = $('end-date').value;
+        const fmt = function (v) { return UI.formatWibDate(v + 'T00:00').replace(/, 00\.00$/, ''); };
+        if (s && e) return fmt(s) + ' sampai ' + fmt(e);
+        if (s) return 'sejak ' + fmt(s);
+        if (e) return 'sampai ' + fmt(e);
+        return 'semua waktu';
+    }
+
+    function statusCell(t) {
+        const cell = h('td');
+        if (t.status === 'borrowed') {
+            cell.appendChild(t.is_overdue
+                ? h('span', { class: 'status status--warn', text: 'Terlambat' })
+                : h('span', { class: 'status', text: 'Dipinjam' }));
+            return cell;
         }
-    });
-    
-    // Submit email export
-    submitEmailBtn.addEventListener('click', function() {
-        handleEmailExport();
-    });
-    
-    // Allow Enter key to submit
-    emailInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            handleEmailExport();
+        cell.appendChild(h('span', { class: 'status status--muted', text: 'Dikembalikan' }));
+        if (t.returned_by_name && t.returned_by_name !== t.student_name) {
+            cell.appendChild(h('span', { class: 'sub', text: 'oleh ' + t.returned_by_name }));
         }
-    });
-
-    function setActiveFilterBtn(activeBtn) {
-        filterBtns.forEach(b => b.classList.remove('active'));
-        activeBtn.classList.add('active');
-    }
-
-    function setQuickFilter(range) {
-        const end = new Date();
-        let start = new Date();
-
-        switch (range) {
-            case 'week':
-                start.setDate(end.getDate() - 7);
-                break;
-            case 'month':
-                start.setMonth(end.getMonth() - 1);
-                break;
-            case 'year':
-                start.setFullYear(end.getFullYear() - 1);
-                break;
-            case 'all':
-                start = null;
-                break;
+        if (!t.return_verified) {
+            cell.appendChild(h('span', { class: 'sub status status--warn', text: 'belum diverifikasi' }));
         }
-
-        if (start) {
-            startDateInput.valueAsDate = start;
-        } else {
-            startDateInput.value = '';
-        }
-        endDateInput.valueAsDate = end;
+        return cell;
     }
 
-    function updateExportLinks() {
-        const start = startDateInput.value;
-        const end = endDateInput.value;
-
-        let query = '';
-        if (start) query += `&start_date=${start}`;
-        if (end) query += `&end_date=${end}`;
-
-        exportCsvBtn.href = `/api/admin/export?format=csv${query}`;
-        exportXlsxBtn.href = `/api/admin/export?format=xlsx${query}`;
-    }
-    
-    function handleExport(button, format) {
-        const start = startDateInput.value;
-        const end = endDateInput.value;
-        
-        // Build URL
-        let url = `/api/admin/export?format=${format}`;
-        if (start) url += `&start_date=${start}`;
-        if (end) url += `&end_date=${end}`;
-        
-        // Save original button content
-        const originalHTML = button.innerHTML;
-        const originalClasses = button.className;
-        
-        // Show loading state
-        button.disabled = true;
-        button.innerHTML = `
-            <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Exporting...
-        `;
-        button.className = originalClasses.replace('hover:bg-', 'bg-') + ' opacity-75 cursor-wait';
-        
-        // Perform fetch to check for errors
-        fetch(url)
-            .then(response => {
-                if (!response.ok) {
-                    // If error, parse JSON error message
-                    return response.json().then(data => {
-                        throw new Error(data.error || 'Export gagal');
-                    });
-                }
-                // If successful, trigger download
-                return response.blob().then(blob => {
-                    const downloadUrl = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = downloadUrl;
-                    a.download = `rekap_peminjaman_${new Date().getTime()}.${format}`;
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    window.URL.revokeObjectURL(downloadUrl);
-                    
-                    // Show success toast
-                    showToast(`Export ${format.toUpperCase()} berhasil!`, 'success');
-                });
-            })
-            .catch(error => {
-                console.error('Export error:', error);
-                showToast(error.message || 'Terjadi kesalahan saat export', 'error');
-            })
-            .finally(() => {
-                // Restore button state
-                button.disabled = false;
-                button.innerHTML = originalHTML;
-                button.className = originalClasses;
-            });
-    }
-    
-    function showToast(message, type = 'info') {
-        // Simple toast notification
-        const toast = document.createElement('div');
-        const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500';
-        
-        toast.className = `fixed bottom-4 right-4 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-fade-in`;
-        toast.textContent = message;
-        
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.classList.add('animate-fade-out');
-            setTimeout(() => {
-                document.body.removeChild(toast);
-            }, 300);
-        }, 3000);
-    }
-    
-    // Email Modal Functions
-    function openEmailModal() {
-        emailInput.value = '';
-        emailError.classList.add('hidden');
-        emailModal.classList.remove('hidden');
-        emailModalBackdrop.classList.remove('hidden');
-        // Focus on email input after animation
-        setTimeout(() => emailInput.focus(), 100);
-    }
-    
-    function closeEmailModal() {
-        emailModal.classList.add('hidden');
-        emailModalBackdrop.classList.add('hidden');
-        emailInput.value = '';
-        emailError.classList.add('hidden');
-    }
-    
-    function validateEmail(email) {
-        // Standard email validation regex
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }
-    
-    function handleEmailExport() {
-        const email = emailInput.value.trim();
-        
-        // Validate email format
-        if (!email) {
-            emailError.textContent = 'Email tidak boleh kosong';
-            emailError.classList.remove('hidden');
+    function render(rows) {
+        const body = $('history-body');
+        body.textContent = '';
+        $('history-count').textContent = rows.length + ' transaksi';
+        if (!rows.length) {
+            body.appendChild(h('tr', null, h('td', { class: 'empty', colspan: '6', text: 'Belum ada peminjaman pada periode ini.' })));
             return;
         }
-        
-        if (!validateEmail(email)) {
-            emailError.textContent = 'Format email tidak valid';
-            emailError.classList.remove('hidden');
+        rows.forEach(function (t) {
+            body.appendChild(h('tr', null,
+                h('td', { class: 'num', text: UI.formatWibDate(t.borrow_time) }),
+                h('td', null, h('span', { text: t.student_name }), h('span', { class: 'sub num', text: t.student_nim || '' })),
+                h('td', null, h('strong', { text: t.tool_name })),
+                h('td', { class: 'num' + (t.is_overdue ? ' status status--warn' : ''), text: UI.formatWibDate(t.due_at) }),
+                h('td', { class: 'num', text: t.return_time ? UI.formatWibDate(t.return_time) : '-' }),
+                statusCell(t)));
+        });
+    }
+
+    async function load() {
+        const s = $('start-date').value;
+        const e = $('end-date').value;
+        if (s && e && s > e) {
+            UI.toast('Tanggal mulai harus sebelum tanggal akhir.', 'warn');
             return;
         }
-        
-        // Get date range
-        const start = startDateInput.value;
-        const end = endDateInput.value;
-        
-        // Disable submit button and show loading
-        const originalHTML = submitEmailBtn.innerHTML;
-        submitEmailBtn.disabled = true;
-        submitEmailBtn.innerHTML = `
-            <svg class="animate-spin h-4 w-4 inline-block mr-2" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Mengirim...
-        `;
-        
-        // Send request to backend
-        const requestData = {
-            email: email,
-            start_date: start || null,
-            end_date: end || null
-        };
-        
-        fetch('/api/admin/send_export_email', {
-            method: 'POST',
-            headers: getCSRFHeaders({
-                'Content-Type': 'application/json'
-            }),
-            body: JSON.stringify(requestData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast(`Email berhasil dikirim ke ${email}`, 'success');
-                closeEmailModal();
-            } else {
-                throw new Error(data.error || 'Gagal mengirim email');
+        try {
+            const res = await UI.fetchJSON('/api/admin/transactions?' + query());
+            if (!res.success) {
+                UI.toast(res.error || 'Data tidak dapat dimuat', 'danger');
+                return;
             }
-        })
-        .catch(error => {
-            console.error('Email export error:', error);
-            showToast(error.message || 'Terjadi kesalahan saat mengirim email', 'error');
-        })
-        .finally(() => {
-            // Restore button state
-            submitEmailBtn.disabled = false;
-            submitEmailBtn.innerHTML = originalHTML;
-        });
+            render(res.data || []);
+        } catch (err) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        }
     }
 
-    function loadData() {
-        const start = startDateInput.value;
-        const end = endDateInput.value;
-
-        // Show loading state (simple opactiy or keep skeleton)
-        tableBody.style.opacity = '0.5';
-
-        updateExportLinks();
-
-        let url = `/api/admin/transactions?`;
-        if (start) url += `start_date=${start}&`;
-        if (end) url += `end_date=${end}`;
-
-        fetch(url)
-            .then(res => res.json())
-            .then(data => {
-                tableBody.style.opacity = '1';
-                if (data.success) {
-                    renderTable(data.data);
-                } else {
-                    console.error('Error:', data.error);
-                }
-            })
-            .catch(err => {
-                console.error('Fetch error:', err);
-                tableBody.style.opacity = '1';
-            });
+    async function download(format, button) {
+        button.disabled = true;
+        const label = button.textContent;
+        button.textContent = 'Menyiapkan…';
+        try {
+            const resp = await fetch('/api/admin/export?format=' + format + (query() ? '&' + query() : ''),
+                { credentials: 'same-origin' });
+            if (!resp.ok) {
+                let msg = 'Export gagal';
+                try { msg = (await resp.json()).error || msg; } catch (e) { /* not JSON */ }
+                UI.toast(msg, 'danger');
+                return;
+            }
+            const blob = await resp.blob();
+            const match = /filename="?([^";]+)"?/.exec(resp.headers.get('Content-Disposition') || '');
+            const a = h('a', { href: URL.createObjectURL(blob), download: match ? match[1] : 'rekap_peminjaman.' + format });
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+            UI.toast('File ' + format.toUpperCase() + ' diunduh.', 'ok');
+        } catch (e) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        } finally {
+            button.disabled = false;
+            button.textContent = label;
+        }
     }
 
-    function renderTable(transactions) {
-        tableBody.innerHTML = '';
+    function openEmail() {
+        $('email-range').textContent = 'Laporan Excel peminjaman ' + rangeText() + ' dikirim ke alamat ini.';
+        $('email-error').textContent = '';
+        $('email-dialog').showModal();
+        $('email-input').focus();
+    }
 
-        if (transactions.length === 0) {
-            emptyState.classList.remove('hidden');
+    async function sendEmail(ev) {
+        ev.preventDefault();
+        const input = $('email-input');
+        const email = input.value.trim();
+        if (!email || !input.checkValidity()) {
+            $('email-error').textContent = 'Alamat email belum benar.';
+            input.focus();
             return;
         }
-
-        emptyState.classList.add('hidden');
-
-        transactions.forEach(t => {
-            const row = document.createElement('tr');
-            row.className = 'hover:bg-gray-50 transition-colors';
-
-            const isReturned = t.status === 'returned';
-            const statusBadge = isReturned
-                ? `<span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">Dikembalikan</span>`
-                : `<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium">Dipinjam</span>`;
-
-            row.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-gray-500 font-mono text-xs">
-                    ${t.borrow_time || '-'}
-                </td>
-                <td class="px-6 py-4">
-                    <div class="font-medium text-gray-900">${t.student_name}</div>
-                    <div class="text-xs text-gray-500">${t.student_nim}</div>
-                </td>
-                <td class="px-6 py-4">
-                    <div class="text-gray-900">${t.tool_name}</div>
-                    <div class="text-xs text-gray-500">${t.tool_category}</div>
-                </td>
-                <td class="px-6 py-4 text-center">
-                    ${statusBadge}
-                </td>
-                <td class="px-6 py-4 text-gray-500 text-xs">
-                    ${t.return_time || '-'}
-                </td>
-            `;
-
-            tableBody.appendChild(row);
-        });
+        const btn = $('email-send');
+        btn.disabled = true;
+        btn.textContent = 'Mengirim…';
+        try {
+            const res = await UI.postJSON('/api/admin/send_export_email', {
+                email: email,
+                start_date: $('start-date').value || null,
+                end_date: $('end-date').value || null,
+            });
+            if (res.success) {
+                $('email-dialog').close();
+                UI.toast(res.message || 'Email terkirim.', 'ok');
+            } else {
+                $('email-error').textContent = res.error || 'Email gagal dikirim.';
+            }
+        } catch (e) {
+            $('email-error').textContent = 'Tidak dapat menghubungi server.';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Kirim';
+        }
     }
 
-    // Initial load
-    loadData();
-});
+    document.querySelectorAll('[data-range]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            setRange(b.getAttribute('data-range'));
+            load();
+        });
+    });
+    $('filter-form').addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        range = '';
+        document.querySelectorAll('[data-range]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
+        load();
+    });
+    $('btn-csv').addEventListener('click', function () { download('csv', $('btn-csv')); });
+    $('btn-xlsx').addEventListener('click', function () { download('xlsx', $('btn-xlsx')); });
+    $('btn-email').addEventListener('click', openEmail);
+    $('email-form').addEventListener('submit', sendEmail);
+    $('email-cancel').addEventListener('click', function () { $('email-dialog').close(); });
+
+    setRange(range);
+    load();
+})();
