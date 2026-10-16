@@ -71,6 +71,7 @@
 /* ---------- Page ---------- */
 
 .page {
+  position: relative; /* contains .visually-hidden (absolute) in the scroller */
   flex: 1;
   min-height: 0;
   overflow-y: auto;

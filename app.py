@@ -229,6 +229,11 @@ def _serialize_borrow_timestamps(tools_data):
         bt = tool_info.get("borrow_time")
         if bt is not None and isinstance(bt, datetime):
             tool_info["borrow_time"] = {"_seconds": int(bt.timestamp())}
+            # WIB wall clock, for pages that parse dates with UI.parseWib.
+            tool_info["borrow_time_wib"] = bt.isoformat()
+        due = tool_info.get("due_at")
+        if isinstance(due, datetime):
+            tool_info["due_at"] = due.isoformat()
 
 
 # ==================== Template Context ====================

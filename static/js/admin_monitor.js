@@ -1,726 +1,308 @@
-/**
- * Admin Monitor Page JavaScript
- * Enhanced version of monitor.js with photo, email, and warning email functionality
+/*
+ * /admin/monitor: open alarms (acknowledge), unverified returns (verify),
+ * tools and loans (search, filters, warning email), students (face data:
+ * record again, delete). Alarms and returns poll /api/kiosk/state every
+ * 3 s; tools and students reload every 15 s and after each action.
  */
+(function () {
+    'use strict';
 
-// ==================== State ====================
-let toolsData = [];
-let currentTooltip = null;
-let activeStatusFilters = [];
-let activeDateFilter = null;
-let currentTooltipData = null; // Store current tooltip tool data for email sending
-
-// ==================== Initialization ====================
-document.addEventListener('DOMContentLoaded', function () {
-    fetchToolsData();
-    setupSearchFilter();
-    setupOutsideClickHandlers();
-});
-
-// ==================== Data Fetching ====================
-
-/**
- * Fetch tools status from admin API (includes email + photo)
- */
-function fetchToolsData() {
-    fetch('/api/admin/tools_status', {
-        credentials: 'same-origin'  // Include session cookies
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                toolsData = data.tools;
-                applyAllFilters();
-            } else {
-                showToast('Gagal memuat data alat', 'error');
-                hideTableLoading();
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching tools:', error);
-            showToast('Terjadi kesalahan saat memuat data', 'error');
-            hideTableLoading();
-        });
-}
-
-function hideTableLoading() {
-    const loadingRow = document.getElementById('loading-row');
-    if (loadingRow) loadingRow.remove();
-}
-
-// ==================== Table Rendering ====================
-
-/**
- * Render tools table with given data
- */
-function renderTable(tools) {
-    const tbody = document.getElementById('tools-table-body');
-    const emptyState = document.getElementById('empty-state');
-
-    hideTableLoading();
-    tbody.innerHTML = '';
-
-    if (!tools || tools.length === 0) {
-        emptyState.classList.remove('hidden');
-        return;
-    }
-
-    emptyState.classList.add('hidden');
-
-    // Sort: borrowed first, then alphabetically
-    tools.sort((a, b) => {
-        if (a.status === 'borrowed' && b.status !== 'borrowed') return -1;
-        if (a.status !== 'borrowed' && b.status === 'borrowed') return 1;
-        return a.name.localeCompare(b.name);
+    const UI = window.UI;
+    const B = window.Board;
+    const h = UI.h;
+    const CFG = window.ADMIN_MONITOR_CONFIG || {};
+    const STATE_MS = 3000;
+    const LIST_MS = 15000;
+    const DAY = 24 * 3600 * 1000;
+    const CLOCK = new Intl.DateTimeFormat('id-ID', {
+        timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false,
     });
 
-    tools.forEach(tool => {
-        const row = document.createElement('tr');
-        row.className = 'hover:bg-primary-50 transition-colors';
+    const $ = function (id) { return document.getElementById(id); };
 
-        // Tool name
-        const nameCell = document.createElement('td');
-        nameCell.className = 'px-6 py-4';
-        nameCell.innerHTML = `<span class="text-sm font-semibold text-primary-900 block truncate">${escapeHtml(tool.name)}</span>`;
-        row.appendChild(nameCell);
+    let tools = [];
+    let students = [];
+    let lastStateKey = '';
 
-        // Status badge
-        const statusCell = document.createElement('td');
-        statusCell.className = 'px-6 py-4';
-        statusCell.innerHTML = getStatusBadge(tool.status);
-        row.appendChild(statusCell);
+    // ---------- Helpers ----------
 
-        // Borrower name (clickable with enhanced tooltip data)
-        const borrowerCell = document.createElement('td');
-        borrowerCell.className = 'px-6 py-4';
-        if (tool.status === 'borrowed' && tool.borrower_name) {
-            const truncatedName = truncateText(tool.borrower_name, 25);
-            const toolIndex = toolsData.indexOf(tool);
-            borrowerCell.innerHTML = `
-                <span class="text-sm text-primary-700 cursor-pointer hover:text-primary-900 hover:underline font-medium inline-block truncate max-w-full"
-                      data-tool-index="${toolIndex}"
-                      onclick="showBorrowerTooltip(event, this)">
-                    ${escapeHtml(truncatedName)}
-                </span>
-            `;
-        } else {
-            borrowerCell.innerHTML = '<span class="text-sm text-primary-400">-</span>';
-        }
-        row.appendChild(borrowerCell);
-
-        // Borrow time
-        const timeCell = document.createElement('td');
-        timeCell.className = 'px-6 py-4';
-        if (tool.status === 'borrowed' && tool.borrow_time) {
-            timeCell.innerHTML = `<span class="text-sm text-primary-700 block truncate">${formatBorrowTime(tool.borrow_time)}</span>`;
-        } else {
-            timeCell.innerHTML = '<span class="text-sm text-primary-400">-</span>';
-        }
-        row.appendChild(timeCell);
-
-        tbody.appendChild(row);
-    });
-}
-
-/**
- * Get status badge HTML
- */
-function getStatusBadge(status) {
-    if (status === 'available') {
-        return '<span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-300 whitespace-nowrap">Tersedia</span>';
-    } else if (status === 'borrowed') {
-        return '<span class="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700 border border-orange-300 whitespace-nowrap">Dipinjam</span>';
-    }
-    return '<span class="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-700 border border-gray-300">-</span>';
-}
-
-// ==================== Filter Logic ====================
-
-/**
- * Apply all active filters combined
- */
-function applyAllFilters() {
-    let filtered = [...toolsData];
-
-    // 1. Status filter
-    if (activeStatusFilters.length > 0) {
-        filtered = filtered.filter(tool => activeStatusFilters.includes(tool.status));
+    function emptyRow(body, cols, text) {
+        body.appendChild(h('tr', null, h('td', { class: 'empty', colspan: String(cols), text: text })));
     }
 
-    // 2. Date filter
-    if (activeDateFilter) {
-        const dateRange = calculateDateRange(activeDateFilter);
-        if (dateRange) {
-            filtered = filtered.filter(tool => {
-                if (!tool.borrow_time) return false;
-                const borrowDate = parseBorrowTime(tool.borrow_time);
-                if (!borrowDate) return false;
-                return borrowDate >= dateRange.start && borrowDate <= dateRange.end;
+    // WIB wall clock as a UTC timestamp, so it compares with nowWib().
+    function wibMs(value) {
+        const t = UI.parseWib(value);
+        return t ? Date.UTC(t.y, t.mo - 1, t.d, +t.h, +t.mi) : null;
+    }
+
+    function nowWib() {
+        return Date.now() + 7 * 3600 * 1000;
+    }
+
+    function confirmDialog(title, text, okLabel, danger) {
+        const dlg = $('confirm');
+        $('confirm-title').textContent = title;
+        $('confirm-text').textContent = text;
+        const ok = $('confirm-ok');
+        ok.textContent = okLabel;
+        ok.className = 'btn ' + (danger ? 'btn--danger' : 'btn--primary');
+        return new Promise(function (resolve) {
+            dlg.addEventListener('close', function onClose() {
+                dlg.removeEventListener('close', onClose);
+                resolve(dlg.returnValue === 'ok');
             });
-        }
-    }
-
-    // 3. Text search
-    const searchTerm = document.getElementById('search-input').value.toLowerCase().trim();
-    if (searchTerm) {
-        filtered = filtered.filter(tool => {
-            const nameMatch = tool.name && tool.name.toLowerCase().includes(searchTerm);
-            const borrowerMatch = tool.borrower_name && tool.borrower_name.toLowerCase().includes(searchTerm);
-            const nimMatch = tool.borrower_nim && tool.borrower_nim.toLowerCase().includes(searchTerm);
-            return nameMatch || borrowerMatch || nimMatch;
+            dlg.returnValue = '';
+            dlg.showModal();
+            ok.focus();
         });
     }
 
-    renderTable(filtered);
-    updateActiveFiltersBar();
-}
-
-function calculateDateRange(filterType) {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-
-    switch (filterType) {
-        case 'yesterday': {
-            const yesterdayStart = new Date(todayStart);
-            yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-            const yesterdayEnd = new Date(todayEnd);
-            yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
-            return { start: yesterdayStart, end: yesterdayEnd };
-        }
-        case 'last_week': {
-            const weekAgo = new Date(todayStart);
-            weekAgo.setDate(weekAgo.getDate() - 7);
-            return { start: weekAgo, end: todayEnd };
-        }
-        case 'last_month': {
-            const monthAgo = new Date(todayStart);
-            monthAgo.setDate(monthAgo.getDate() - 30);
-            return { start: monthAgo, end: todayEnd };
-        }
-        default:
-            return null;
-    }
-}
-
-function parseBorrowTime(timestamp) {
-    if (!timestamp) return null;
-    if (timestamp._seconds) return new Date(timestamp._seconds * 1000);
-    if (timestamp.seconds) return new Date(timestamp.seconds * 1000);
-    const d = new Date(timestamp);
-    return isNaN(d.getTime()) ? null : d;
-}
-
-// ==================== Search ====================
-
-function setupSearchFilter() {
-    const searchInput = document.getElementById('search-input');
-    const resetBtn = document.getElementById('search-reset-btn');
-
-    searchInput.addEventListener('input', function () {
-        if (this.value.length > 0) {
-            resetBtn.classList.remove('hidden');
-            resetBtn.classList.add('flex');
-        } else {
-            resetBtn.classList.add('hidden');
-            resetBtn.classList.remove('flex');
-        }
-        applyAllFilters();
-    });
-}
-
-function resetSearch() {
-    const searchInput = document.getElementById('search-input');
-    const resetBtn = document.getElementById('search-reset-btn');
-    searchInput.value = '';
-    resetBtn.classList.add('hidden');
-    resetBtn.classList.remove('flex');
-    applyAllFilters();
-}
-
-// ==================== Status Filter ====================
-
-function toggleStatusDropdown(event) {
-    event.stopPropagation();
-    const dropdown = document.getElementById('status-dropdown');
-    const dateDropdown = document.getElementById('date-dropdown');
-    if (!dateDropdown.classList.contains('hidden')) {
-        dateDropdown.classList.add('hidden');
-    }
-    dropdown.classList.toggle('hidden');
-}
-
-function toggleStatusOption(element) {
-    const status = element.getAttribute('data-status');
-    const checkBox = element.querySelector('.status-check');
-    const checkIcon = checkBox.querySelector('svg');
-    const idx = activeStatusFilters.indexOf(status);
-
-    if (idx > -1) {
-        activeStatusFilters.splice(idx, 1);
-        checkBox.classList.remove('bg-primary-500', 'border-primary-500');
-        checkBox.classList.add('border-primary-300');
-        checkIcon.classList.add('hidden');
-    } else {
-        activeStatusFilters.push(status);
-        checkBox.classList.add('bg-primary-500', 'border-primary-500');
-        checkBox.classList.remove('border-primary-300');
-        checkIcon.classList.remove('hidden');
-    }
-
-    const badge = document.getElementById('status-filter-badge');
-    const btn = document.getElementById('status-filter-btn');
-    if (activeStatusFilters.length > 0) {
-        badge.classList.remove('hidden');
-        btn.classList.add('border-primary-500', 'bg-primary-50');
-        btn.classList.remove('border-primary-200');
-    } else {
-        badge.classList.add('hidden');
-        btn.classList.remove('border-primary-500', 'bg-primary-50');
-        btn.classList.add('border-primary-200');
-    }
-
-    applyAllFilters();
-}
-
-// ==================== Date Filter ====================
-
-function toggleDateDropdown(event) {
-    event.stopPropagation();
-    const dropdown = document.getElementById('date-dropdown');
-    const statusDropdown = document.getElementById('status-dropdown');
-    if (!statusDropdown.classList.contains('hidden')) {
-        statusDropdown.classList.add('hidden');
-    }
-    dropdown.classList.toggle('hidden');
-}
-
-function selectDateOption(element) {
-    const dateValue = element.getAttribute('data-date');
-
-    if (activeDateFilter === dateValue) {
-        activeDateFilter = null;
-        clearDateRadioUI();
-    } else {
-        activeDateFilter = dateValue;
-        clearDateRadioUI();
-        const radio = element.querySelector('.date-radio');
-        const dot = radio.querySelector('span');
-        radio.classList.add('border-primary-500');
-        radio.classList.remove('border-primary-300');
-        dot.classList.remove('hidden');
-    }
-
-    const badge = document.getElementById('date-filter-badge');
-    const btn = document.getElementById('date-filter-btn');
-    if (activeDateFilter) {
-        badge.classList.remove('hidden');
-        btn.classList.add('border-primary-500', 'bg-primary-50');
-        btn.classList.remove('border-primary-200');
-    } else {
-        badge.classList.add('hidden');
-        btn.classList.remove('border-primary-500', 'bg-primary-50');
-        btn.classList.add('border-primary-200');
-    }
-
-    applyAllFilters();
-}
-
-function clearDateRadioUI() {
-    document.querySelectorAll('.date-option').forEach(opt => {
-        const radio = opt.querySelector('.date-radio');
-        const dot = radio.querySelector('span');
-        radio.classList.remove('border-primary-500');
-        radio.classList.add('border-primary-300');
-        dot.classList.add('hidden');
-    });
-}
-
-// ==================== Active Filters Bar ====================
-
-function updateActiveFiltersBar() {
-    const bar = document.getElementById('active-filters-bar');
-    const chips = document.getElementById('active-filter-chips');
-    chips.innerHTML = '';
-
-    const hasFilters = activeStatusFilters.length > 0 || activeDateFilter;
-
-    if (!hasFilters) {
-        bar.classList.add('hidden');
-        return;
-    }
-
-    bar.classList.remove('hidden');
-    bar.classList.add('flex');
-
-    activeStatusFilters.forEach(status => {
-        const label = status === 'borrowed' ? 'Dipinjam' : 'Tersedia';
-        const color = status === 'borrowed' ? 'orange' : 'green';
-        chips.innerHTML += `
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-${color}-100 text-${color}-700 border border-${color}-300">
-                ${label}
-                <button onclick="removeStatusFilter('${status}')" class="ml-0.5 hover:text-${color}-900 transition-colors">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </span>
-        `;
-    });
-
-    if (activeDateFilter) {
-        const dateLabels = {
-            'yesterday': 'Kemarin',
-            'last_week': 'Minggu Lalu',
-            'last_month': 'Bulan Lalu'
-        };
-        const label = dateLabels[activeDateFilter] || activeDateFilter;
-        chips.innerHTML += `
-            <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-700 border border-primary-300">
-                📅 ${label}
-                <button onclick="removeDateFilter()" class="ml-0.5 hover:text-primary-900 transition-colors">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                </button>
-            </span>
-        `;
-    }
-}
-
-function removeStatusFilter(status) {
-    const idx = activeStatusFilters.indexOf(status);
-    if (idx > -1) activeStatusFilters.splice(idx, 1);
-
-    const option = document.querySelector(`.status-option[data-status="${status}"]`);
-    if (option) {
-        const checkBox = option.querySelector('.status-check');
-        const checkIcon = checkBox.querySelector('svg');
-        checkBox.classList.remove('bg-primary-500', 'border-primary-500');
-        checkBox.classList.add('border-primary-300');
-        checkIcon.classList.add('hidden');
-    }
-
-    const badge = document.getElementById('status-filter-badge');
-    const btn = document.getElementById('status-filter-btn');
-    if (activeStatusFilters.length === 0) {
-        badge.classList.add('hidden');
-        btn.classList.remove('border-primary-500', 'bg-primary-50');
-        btn.classList.add('border-primary-200');
-    }
-
-    applyAllFilters();
-}
-
-function removeDateFilter() {
-    activeDateFilter = null;
-    clearDateRadioUI();
-
-    const badge = document.getElementById('date-filter-badge');
-    const btn = document.getElementById('date-filter-btn');
-    badge.classList.add('hidden');
-    btn.classList.remove('border-primary-500', 'bg-primary-50');
-    btn.classList.add('border-primary-200');
-
-    applyAllFilters();
-}
-
-function clearAllFilters() {
-    resetSearch();
-
-    activeStatusFilters = [];
-    document.querySelectorAll('.status-option').forEach(opt => {
-        const checkBox = opt.querySelector('.status-check');
-        const checkIcon = checkBox.querySelector('svg');
-        checkBox.classList.remove('bg-primary-500', 'border-primary-500');
-        checkBox.classList.add('border-primary-300');
-        checkIcon.classList.add('hidden');
-    });
-    const statusBadge = document.getElementById('status-filter-badge');
-    const statusBtn = document.getElementById('status-filter-btn');
-    statusBadge.classList.add('hidden');
-    statusBtn.classList.remove('border-primary-500', 'bg-primary-50');
-    statusBtn.classList.add('border-primary-200');
-
-    activeDateFilter = null;
-    clearDateRadioUI();
-    const dateBadge = document.getElementById('date-filter-badge');
-    const dateBtn = document.getElementById('date-filter-btn');
-    dateBadge.classList.add('hidden');
-    dateBtn.classList.remove('border-primary-500', 'bg-primary-50');
-    dateBtn.classList.add('border-primary-200');
-
-    applyAllFilters();
-}
-
-// ==================== Enhanced Borrower Tooltip ====================
-
-/**
- * Show enhanced borrower tooltip with photo, email, and warning button
- */
-function showBorrowerTooltip(event, element) {
-    event.stopPropagation();
-
-    const toolIndex = parseInt(element.getAttribute('data-tool-index'));
-    const tool = toolsData[toolIndex];
-    if (!tool) return;
-
-    // Hide any existing tooltip first (without nullifying data yet)
-    if (currentTooltip) {
-        currentTooltip.classList.add('hidden');
-        currentTooltip = null;
-    }
-
-    // NOW store current tool data for email sending
-    currentTooltipData = tool;
-
-    const tooltip = document.getElementById('borrower-tooltip');
-
-    // Set name & NIM
-    document.getElementById('tooltip-name').textContent = tool.borrower_name || '-';
-    document.getElementById('tooltip-nim').textContent = `NIM: ${tool.borrower_nim || '-'}`;
-
-    // Set email
-    const emailEl = document.getElementById('tooltip-email');
-    emailEl.textContent = tool.borrower_email && tool.borrower_email !== '-'
-        ? `📧 ${tool.borrower_email}` : '📧 Email tidak tersedia';
-
-    // Set photo
-    const photoContainer = document.getElementById('tooltip-photo-container');
-    if (tool.borrower_photo_url && tool.borrower_photo_url.length > 0) {
-        const img = document.createElement('img');
-        img.src = tool.borrower_photo_url;
-        img.alt = `Foto ${tool.borrower_name}`;
-        img.className = 'w-20 h-20 rounded-full object-cover border-2 border-primary-200 bg-primary-50';
-        img.onerror = function () {
-            photoContainer.innerHTML = getPhotoFallback(tool.borrower_name);
-        };
-        photoContainer.innerHTML = '';
-        photoContainer.appendChild(img);
-    } else {
-        photoContainer.innerHTML = getPhotoFallback(tool.borrower_name);
-    }
-
-    // Reset email button state
-    resetEmailButton();
-
-    // Disable button if no email
-    const emailBtn = document.getElementById('tooltip-email-btn');
-    if (!tool.borrower_email || tool.borrower_email === '-') {
-        emailBtn.disabled = true;
-        emailBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        emailBtn.classList.remove('hover:bg-primary-600', 'active:bg-primary-700');
-    } else {
-        emailBtn.disabled = false;
-        emailBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        emailBtn.classList.add('hover:bg-primary-600', 'active:bg-primary-700');
-    }
-
-    // Position tooltip near clicked element
-    const rect = element.getBoundingClientRect();
-    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-
-    let top = rect.bottom + scrollTop + 5;
-    let left = rect.left + scrollLeft;
-
-    // Keep tooltip on screen
-    if (left + 400 > window.innerWidth) {
-        left = window.innerWidth - 420;
-    }
-    if (left < 10) left = 10;
-
-    // Check if tooltip would go below viewport
-    const tooltipHeight = 200; // approximate
-    if (top + tooltipHeight > window.innerHeight + scrollTop) {
-        top = rect.top + scrollTop - tooltipHeight - 5;
-    }
-
-    tooltip.style.top = top + 'px';
-    tooltip.style.left = left + 'px';
-    tooltip.classList.remove('hidden');
-    currentTooltip = tooltip;
-}
-
-/**
- * Generate photo fallback with initials
- */
-function getPhotoFallback(name) {
-    const initials = getInitials(name);
-    return `
-        <div class="w-20 h-20 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white text-xl font-bold border-2 border-primary-200 shadow-inner">
-            ${escapeHtml(initials)}
-        </div>
-    `;
-}
-
-/**
- * Get initials from a name
- */
-function getInitials(name) {
-    if (!name) return '?';
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-}
-
-/**
- * Hide tooltip
- */
-function hideTooltip() {
-    if (currentTooltip) {
-        currentTooltip.classList.add('hidden');
-        currentTooltip = null;
-    }
-    currentTooltipData = null;
-}
-
-// ==================== Email Warning ====================
-
-/**
- * Send warning email to current borrower
- */
-function sendWarningEmail() {
-    if (!currentTooltipData) return;
-
-    const tool = currentTooltipData;
-
-    if (!tool.borrower_email || tool.borrower_email === '-') {
-        showToast('Email mahasiswa tidak tersedia', 'error');
-        return;
-    }
-
-    // Set button to loading state
-    const btn = document.getElementById('tooltip-email-btn');
-    const btnText = document.getElementById('tooltip-email-btn-text');
-    btn.disabled = true;
-    btn.classList.add('opacity-75');
-    btnText.textContent = 'Mengirim email...';
-
-    // Prepare payload — send borrow_date as ISO string for backend duration calculation
-    const borrowDate = parseBorrowTime(tool.borrow_time);
-    const payload = {
-        student_name: tool.borrower_name,
-        student_email: tool.borrower_email,
-        tool_name: tool.name,
-        borrow_date: borrowDate ? borrowDate.toISOString() : ''
-    };
-
-    fetch('/api/admin/send_warning_email', {
-        method: 'POST',
-        headers: getCSRFHeaders({
-            'Content-Type': 'application/json'
-        }),
-        credentials: 'same-origin',  // Include session cookies
-        body: JSON.stringify(payload)
-    })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                // Success state
-                btn.classList.remove('bg-primary-500', 'opacity-75');
-                btn.classList.add('bg-green-500');
-                btnText.textContent = '✅ Email terkirim!';
-                showToast('Email warning berhasil dikirim!', 'success');
-
-                // Auto-close tooltip after 1.5s
-                setTimeout(() => {
-                    hideTooltip();
-                }, 1500);
-            } else {
-                // Error state
-                btn.classList.remove('bg-primary-500', 'opacity-75');
-                btn.classList.add('bg-red-500');
-                btnText.textContent = '❌ Gagal - Klik untuk coba lagi';
-                btn.disabled = false;
-                btn.onclick = function () {
-                    resetEmailButton();
-                    sendWarningEmail();
-                };
-                showToast(data.error || 'Gagal mengirim email', 'error');
+    async function act(button, url, body, okText) {
+        button.disabled = true;
+        try {
+            const res = await UI.postJSON(url, body);
+            if (res.success) {
+                UI.toast(okText, 'ok');
+                return true;
             }
-        })
-        .catch(error => {
-            console.error('Error sending email:', error);
-            btn.classList.remove('bg-primary-500', 'opacity-75');
-            btn.classList.add('bg-red-500');
-            btnText.textContent = '❌ Gagal - Klik untuk coba lagi';
-            btn.disabled = false;
-            btn.onclick = function (e) {
-                e.stopPropagation();
-                resetEmailButton();
-                sendWarningEmail();
-            };
-            showToast('Periksa koneksi internet Anda', 'error');
+            UI.toast(res.error || 'Permintaan gagal', 'danger');
+        } catch (e) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        } finally {
+            button.disabled = false;
+        }
+        return false;
+    }
+
+    function personCell(name, nim, photo) {
+        const img = photo
+            ? h('img', { src: photo, alt: '', loading: 'lazy' })
+            : h('span', { class: 'person-cell__blank', 'aria-hidden': 'true' });
+        if (photo) img.onerror = function () { img.onerror = null; img.src = CFG.placeholderPhoto; };
+        return h('div', { class: 'person-cell' }, img,
+            h('div', null, h('span', { text: name || '-' }), nim ? h('span', { class: 'sub', text: nim }) : null));
+    }
+
+    // ---------- Alarms + unverified returns ----------
+
+    function renderAlarms(alarms) {
+        const body = $('alarms-body');
+        body.textContent = '';
+        $('alarms-count').textContent = alarms.length ? alarms.length + ' alat' : '';
+        $('alarms-head').classList.toggle('section-head--danger', alarms.length > 0);
+        if (!alarms.length) {
+            emptyRow(body, 3, 'Tidak ada alarm terbuka.');
+            return;
+        }
+        alarms.forEach(function (a) {
+            const btn = h('button', { type: 'button', class: 'btn btn--danger btn--sm', text: 'Matikan alarm' });
+            btn.addEventListener('click', async function () {
+                if (await act(btn, '/api/alarms/' + a.alarm_id + '/ack', undefined, 'Alarm ' + (a.tool_name || '') + ' dimatikan.')) refreshState();
+            });
+            body.appendChild(h('tr', null,
+                h('td', null, h('strong', { text: a.tool_name || 'Alat #' + a.tool_id })),
+                h('td', { class: 'num', text: UI.formatWibDate(a.started_at) }),
+                h('td', { class: 'actions' }, btn)));
         });
-}
+    }
 
-/**
- * Reset email button to default state
- */
-function resetEmailButton() {
-    const btn = document.getElementById('tooltip-email-btn');
-    const btnText = document.getElementById('tooltip-email-btn-text');
-    btn.classList.remove('bg-green-500', 'bg-red-500', 'opacity-75', 'opacity-50', 'cursor-not-allowed');
-    btn.classList.add('bg-primary-500', 'hover:bg-primary-600', 'active:bg-primary-700');
-    btn.disabled = false;
-    btnText.textContent = 'Kirim Email Warning';
-    btn.onclick = function (e) { e.stopPropagation(); sendWarningEmail(); };
-}
-
-// ==================== Outside Click Handlers ====================
-
-function setupOutsideClickHandlers() {
-    document.addEventListener('click', function (event) {
-        const statusDropdown = document.getElementById('status-dropdown');
-        const dateDropdown = document.getElementById('date-dropdown');
-        const statusBtn = document.getElementById('status-filter-btn');
-        const dateBtn = document.getElementById('date-filter-btn');
-        const tooltip = document.getElementById('borrower-tooltip');
-
-        if (!statusDropdown.classList.contains('hidden') &&
-            !statusDropdown.contains(event.target) &&
-            !statusBtn.contains(event.target)) {
-            statusDropdown.classList.add('hidden');
+    function renderUnverified(rows) {
+        const body = $('unverified-body');
+        body.textContent = '';
+        $('unverified-count').textContent = rows.length ? rows.length + ' alat' : '';
+        if (!rows.length) {
+            emptyRow(body, 4, 'Semua pengembalian sudah diverifikasi.');
+            return;
         }
+        rows.forEach(function (r) {
+            const btn = h('button', { type: 'button', class: 'btn btn--secondary btn--sm', text: 'Verifikasi' });
+            btn.addEventListener('click', async function () {
+                if (await act(btn, '/api/admin/transactions/' + r.transaction_id + '/verify_return', undefined,
+                    r.tool_name + ' diverifikasi.')) refreshState();
+            });
+            body.appendChild(h('tr', null,
+                h('td', null, h('strong', { text: r.tool_name })),
+                h('td', { text: r.borrower_name || '-' }),
+                h('td', { class: 'num', text: UI.formatWibDate(r.return_time) }),
+                h('td', { class: 'actions' }, btn)));
+        });
+    }
 
-        if (!dateDropdown.classList.contains('hidden') &&
-            !dateDropdown.contains(event.target) &&
-            !dateBtn.contains(event.target)) {
-            dateDropdown.classList.add('hidden');
+    async function refreshState() {
+        try {
+            const s = await UI.fetchJSON('/api/kiosk/state');
+            if (!s.success) return;
+            const key = JSON.stringify([s.alarms, s.unverified_returns]);
+            if (key !== lastStateKey) {
+                lastStateKey = key;
+                renderAlarms(s.alarms || []);
+                renderUnverified(s.unverified_returns || []);
+            }
+        } catch (e) { /* next poll */ }
+    }
+
+    // ---------- Tools and loans ----------
+
+    function toolStatus(t) {
+        const kind = B.markOf(t);
+        const label = {
+            present: ['Di rak', ''],
+            borrowed: ['Dipinjam', ''],
+            overdue: ['Terlambat', 'status--warn'],
+            missing: ['Hilang', 'status--danger'],
+            unknown: ['Belum terbaca', 'status--muted'],
+        }[kind];
+        return h('span', { class: 'legend__item' },
+            h('span', { class: 'unit-mark unit-mark--' + kind, 'aria-hidden': 'true' }),
+            h('span', { class: 'status ' + label[1], text: label[0] }));
+    }
+
+    function matchesDate(t, range) {
+        if (!range) return true;
+        const ms = wibMs(t.borrow_time_wib);
+        if (ms === null) return false;
+        const today = Math.floor(nowWib() / DAY);
+        const day = Math.floor(ms / DAY);
+        if (range === 'yesterday') return day === today - 1;
+        return today - day < +range;
+    }
+
+    function renderTools() {
+        const q = $('loan-search').value.trim().toLowerCase();
+        const status = $('loan-status').value;
+        const range = $('loan-date').value;
+        const rows = tools.filter(function (t) {
+            if (status === 'borrowed' && t.status !== 'borrowed') return false;
+            if (status === 'overdue' && !t.is_overdue) return false;
+            if (range && !matchesDate(t, range)) return false;
+            if (!q) return true;
+            return [t.name, t.borrower_name, t.borrower_nim].some(function (v) {
+                return v && String(v).toLowerCase().indexOf(q) >= 0;
+            });
+        });
+        const borrowed = tools.filter(function (t) { return t.status === 'borrowed'; }).length;
+        const overdue = tools.filter(function (t) { return t.is_overdue; }).length;
+        $('loans-count').textContent = borrowed + ' dipinjam' + (overdue ? ' · ' + overdue + ' terlambat' : '') +
+            ' · ' + tools.length + ' alat';
+        const body = $('loans-body');
+        body.textContent = '';
+        if (!rows.length) {
+            emptyRow(body, 6, tools.length ? 'Tidak ada alat yang cocok dengan filter.' : 'Belum ada alat terdaftar.');
+            return;
         }
+        rows.forEach(function (t) {
+            const borrowed = t.status === 'borrowed';
+            let action = null;
+            if (borrowed && t.borrower_email) {
+                action = h('button', { type: 'button', class: 'linkbtn', text: 'Kirim pengingat' });
+                action.addEventListener('click', function () { sendWarning(t, action); });
+            }
+            body.appendChild(h('tr', null,
+                h('td', null, h('strong', { text: t.name })),
+                h('td', null, borrowed ? personCell(t.borrower_name, t.borrower_nim, t.borrower_photo_url) : h('span', { class: 'muted', text: '-' })),
+                h('td', { class: 'num', text: borrowed ? UI.formatWibDate(t.borrow_time_wib, true) : '' }),
+                h('td', { class: 'num' + (t.is_overdue ? ' status status--warn' : ''), text: borrowed ? UI.formatWibDate(t.due_at, true) : '' }),
+                h('td', null, toolStatus(t)),
+                h('td', { class: 'actions' }, action)));
+        });
+    }
 
-        if (tooltip && !tooltip.classList.contains('hidden') &&
-            !tooltip.contains(event.target)) {
-            hideTooltip();
+    async function sendWarning(t, button) {
+        const ok = await confirmDialog('Kirim pengingat?',
+            'Email pengingat pengembalian ' + t.name + ' dikirim ke ' + t.borrower_name + ' (' + t.borrower_email + ').',
+            'Kirim email', false);
+        if (!ok) return;
+        const original = button.textContent;
+        button.textContent = 'Mengirim…';
+        await act(button, '/api/admin/send_warning_email', {
+            student_name: t.borrower_name,
+            student_email: t.borrower_email,
+            tool_name: t.name,
+            borrow_date: t.borrow_time_wib || '',
+        }, 'Email pengingat terkirim ke ' + t.borrower_name + '.');
+        button.textContent = original;
+    }
+
+    // ---------- Students ----------
+
+    function renderStudents() {
+        const q = $('student-search').value.trim().toLowerCase();
+        const rows = students.filter(function (s) {
+            if (!q) return true;
+            return [s.name, s.nim, s.email].some(function (v) { return v && v.toLowerCase().indexOf(q) >= 0; });
+        });
+        const withFace = students.filter(function (s) { return s.has_face; }).length;
+        $('students-count').textContent = students.length + ' mahasiswa · ' + withFace + ' dengan data wajah';
+        const body = $('students-body');
+        body.textContent = '';
+        if (!rows.length) {
+            emptyRow(body, 5, students.length ? 'Tidak ada mahasiswa yang cocok.' : 'Belum ada mahasiswa terdaftar.');
+            return;
         }
-    });
-}
+        rows.forEach(function (s) {
+            const record = h('a', {
+                href: CFG.registerUrl + '?student_id=' + encodeURIComponent(s.student_id),
+                text: s.has_face ? 'Rekam ulang wajah' : 'Rekam wajah',
+            });
+            let del = null;
+            if (s.has_face) {
+                del = h('button', { type: 'button', class: 'linkbtn linkbtn--danger', text: 'Hapus data wajah' });
+                del.addEventListener('click', function () { deleteFace(s, del); });
+            }
+            body.appendChild(h('tr', null,
+                h('td', null, personCell(s.name, s.nim, s.photo_url)),
+                h('td', null, h('span', { text: s.email }), h('span', { class: 'sub num', text: s.phone })),
+                h('td', null, s.has_face
+                    ? h('span', { class: 'status', text: 'Ada' })
+                    : h('span', { class: 'status status--muted', text: 'Belum ada' })),
+                h('td', { class: 'num', text: String(s.open_loans) }),
+                h('td', { class: 'actions' }, record, del)));
+        });
+    }
 
-// ==================== Utility Functions ====================
+    async function deleteFace(s, button) {
+        const ok = await confirmDialog('Hapus data wajah?',
+            'Data pengenalan wajah dan foto profil ' + s.name + ' (' + s.nim + ') akan dihapus. ' +
+            'Mahasiswa ini perlu merekam wajah lagi sebelum dapat meminjam alat.',
+            'Hapus data wajah', true);
+        if (!ok) return;
+        if (await act(button, '/api/admin/students/' + s.student_id + '/face/delete', undefined,
+            'Data wajah ' + s.name + ' dihapus.')) loadLists();
+    }
 
-function truncateText(text, maxLength) {
-    if (!text) return '-';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-}
+    // ---------- Load ----------
 
-function formatBorrowTime(timestamp) {
-    const date = parseBorrowTime(timestamp);
-    if (!date) return '-';
+    async function loadLists() {
+        try {
+            const res = await Promise.all([
+                UI.fetchJSON('/api/admin/tools_status'),
+                UI.fetchJSON('/api/admin/students'),
+            ]);
+            if (res[0].success) {
+                tools = res[0].tools || [];
+                renderTools();
+            } else if (res[0].error === 'Unauthorized') {
+                window.location.href = '/admin/login';
+                return;
+            }
+            if (res[1].success) {
+                students = res[1].students || [];
+                renderStudents();
+            }
+            $('updated').textContent = 'Diperbarui ' + CLOCK.format(new Date()).replace(':', '.');
+        } catch (e) {
+            UI.toast('Data tidak dapat dimuat. Periksa koneksi.', 'danger');
+        }
+    }
 
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    $('loan-search').addEventListener('input', renderTools);
+    $('loan-status').addEventListener('change', renderTools);
+    $('loan-date').addEventListener('change', renderTools);
+    $('student-search').addEventListener('input', renderStudents);
 
-    return `${day}-${month}-${year} @${hours}:${minutes}`;
-}
-
-function escapeHtml(text) {
-    if (!text) return '';
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+    refreshState();
+    loadLists();
+    setInterval(refreshState, STATE_MS);
+    setInterval(loadLists, LIST_MS);
+})();
