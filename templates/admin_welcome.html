@@ -1,125 +1,37 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
+{% set crumbs = [("Beranda", url_for('index')), ("Admin", None)] %}
 
-{% block title %}Admin Panel - Lab Fabrikasi{% endblock %}
+{% block title %}Admin — Lab Fabrikasi{% endblock %}
+{% block page_class %}page--menu{% endblock %}
 
-{% block content %}
-<div class="flex items-center justify-center min-h-[82vh]">
-    <div class="text-center max-w-4xl w-full relative">
-        <!-- Logout Button -->
-        <div class="absolute top-0 right-0 -mt-2 -mr-2">
-            <a href="{{ url_for('admin_logout') }}"
-                class="inline-flex items-center space-x-1 bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded-lg text-sm font-semibold transition-colors border border-red-200">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
-                <span>Logout</span>
-            </a>
-        </div>
+{% block page %}
+<div class="menu-hero">
+    <h1>Panel Admin</h1>
+    <p>Kelola dan pantau peminjaman alat Lab Fabrikasi.</p>
+</div>
 
-        <!-- Hero Section -->
-        <div class="mb-10">
-            <div class="inline-block mb-5">
-                <div
-                    class="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                </div>
-            </div>
+<ul class="menu">
+    <li>
+        <a class="menu__link" href="{{ url_for('admin_monitor') }}">
+            <span class="menu__title">Monitor &amp; Kelola</span>
+            <span class="menu__desc">Alarm, pengembalian yang belum diverifikasi, peminjaman, data wajah mahasiswa</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="{{ url_for('admin_input_tool') }}">
+            <span class="menu__title">Input Alat</span>
+            <span class="menu__desc">Daftarkan unit alat baru dengan tag RFID dan foto</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="{{ url_for('admin_history') }}">
+            <span class="menu__title">Riwayat &amp; Export</span>
+            <span class="menu__desc">Lihat riwayat peminjaman, unduh CSV atau Excel, kirim lewat email</span>
+        </a>
+    </li>
+</ul>
 
-            <h1 class="text-4xl font-bold text-primary-900 mb-3">
-                Panel Admin
-            </h1>
-
-            <p class="text-lg text-primary-700 font-medium">
-                Kelola dan pantau sistem Lab Fabrikasi
-            </p>
-        </div>
-
-        <!-- Action Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
-            <!-- Monitor & Kelola Alat Card -->
-            <a href="{{ url_for('admin_monitor') }}"
-                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
-                <div class="flex flex-col items-center space-y-3">
-                    <div
-                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Monitor & Kelola
-                        </h2>
-                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Pantau peminjaman dan kirim pengingat
-                        </p>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Input Alat Card -->
-            <a href="{{ url_for('admin_input_tool') }}"
-                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
-                <div class="flex flex-col items-center space-y-3">
-                    <div
-                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Input Alat
-                        </h2>
-                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Registrasi alat baru ke sistem RFID
-                        </p>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Riwayat & Export Card -->
-            <a href="{{ url_for('admin_history') }}"
-                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
-                <div class="flex flex-col items-center space-y-3">
-                    <div
-                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Riwayat & Export
-                        </h2>
-                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Lihat dan unduh data
-                        </p>
-                    </div>
-                </div>
-            </a>
-        </div>
-
-        <!-- Back to Landing Button -->
-        <div class="mt-8">
-            <a href="{{ url_for('index') }}"
-                class="inline-flex items-center space-x-2 text-primary-600 hover:text-primary-800 font-semibold transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                <span>Kembali ke Menu Utama</span>
-            </a>
-        </div>
-    </div>
+<div class="menu-foot">
+    <a href="{{ url_for('admin_logout') }}">Logout</a>
 </div>
 {% endblock %}

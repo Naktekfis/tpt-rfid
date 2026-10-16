@@ -244,15 +244,21 @@ def mahasiswa_menu():
 
 
 @app.route("/register")
+@app.route("/daftar")
 def register():
-    """Student registration page"""
-    return render_template("register.html")
+    """Self-registration: form, then face capture. An admin can open it as
+    /daftar?student_id=<id> to record a student's face again."""
+    enroll_student = None
+    raw = request.args.get("student_id", "")
+    if session.get("admin_logged_in") and raw.isdigit():
+        enroll_student = database.get_student_by_id(raw)
+    return render_template("register.html", enroll_student=enroll_student)
 
 
 @app.route("/scan")
 def scan():
-    """Tool scanning/borrowing page"""
-    return render_template("scan.html")
+    """Old card-tap page: borrowing and returning now happen at the kiosk."""
+    return redirect(url_for("kiosk_page"))
 
 
 @app.route("/monitor")
@@ -349,17 +355,19 @@ def check_rfid():
 @app.route("/api/register", methods=["POST"])
 @limiter.limit("10 per minute")
 def api_register():
-    """Register new student"""
+    """Register a new student (name, NIM, email, phone; card and photo
+    optional). The face is recorded afterwards via /api/face/enroll/<id>."""
     try:
         # Get form data
         name = sanitize_input(request.form.get("name", ""))
         nim = sanitize_input(request.form.get("nim", ""))
         email = sanitize_input(request.form.get("email", ""))
         phone = sanitize_input(request.form.get("phone", ""))
-        rfid_uid = request.form.get("rfid_uid", "")
+        # Optional since the face flow (students no longer need a card).
+        rfid_uid = request.form.get("rfid_uid", "").strip() or None
 
         # Validate required fields
-        if not all([name, nim, email, phone, rfid_uid]):
+        if not all([name, nim, email, phone]):
             return jsonify({"success": False, "error": "Semua field harus diisi"}), 400
 
         # Validate NIM format
@@ -372,8 +380,7 @@ def api_register():
             return jsonify({"success": False, "error": "NIM sudah terdaftar"}), 400
 
         # Check if RFID UID already exists
-        existing_rfid = database.get_student_by_uid(rfid_uid)
-        if existing_rfid:
+        if rfid_uid and database.get_student_by_uid(rfid_uid):
             return jsonify(
                 {"success": False, "error": "Kartu RFID sudah terdaftar"}
             ), 400

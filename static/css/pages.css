@@ -1,0 +1,634 @@
+/*
+ * Pages on app_base.html (everything except /kiosk), design D.
+ * Uses tokens.css + ui.css; same rules: square corners, hairlines, no
+ * shadows, no pills, no card-in-card, tabular figures for numbers.
+ *
+ *   .topbar, .crumbs                thin top bar with breadcrumb and clock
+ *   .page, .page--narrow, .page--menu   scrolling page body
+ *   .page-head (h1 + p + __actions) page title row
+ *   .menu, .menu__link              menu list (landing / mahasiswa / admin)
+ *   .form, .form__row, .check       forms (physical keyboard, Enter submits)
+ *   .btn--sm, .linkbtn              small button, text button
+ *   .section                        titled block on admin pages
+ *   .camera-panel                   dark camera box with mirrored stream + oval
+ *   .result --ok --warn --danger    outcome block (register, input tool)
+ *   .dialog                         native <dialog> confirm
+ *   .board                          read-only tool board (monitor)
+ *   .status --warn --danger --brand coloured status text in tables
+ */
+
+/* ---------- Top bar ---------- */
+
+.topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: var(--sp-2) var(--sp-8);
+  border-bottom: var(--hairline);
+  font-size: var(--fs-md);
+}
+.topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  color: var(--c-ink);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.topbar__brand:hover {
+  color: var(--c-ink);
+}
+.topbar__brand img {
+  height: 2rem;
+  width: auto;
+}
+.topbar__clock {
+  margin-left: auto;
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+
+.crumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  padding-left: var(--sp-6);
+  border-left: var(--hairline);
+  color: var(--c-text-muted);
+}
+.crumbs li + li::before {
+  content: "/";
+  margin-right: var(--sp-2);
+  color: var(--c-text-subtle);
+}
+.crumbs [aria-current] {
+  color: var(--c-ink);
+  font-weight: 600;
+}
+
+/* ---------- Page ---------- */
+
+.page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--sp-8) var(--sp-10) var(--sp-10);
+}
+.page--narrow > * {
+  max-width: 52rem;
+}
+.page--menu {
+  padding-top: 9vh;
+  padding-left: 12vw;
+}
+.page--menu > * {
+  max-width: 44rem;
+}
+.page--fill {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: var(--sp-8);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--sp-4) var(--sp-8);
+  margin-bottom: var(--sp-6);
+}
+.page-head h1 {
+  font-size: var(--fs-2xl);
+}
+.page-head p {
+  margin-top: var(--sp-1);
+  font-size: var(--fs-lg);
+  color: var(--c-text-muted);
+}
+.page-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+.lead {
+  font-size: var(--fs-lg);
+  color: var(--c-text-muted);
+}
+
+/* ---------- Menu ---------- */
+
+.menu-hero {
+  margin-bottom: var(--sp-8);
+}
+.menu-hero h1 {
+  font-size: var(--fs-3xl);
+  line-height: var(--lh-tight);
+}
+.menu-hero p {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-lg);
+  color: var(--c-text-muted);
+}
+
+.menu {
+  border-top: 2px solid var(--c-ink);
+}
+.menu li {
+  border-bottom: var(--hairline);
+}
+.menu__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  padding: var(--sp-4) var(--sp-2);
+  margin: 0 calc(-1 * var(--sp-2));
+  color: var(--c-ink);
+}
+.menu__link:hover {
+  color: var(--c-ink);
+  text-decoration: none;
+  background: var(--c-fill);
+}
+.menu__title {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--c-brand);
+}
+.menu__link:hover .menu__title {
+  color: var(--c-brand-hover);
+  text-decoration: underline;
+}
+.menu__desc {
+  font-size: var(--fs-lg);
+  color: var(--c-text-muted);
+}
+.menu--minor .menu__title {
+  font-size: var(--fs-lg);
+}
+.menu--minor .menu__desc {
+  font-size: var(--fs-md);
+}
+.menu-label {
+  margin: var(--sp-8) 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-text-muted);
+}
+.menu-foot {
+  margin-top: var(--sp-6);
+  display: flex;
+  gap: var(--sp-8);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+}
+
+/* ---------- Forms ---------- */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+.form__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-4) var(--sp-5);
+}
+.form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3) var(--sp-5);
+  margin-top: var(--sp-2);
+}
+.field__hint {
+  font-size: var(--fs-sm);
+  color: var(--c-text-subtle);
+}
+.field__error {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-danger);
+}
+.input[aria-invalid="true"] {
+  border-color: var(--c-danger);
+}
+select.input {
+  padding-right: var(--sp-2);
+  font-size: var(--fs-base);
+}
+.input--sm {
+  height: 2.25rem;
+  font-size: var(--fs-base);
+}
+input[type="date"].input {
+  font-size: var(--fs-base);
+}
+
+.check {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  font-size: var(--fs-md);
+  line-height: var(--lh-normal);
+  cursor: pointer;
+}
+.check input {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--c-brand);
+}
+
+.form-error {
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--c-danger);
+}
+.form-error:empty {
+  display: none;
+}
+
+/* ---------- Buttons (additions) ---------- */
+
+.btn--sm {
+  height: 2.25rem;
+  padding: 0 var(--sp-3);
+  font-size: var(--fs-md);
+}
+.linkbtn {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--c-brand);
+  cursor: pointer;
+}
+.linkbtn:hover {
+  color: var(--c-brand-hover);
+  text-decoration: underline;
+}
+.linkbtn--danger {
+  color: var(--c-danger);
+}
+.linkbtn--danger:hover {
+  color: var(--c-danger-hover);
+}
+
+/* ---------- Sections (admin) ---------- */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.section + .section {
+  margin-top: var(--sp-10);
+}
+.section .section-head h2 {
+  font-size: var(--fs-xl);
+}
+.section-head--danger h2 {
+  color: var(--c-danger);
+}
+.section-head--warn h2 {
+  color: var(--c-warn);
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--sp-3) var(--sp-4);
+}
+.toolbar .field {
+  min-width: 0;
+}
+.table td.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+.table td.actions > * + * {
+  margin-left: var(--sp-4);
+}
+.table .sub {
+  display: block;
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+.table .empty {
+  padding: var(--sp-5) var(--sp-3);
+}
+.table--compact td {
+  padding: var(--sp-2) var(--sp-3);
+}
+.person-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.person-cell img {
+  flex: none;
+  width: 2.25rem;
+  height: 2.75rem;
+  object-fit: cover;
+  background: var(--c-fill);
+}
+.person-cell__blank {
+  flex: none;
+  width: 2.25rem;
+  height: 2.75rem;
+  background: var(--c-fill);
+}
+
+.status {
+  font-weight: 600;
+}
+.status--brand {
+  color: var(--c-brand);
+}
+.status--warn {
+  color: var(--c-warn);
+}
+.status--danger {
+  color: var(--c-danger);
+}
+.status--muted {
+  color: var(--c-text-muted);
+  font-weight: 400;
+}
+
+/* ---------- Camera panel (register, tool photo) ---------- */
+
+.camera-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--c-dark-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.camera-panel__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+.camera-panel--mirror .camera-panel__img {
+  transform: scaleX(-1);
+}
+.camera-panel__label {
+  position: absolute;
+  top: var(--sp-4);
+  left: var(--sp-4);
+  font-size: var(--fs-sm);
+  color: var(--c-on-dark-subtle);
+}
+.camera-panel__guide {
+  position: relative;
+  height: 78%;
+  aspect-ratio: 300 / 380;
+  fill: none;
+}
+.camera-panel__guide ellipse {
+  stroke: #ffffff;
+  stroke-width: 3;
+  stroke-dasharray: 10 10;
+}
+.camera-panel--busy .camera-panel__guide ellipse {
+  stroke: var(--c-face-ok);
+  stroke-dasharray: none;
+}
+.camera-panel--done .camera-panel__guide ellipse {
+  stroke: var(--c-face-ok);
+  stroke-dasharray: none;
+}
+
+/* ---------- Result block ---------- */
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding-top: var(--sp-5);
+  border-top: 2px solid var(--c-ink);
+}
+.result h2 {
+  font-size: var(--fs-xl);
+}
+.result p,
+.result li {
+  font-size: var(--fs-lg);
+  line-height: var(--lh-normal);
+}
+.result ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.result li::before {
+  content: "– ";
+  color: var(--c-text-subtle);
+}
+.result--ok {
+  border-top-color: var(--c-brand);
+}
+.result--ok h2 {
+  color: var(--c-brand);
+}
+.result--warn {
+  border-top-color: var(--c-warn);
+}
+.result--warn h2 {
+  color: var(--c-warn);
+}
+.result--danger {
+  border-top-color: var(--c-danger);
+}
+.result--danger h2 {
+  color: var(--c-danger);
+}
+.result .form__actions {
+  margin-top: var(--sp-3);
+}
+
+/* ---------- Dialog ---------- */
+
+.dialog {
+  width: min(32rem, 90vw);
+  padding: var(--sp-6);
+  border: 1px solid var(--c-ink);
+  border-radius: 0;
+  color: var(--c-ink);
+  background: var(--c-surface);
+}
+.dialog::backdrop {
+  background: rgba(21, 25, 30, 0.45);
+}
+.dialog h2 {
+  font-size: var(--fs-xl);
+  margin-bottom: var(--sp-3);
+}
+.dialog p {
+  font-size: var(--fs-lg);
+  line-height: var(--lh-normal);
+}
+.dialog .form {
+  margin-top: var(--sp-4);
+}
+.dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-3);
+  margin-top: var(--sp-6);
+}
+
+/* ---------- Tool board (monitor) ---------- */
+
+.board {
+  border-top: 2px solid var(--c-ink);
+}
+.board__type {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sp-5);
+  padding: var(--sp-5) 0;
+  border-bottom: var(--hairline);
+}
+.board__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+.board__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-5);
+}
+.board__title h2 {
+  font-size: var(--fs-xl);
+}
+.board__count {
+  font-size: var(--fs-md);
+  color: var(--c-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.board__count--warn {
+  color: var(--c-warn);
+  font-weight: 600;
+}
+.board__count--danger {
+  color: var(--c-danger);
+  font-weight: 600;
+}
+.board__loans {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--fs-md);
+  font-variant-numeric: tabular-nums;
+}
+.board__loans li {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  gap: var(--sp-4);
+  padding: var(--sp-1) 0;
+}
+.board__loans .is-overdue {
+  color: var(--c-warn);
+  font-weight: 600;
+}
+.board__loans .is-missing {
+  color: var(--c-danger);
+  font-weight: 600;
+}
+.board-legend {
+  margin-top: var(--sp-4);
+}
+
+.tool-photo--xs {
+  width: 3rem;
+  height: 3rem;
+}
+.tool-photo--xs .tool-photo__initials {
+  font-size: var(--fs-base);
+}
+
+/* ---------- Admin login ---------- */
+
+.login-form {
+  max-width: 22rem;
+}
+.input--pin {
+  font-size: var(--fs-xl);
+  letter-spacing: 0.2em;
+}
+
+/* ---------- Register ---------- */
+
+.reg-step {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.reg-form {
+  max-width: 52rem;
+}
+.reg-face {
+  flex: 1;
+}
+.reg-face__grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--sp-10);
+}
+.reg-face__camera {
+  min-height: 18rem;
+  height: 100%;
+}
+.reg-face__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+  min-height: 0;
+  overflow-y: auto;
+}
+.reg-face__instruction {
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1.15;
+}
+.reg-face__restart {
+  margin-top: auto;
+  font-size: var(--fs-md);
+  color: var(--c-text-muted);
+}

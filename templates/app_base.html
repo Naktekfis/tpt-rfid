@@ -1,0 +1,46 @@
+{% extends "kiosk_base.html" %}
+{#
+  Shell for every page except the kiosk: thin top bar (logos, lab name,
+  breadcrumb, clock) above a scrolling page. Child templates set
+  `crumbs` = [(label, url or None), ...] before their blocks.
+#}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
+{% block page_head %}{% endblock %}
+{% endblock %}
+
+{% block header %}
+<header class="topbar">
+    <a class="topbar__brand" href="{{ url_for('index') }}">
+        <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}"
+            alt="Institut Teknologi Bandung">
+        <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
+        <span>Lab Fabrikasi · Teknik Fisika ITB</span>
+    </a>
+    {% if crumbs %}
+    <nav class="crumbs" aria-label="Lokasi halaman">
+        <ol>
+            {% for label, url in crumbs %}
+            <li>
+                {% if url and not loop.last %}<a href="{{ url }}">{{ label }}</a>
+                {% else %}<span{% if loop.last %} aria-current="page"{% endif %}>{{ label }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ol>
+    </nav>
+    {% endif %}
+    <span class="topbar__clock num" data-clock>--.--</span>
+</header>
+{% endblock %}
+
+{% block content %}
+<div class="page {% block page_class %}{% endblock %}">
+    {% block page %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>UI.startClock();</script>
+{% block page_scripts %}{% endblock %}
+{% endblock %}

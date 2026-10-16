@@ -1,6 +1,6 @@
 /*
- * Shared helpers for pages on kiosk_base.html: CSRF, JSON fetch, toasts,
- * date formatting. Plain globals, no build step.
+ * Shared helpers for pages on kiosk_base.html / app_base.html: CSRF, JSON
+ * fetch, toasts, date formatting, clock. Plain globals, no build step.
  */
 (function () {
     'use strict';
@@ -107,8 +107,34 @@
         return DAYS[wd] + ' ' + t.d + ' ' + MONTHS_LONG[t.mo - 1] + ', ' + t.h + '.' + t.mi;
     }
 
+    // Live WIB clock in every [data-clock] element ("14.05").
+    function startClock() {
+        const fmt = new Intl.DateTimeFormat('id-ID', {
+            timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false,
+        });
+        function tick() {
+            const text = fmt.format(new Date()).replace(':', '.');
+            document.querySelectorAll('[data-clock]').forEach(function (el) {
+                if (el.textContent !== text) el.textContent = text;
+            });
+        }
+        tick();
+        setInterval(tick, 5000);
+    }
+
+    // POST a FormData (multipart) with the CSRF token.
+    function postForm(url, formData) {
+        return fetchJSON(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': getCSRFToken() },
+            body: formData,
+        });
+    }
+
     window.UI = {
         getCSRFToken: getCSRFToken,
+        postForm: postForm,
+        startClock: startClock,
         fetchJSON: fetchJSON,
         postJSON: postJSON,
         toast: toast,

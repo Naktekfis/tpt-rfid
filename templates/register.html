@@ -1,171 +1,107 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
+{% if enroll_student %}
+{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Monitor", url_for('admin_monitor')), ("Rekam ulang wajah", None)] %}
+{% else %}
+{% set crumbs = [("Beranda", url_for('index')), ("Mahasiswa", url_for('mahasiswa_menu')), ("Daftar", None)] %}
+{% endif %}
 
-{% block title %}Registrasi Mahasiswa - Workshop RFID{% endblock %}
+{% block title %}Daftar — Lab Fabrikasi{% endblock %}
+{% block page_class %}page--fill{% endblock %}
 
-{% block content %}
-<div class="max-w-7xl mx-auto">
-    <!-- Header -->
-    <div class="text-center mb-8">
-        <h1 class="text-3xl font-bold text-primary-900 mb-1">Daftar Akun Mahasiswa</h1>
-        <p class="text-base text-primary-700">Lengkapi data diri dan <span class="font-bold">tempelkan KTM</span> untuk
-            mendaftar</p>
-    </div>
-
-    <!-- Two Column Layout - 5:3 Ratio -->
-    <div class="grid grid-cols-1 lg:grid-cols-8 gap-8">
-        <!-- Left Column: Registration Form (5/8) -->
-        <div class="lg:col-span-5">
-            <div class="bg-white rounded-2xl shadow-lg p-6 border border-primary-100">
-                <form id="registration-form" enctype="multipart/form-data">
-                    <!-- Name -->
-                    <div class="mb-5">
-                        <label class="block text-primary-900 text-base font-semibold mb-2" for="name">
-                            Nama Lengkap <span class="text-red-500">*</span>
-                        </label>
-                        <input type="text" id="name" name="name" required
-                            class="w-full px-4 py-3 text-base border-2 border-primary-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                            placeholder="Masukkan nama lengkap">
-                    </div>
-
-                    <!-- NIM -->
-                    <div class="mb-5">
-                        <label class="block text-primary-900 text-base font-semibold mb-2" for="nim">
-                            NIM <span class="text-red-500">*</span>
-                        </label>
-                        <input type="text" id="nim" name="nim" required
-                            class="w-full px-4 py-3 text-base border-2 border-primary-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                            placeholder="Masukkan NIM">
-                    </div>
-
-                    <!-- Email -->
-                    <div class="mb-5">
-                        <label class="block text-primary-900 text-base font-semibold mb-2" for="email">
-                            Email <span class="text-red-500">*</span>
-                        </label>
-                        <input type="email" id="email" name="email" required
-                            class="w-full px-4 py-3 text-base border-2 border-primary-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                            placeholder="contoh@email.com">
-                    </div>
-
-                    <!-- Phone -->
-                    <div class="mb-5">
-                        <label class="block text-primary-900 text-base font-semibold mb-2" for="phone">
-                            Nomor Telepon <span class="text-red-500">*</span>
-                        </label>
-                        <input type="tel" id="phone" name="phone" required
-                            class="w-full px-4 py-3 text-base border-2 border-primary-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                            placeholder="08xxxxxxxxxx">
-                    </div>
-
-                    <!-- Photo Upload -->
-                    <div class="mb-5">
-                        <label class="block text-primary-900 text-base font-semibold mb-2" for="photo">
-                            Foto Profil <span class="text-red-500">*</span>
-                        </label>
-                        <div class="flex items-center space-x-4">
-                            <label class="flex-1 cursor-pointer">
-                                <div
-                                    class="border-2 border-dashed border-primary-300 rounded-xl p-5 hover:border-primary-500 hover:bg-primary-50 transition-all text-center">
-                                    <svg class="mx-auto h-12 w-12 text-primary-400" stroke="currentColor" fill="none"
-                                        viewBox="0 0 48 48">
-                                        <path
-                                            d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                                    </svg>
-                                    <p class="mt-2 text-sm text-primary-700 font-semibold">Klik untuk upload</p>
-                                    <p class="text-xs text-primary-600 mt-1">PNG, JPG, JPEG (Max 16MB)</p>
-                                </div>
-                                <input type="file" id="photo" name="photo" accept="image/*" class="hidden" required>
-                            </label>
-                            <div id="photo-preview" class="hidden">
-                                <img id="preview-img"
-                                    class="h-32 w-32 object-cover rounded-xl border-4 border-primary-200 shadow-md"
-                                    alt="Preview">
-                            </div>
-                        </div>
-                        <p id="photo-name" class="text-sm text-primary-600 mt-2 font-medium"></p>
-                    </div>
-
-                    <!-- Result/error of the last submit (set by register.js) -->
-                    <div id="form-status" class="mt-4"></div>
-
-                    <!-- Hidden RFID UID -->
-                    <input type="hidden" id="rfid_uid" name="rfid_uid" value="">
-
-                    <!-- Buttons -->
-                    <div class="flex space-x-3 mt-6">
-                        <button type="submit" id="submit-btn" disabled
-                            class="flex-1 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white font-bold py-4 px-6 rounded-xl text-lg shadow-lg transition-all disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed">
-                            Daftar
-                        </button>
-                        <a href="{{ url_for('mahasiswa_menu') }}"
-                            class="flex-1 bg-white hover:bg-primary-50 text-primary-700 border-2 border-primary-300 hover:border-primary-500 font-bold py-4 px-6 rounded-xl text-lg text-center shadow-lg transition-all">
-                            Kembali
-                        </a>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Right Column: RFID Scanner (3/8) -->
-        <div class="lg:col-span-3">
-            <div class="bg-white rounded-2xl shadow-lg p-6 sticky top-4 border border-primary-100">
-                <h2 class="text-xl font-bold text-primary-900 mb-4 flex items-center space-x-2">
-                    <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span>Scan KTM</span>
-                </h2>
-
-                <!-- RFID Status Indicator -->
-                <div id="rfid-indicator"
-                    class="border-4 border-primary-200 rounded-2xl p-6 text-center transition-all duration-300 bg-primary-50/30">
-                    <svg id="rfid-icon" class="mx-auto h-20 w-20 text-primary-400" fill="none" stroke="currentColor"
-                        viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-
-                    <p id="rfid-status" class="text-lg font-semibold text-primary-700 mt-4">
-                        Menunggu kartu...
-                    </p>
-
-                    <div id="rfid-uid-display" class="mt-4 hidden">
-                        <p class="text-xs text-primary-600 mb-2 font-medium">UID Terdeteksi:</p>
-                        <p id="rfid-uid-text"
-                            class="text-xl font-mono font-bold text-primary-900 bg-white px-4 py-2 rounded-xl border-2 border-primary-300 shadow-sm">
-                            -
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Instructions -->
-                <div
-                    class="mt-4 p-4 bg-gradient-to-br from-primary-50 to-primary-100 rounded-xl border border-primary-200">
-                    <p class="text-sm text-primary-900 leading-relaxed">
-                        <span class="font-bold text-base block mb-2 text-primary-900">Instruksi:</span>
-                        <span class="block mb-1 text-xs">1. Isi semua data form</span>
-                        <span class="block mb-1 text-xs">2. Tempelkan kartu RFID pada reader</span>
-                        <span class="block mb-1 text-xs">3. Tunggu hingga kartu terdeteksi</span>
-                        <span class="block text-xs">4. Klik tombol "Daftar"</span>
-                    </p>
-                </div>
-
-                <!-- Debug Helper -->
-                <div class="mt-3 p-3 bg-yellow-50 rounded-xl border border-yellow-200">
-                    <p class="text-xs text-yellow-900">
-                        <span class="font-semibold">🛠️ Dev Mode:</span><br>
-                        <code
-                            class="bg-yellow-200 px-2 py-1 rounded mt-1 inline-block font-mono text-xs">simulateRFID("UID123")</code>
-                    </p>
-                </div>
-            </div>
+{% block page %}
+<!-- Step 1: personal data -->
+<section class="reg-step" id="step-form" {% if enroll_student %}hidden{% endif %}>
+    <div class="page-head">
+        <div>
+            <h1>Daftar</h1>
+            <p>Langkah 1 dari 2 · Isi data diri Anda. Setelah itu wajah Anda direkam di kamera kiosk.</p>
         </div>
     </div>
-</div>
+
+    <form class="form reg-form" id="reg-form" autocomplete="off" novalidate>
+        <div class="form__row">
+            <div class="field">
+                <label class="field__label" for="name">Nama lengkap</label>
+                <input class="input" id="name" name="name" type="text" maxlength="200" required autofocus>
+            </div>
+            <div class="field">
+                <label class="field__label" for="nim">NIM</label>
+                <input class="input" id="nim" name="nim" type="text" inputmode="numeric" maxlength="20" required
+                    aria-describedby="nim-hint">
+                <span class="field__hint" id="nim-hint">Huruf atau angka, 5 sampai 20 karakter</span>
+            </div>
+        </div>
+        <div class="form__row">
+            <div class="field">
+                <label class="field__label" for="email">Email</label>
+                <input class="input" id="email" name="email" type="email" maxlength="200" required
+                    aria-describedby="email-hint">
+                <span class="field__hint" id="email-hint">Pengingat pengembalian dikirim ke alamat ini</span>
+            </div>
+            <div class="field">
+                <label class="field__label" for="phone">No. HP</label>
+                <input class="input" id="phone" name="phone" type="tel" maxlength="20" required>
+            </div>
+        </div>
+        <label class="check">
+            <input type="checkbox" id="consent" name="consent" required>
+            <span>Saya setuju foto wajah saya disimpan untuk verifikasi peminjaman alat di Lab Fabrikasi. Data dapat
+                dihapus oleh admin atas permintaan saya.</span>
+        </label>
+        <p class="form-error" id="form-error" role="alert"></p>
+        <div class="form__actions">
+            <button type="submit" class="btn btn--primary btn--lg" id="form-submit">Lanjut ke rekam wajah</button>
+            <a href="{{ url_for('mahasiswa_menu') }}">Batal</a>
+        </div>
+    </form>
+</section>
+
+<!-- Step 2: face capture -->
+<section class="reg-step reg-face" id="step-face" {% if not enroll_student %}hidden{% endif %}>
+    <div class="page-head">
+        <div>
+            <h1>{% if enroll_student %}Rekam ulang wajah{% else %}Rekam wajah{% endif %}</h1>
+            <p>{% if not enroll_student %}Langkah 2 dari 2 · {% endif %}<span id="face-who">{% if enroll_student %}{{ enroll_student.name }} ({{ enroll_student.nim }}){% endif %}</span></p>
+        </div>
+    </div>
+
+    <div class="reg-face__grid">
+        <div class="camera-panel camera-panel--mirror reg-face__camera" id="cam">
+            <img class="camera-panel__img" id="cam-img" alt="Tampilan kamera" hidden>
+            <span class="camera-panel__label" id="cam-label">Menyambungkan kamera…</span>
+            <svg class="camera-panel__guide" viewBox="0 0 300 380" aria-hidden="true">
+                <ellipse cx="150" cy="190" rx="130" ry="170" />
+            </svg>
+        </div>
+
+        <div class="reg-face__side">
+            <div class="stack-sm" id="face-intro">
+                <p class="reg-face__instruction">Lihat lurus ke kamera, lalu gerakkan kepala sedikit ke kiri dan kanan.</p>
+                <p class="lead">Perekaman berlangsung sekitar dua detik. Pastikan wajah berada di dalam bingkai,
+                    hanya Anda yang terlihat, dan cahaya cukup.</p>
+            </div>
+            <div class="form__actions" id="face-actions">
+                <button type="button" class="btn btn--primary btn--lg" id="face-btn">Rekam wajah</button>
+                <span class="muted" id="face-busy" role="status" hidden>Merekam… tetap lihat ke kamera.</span>
+            </div>
+            <p class="reg-face__restart" id="face-restart" hidden>Bukan data Anda?
+                <button type="button" class="linkbtn" id="face-restart-btn">Isi formulir baru</button></p>
+            <div class="result" id="face-result" role="status" aria-live="polite" hidden></div>
+        </div>
+    </div>
+</section>
 {% endblock %}
 
-{% block extra_js %}
+{% block page_scripts %}
+<script>
+    window.REGISTER_CONFIG = {
+        cameraStream: "/camera/stream",
+        kioskUrl: "{{ url_for('kiosk_page') }}",
+        menuUrl: "{{ url_for('mahasiswa_menu') }}",
+        adminMonitorUrl: "{{ url_for('admin_monitor') }}",
+        student: {% if enroll_student %}{{ {"student_id": enroll_student.student_id, "name": enroll_student.name, "nim": enroll_student.nim} | tojson }}{% else %}null{% endif %},
+        adminMode: {{ 'true' if enroll_student else 'false' }},
+    };
+</script>
 <script src="{{ url_for('static', filename='js/register.js') }}"></script>
 {% endblock %}

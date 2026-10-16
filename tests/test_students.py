@@ -76,3 +76,15 @@ def test_scan_student_without_json_body(client):
 
 def test_student_photo_missing(client, student):
     assert client.get(f"/api/student/{student['student_id']}/photo").status_code == 404
+
+
+def test_register_without_card_twice(client):
+    """Face flow: no rfid_uid; two students without a card must not collide."""
+    data = {k: v for k, v in FORM.items() if k != "rfid_uid"}
+    first = client.post("/api/register", data=data)
+    assert first.status_code == 200
+    second = client.post("/api/register", data=dict(data, nim="87654321"))
+    assert second.status_code == 200
+    s1, s2 = first.get_json()["student"], second.get_json()["student"]
+    assert s1["student_id"] != s2["student_id"]
+    assert app_module.database.get_student_by_id(s1["student_id"])["rfid_uid"] is None

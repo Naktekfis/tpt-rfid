@@ -1,280 +1,319 @@
-/**
- * Registration Page Logic
- * Handles form submission, photo preview, and RFID polling
+/*
+ * /daftar: step 1 posts the form to /api/register, step 2 records the face
+ * with POST /api/face/enroll/<student_id> (the server captures ~8 frames over
+ * ~2 s). The created student is kept in sessionStorage, so a failed capture
+ * or a page reload retries on the same student without the form.
+ * Admin mode (/daftar?student_id=<id> with an admin session) starts at step 2.
  */
+(function () {
+    'use strict';
 
-let rfidPollInterval;
-let currentRFID = null;
-let rfidBusy = false;     // a card lookup is in flight
-let submitting = false;
+    const UI = window.UI;
+    const h = UI.h;
+    const CFG = window.REGISTER_CONFIG || {};
+    const STORE = 'tpt-register-student';
+    const CAMERA_RETRY_MS = 8000;
 
-function postJSON(url, body) {
-    return fetchJSON(url, {
-        method: 'POST',
-        headers: getCSRFHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(body)
-    });
-}
+    const $ = function (id) { return document.getElementById(id); };
 
-function clearRFIDState() {
-    return postJSON('/api/rfid/clear', {});
-}
+    let student = CFG.student || null;
 
-document.addEventListener('DOMContentLoaded', function () {
-    console.log('Registration page loaded');
+    // ---------- Step switching ----------
 
-    // Get form elements
-    const form = document.getElementById('registration-form');
-    const photoInput = document.getElementById('photo');
-    const photoPreview = document.getElementById('photo-preview');
-    const previewImg = document.getElementById('preview-img');
-    const photoName = document.getElementById('photo-name');
-    const submitBtn = document.getElementById('submit-btn');
-    const rfidIndicator = document.getElementById('rfid-indicator');
-    const rfidStatus = document.getElementById('rfid-status');
-    const rfidIcon = document.getElementById('rfid-icon');
-    const rfidUidDisplay = document.getElementById('rfid-uid-display');
-    const rfidUidText = document.getElementById('rfid-uid-text');
-    const rfidUidInput = document.getElementById('rfid_uid');
+    function showForm() {
+        $('step-face').hidden = true;
+        $('step-form').hidden = false;
+        $('name').focus();
+    }
 
-    // Photo preview
-    photoInput.addEventListener('change', function (e) {
-        const file = e.target.files[0];
-        if (file) {
-            // Show preview
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                previewImg.src = e.target.result;
-                photoPreview.classList.remove('hidden');
-            };
-            reader.readAsDataURL(file);
+    function showFace() {
+        $('step-form').hidden = true;
+        $('step-face').hidden = false;
+        $('face-who').textContent = student.name + ' (' + student.nim + ')';
+        $('face-result').hidden = true;
+        $('face-intro').hidden = false;
+        $('face-actions').hidden = false;
+        $('face-btn').textContent = 'Rekam wajah';
+        startCamera();
+        $('face-btn').focus();
+    }
 
-            // Show filename
-            photoName.textContent = `File: ${file.name}`;
+    function remember(s) {
+        try {
+            if (s) sessionStorage.setItem(STORE, JSON.stringify(s));
+            else sessionStorage.removeItem(STORE);
+        } catch (e) { /* private mode: retry still works until reload */ }
+    }
 
-            // Check form validity
-            checkFormValidity();
+    function recalled() {
+        try {
+            const raw = sessionStorage.getItem(STORE);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
         }
-    });
+    }
 
-    // Start from a clean reader state so a card or tag from a previous page
-    // is not pre-filled, then poll.
-    clearRFIDState().catch(() => {}).finally(startRFIDPolling);
+    // ---------- Step 1: form ----------
 
-    // Form submission
-    form.addEventListener('submit', function (e) {
-        e.preventDefault();
+    const FIELDS = ['name', 'nim', 'email', 'phone'];
 
-        // Validate RFID
-        if (!currentRFID) {
-            showToast('Harap scan kartu RFID terlebih dahulu', 'error');
+    function clearErrors() {
+        $('form-error').textContent = '';
+        FIELDS.forEach(function (f) { $(f).removeAttribute('aria-invalid'); });
+    }
+
+    function fail(field, message) {
+        $('form-error').textContent = message;
+        if (field) {
+            $(field).setAttribute('aria-invalid', 'true');
+            $(field).focus();
+        }
+    }
+
+    // Field order, so the first problem is the one nearest the top.
+    const CHECKS = [
+        ['name', function (v) { return v ? '' : 'Isi nama lengkap Anda.'; }],
+        ['nim', function (v) {
+            if (!v) return 'Isi NIM Anda.';
+            return /^[A-Za-z0-9]{5,20}$/.test(v) ? '' : 'NIM berisi 5 sampai 20 huruf atau angka, tanpa spasi.';
+        }],
+        ['email', function (v, el) {
+            if (!v) return 'Isi alamat email Anda.';
+            return el.checkValidity() ? '' : 'Alamat email belum benar.';
+        }],
+        ['phone', function (v) {
+            if (!v) return 'Isi nomor HP Anda.';
+            return /^[0-9+\-\s]{8,20}$/.test(v) ? '' : 'Nomor HP berisi 8 sampai 20 angka.';
+        }],
+    ];
+
+    function validate() {
+        for (let i = 0; i < CHECKS.length; i++) {
+            const el = $(CHECKS[i][0]);
+            const msg = CHECKS[i][1](el.value.trim(), el);
+            if (msg) {
+                fail(CHECKS[i][0], msg);
+                return false;
+            }
+        }
+        if (!$('consent').checked) {
+            fail(null, 'Centang persetujuan penyimpanan foto wajah untuk melanjutkan.');
+            $('consent').focus();
+            return false;
+        }
+        return true;
+    }
+
+    async function submitForm(ev) {
+        ev.preventDefault();
+        clearErrors();
+        if (!validate()) return;
+        const btn = $('form-submit');
+        btn.disabled = true;
+        const fd = new FormData();
+        FIELDS.forEach(function (f) { fd.append(f, $(f).value.trim()); });
+        try {
+            const res = await UI.postForm('/api/register', fd);
+            if (!res.success) {
+                if (res.error === 'NIM sudah terdaftar') {
+                    fail('nim', 'NIM ini sudah terdaftar. Bila Anda belum merekam wajah, hubungi admin.');
+                } else if (res.error === 'Format NIM tidak valid') {
+                    fail('nim', 'NIM berisi 5 sampai 20 huruf atau angka, tanpa spasi.');
+                } else {
+                    fail(null, res.error || 'Pendaftaran gagal. Coba lagi.');
+                }
+                return;
+            }
+            student = res.student;
+            remember(student);
+            showFace();
+        } catch (e) {
+            fail(null, 'Tidak dapat menghubungi server. Coba lagi.');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // ---------- Step 2: camera ----------
+
+    let cameraStarted = false;
+
+    function startCamera() {
+        if (cameraStarted) return;
+        cameraStarted = true;
+        const img = $('cam-img');
+        const label = $('cam-label');
+        img.onload = function () {
+            label.hidden = true;
+            img.hidden = false;
+        };
+        img.onerror = function () {
+            img.hidden = true;
+            label.hidden = false;
+            label.textContent = 'Kamera tidak tersedia';
+            setTimeout(function () { img.src = CFG.cameraStream + '?t=' + Date.now(); }, CAMERA_RETRY_MS);
+        };
+        img.src = CFG.cameraStream;
+    }
+
+    // ---------- Step 2: enroll ----------
+
+    const HINTS = {
+        no_face: 'Pastikan seluruh wajah berada di dalam bingkai.',
+        multiple_faces: 'Pastikan hanya Anda yang terlihat di kamera.',
+        too_small: 'Mendekatlah ke kamera sampai wajah mengisi bingkai.',
+        blurry: 'Gerakkan kepala lebih pelan dan pastikan cahaya cukup.',
+    };
+
+    function result(kind, title, paragraphs, actions, list) {
+        const box = $('face-result');
+        box.className = 'result result--' + kind;
+        box.textContent = '';
+        box.appendChild(h('h2', { text: title }));
+        (paragraphs || []).forEach(function (p) { box.appendChild(h('p', { text: p })); });
+        if (list && list.length) {
+            const ul = h('ul');
+            list.forEach(function (t) { ul.appendChild(h('li', { text: t })); });
+            box.appendChild(ul);
+        }
+        if (actions && actions.length) {
+            const row = h('div', { class: 'form__actions' });
+            actions.forEach(function (a) { row.appendChild(a); });
+            box.appendChild(row);
+        }
+        box.hidden = false;
+    }
+
+    function link(href, text, primary) {
+        return h('a', { class: 'btn ' + (primary ? 'btn--primary' : 'btn--secondary'), href: href, text: text });
+    }
+
+    function backLink(primary) {
+        return CFG.adminMode
+            ? link(CFG.adminMonitorUrl, 'Kembali ke Monitor', primary)
+            : link(CFG.kioskUrl, 'Ke kiosk', primary);
+    }
+
+    // Final outcome: no more recording on this page.
+    function finish(kind, title, paragraphs, actions) {
+        $('face-intro').hidden = true;
+        $('face-actions').hidden = true;
+        $('face-restart').hidden = true;
+        result(kind, title, paragraphs, actions);
+        const first = $('face-result').querySelector('a, button');
+        if (first) first.focus();
+    }
+
+    // Retryable outcome: instructions stay, the button becomes "Coba lagi".
+    function again(kind, title, paragraphs, list) {
+        $('face-btn').textContent = 'Coba lagi';
+        result(kind, title, paragraphs, null, list);
+        $('face-btn').focus();
+    }
+
+    function showResult(status, res, httpOk) {
+        if (status === 'ok') {
+            $('cam').classList.add('camera-panel--done');
+            remember(null);
+            const paras = CFG.adminMode
+                ? ['Wajah ' + student.name + ' sudah direkam ulang dan dapat dipakai di kiosk.']
+                : ['Silakan kembali ke kiosk. Di sana, lihat ke kamera untuk meminjam atau mengembalikan alat.'];
+            if (res && res.verified === false) {
+                paras.push('Uji pengenalan setelah perekaman belum berhasil. Bila nanti wajah tidak dikenali di kiosk, minta admin merekam ulang.');
+            }
+            finish('ok', CFG.adminMode ? 'Wajah tersimpan.' : 'Pendaftaran selesai.', paras, [backLink(true)]);
             return;
         }
-
-        // Validate all fields
-        if (!form.checkValidity()) {
-            showToast('Harap isi semua field yang diperlukan', 'error');
+        if (status === 'insufficient') {
+            const problems = (res && res.problems) || {};
+            const hints = Object.keys(HINTS).filter(function (k) { return problems[k]; }).map(function (k) { return HINTS[k]; });
+            if (!hints.length) hints.push(HINTS.no_face, HINTS.blurry);
+            again('warn', 'Wajah belum terekam dengan baik',
+                ['Hanya ' + (res.good_frames || 0) + ' dari ' + (res.needed || 3) + ' gambar yang dibutuhkan cukup jelas.'],
+                hints);
             return;
         }
-
-        // Submit form
-        submitRegistration();
-    });
-
-    // Clean up on page unload
-    window.addEventListener('beforeunload', function () {
-        stopRFIDPolling();
-    });
-});
-
-/**
- * Start polling for RFID card
- */
-function startRFIDPolling() {
-    console.log('Starting RFID polling');
-
-    // Poll every 2 seconds
-    rfidPollInterval = setInterval(checkRFID, 2000);
-
-    // Initial check
-    checkRFID();
-}
-
-/**
- * Stop RFID polling
- */
-function stopRFIDPolling() {
-    if (rfidPollInterval) {
-        clearInterval(rfidPollInterval);
-        rfidPollInterval = null;
-    }
-}
-
-/**
- * Check for RFID card
- */
-function checkRFID() {
-    if (rfidBusy || submitting) return;
-    fetchJSON('/api/check_rfid')
-        .then(data => {
-            if (data.success && data.detected && data.uid) {
-                // Card detected
-                onRFIDDetected(data.uid);
-            } else {
-                // No card
-                onRFIDRemoved();
-            }
-        })
-        .catch(error => {
-            console.error('Error checking RFID:', error);
-        });
-}
-
-/**
- * Handle a tapped card. A card that already belongs to a student or a tool is
- * rejected right away instead of after the whole form is typed. Tapping
- * another card replaces the UID.
- */
-async function onRFIDDetected(uid) {
-    if (uid === currentRFID) return;
-    rfidBusy = true;
-    try {
-        const [studentRes, toolRes] = await Promise.all([
-            postJSON('/api/scan_student', { rfid_uid: uid }),
-            postJSON('/api/scan_tool', { rfid_uid: uid }),
-        ]);
-        if (studentRes.success) {
-            setRFIDStatus('Kartu ini sudah terdaftar. Gunakan kartu lain atau langsung pinjam alat.', 'error');
-        } else if (toolRes.success) {
-            setRFIDStatus('Ini tag alat, bukan KTM. Tap KTM Anda.', 'error');
-        } else {
-            acceptRFID(uid);
+        if (status === 'duplicate') {
+            remember(null);
+            finish('danger', 'Wajah sudah terdaftar',
+                ['Wajah ini sudah terdaftar atas nama mahasiswa lain. Hubungi admin.'],
+                [CFG.adminMode ? backLink(false) : link(CFG.menuUrl, 'Kembali ke menu', false)]);
+            return;
         }
-        // Handled: clear so the next tap is a new event.
-        await clearRFIDState().catch(() => {});
-    } catch (error) {
-        console.error('Error checking card:', error);
-        setRFIDStatus('Gagal memeriksa kartu. Coba tap lagi.', 'error');
-    } finally {
-        rfidBusy = false;
+        if (status === 'already_enrolled') {
+            remember(null);
+            finish('warn', 'Wajah sudah terekam',
+                ['Wajah untuk akun ini sudah terdaftar. Untuk merekam ulang, hubungi admin.'],
+                [backLink(false)]);
+            return;
+        }
+        if (status === 'not_found') {
+            remember(null);
+            finish('danger', 'Data tidak ditemukan',
+                CFG.adminMode ? ['Data mahasiswa ini tidak ditemukan.'] : ['Data pendaftaran Anda tidak ditemukan. Silakan isi formulir lagi.'],
+                [CFG.adminMode ? backLink(false)
+                    : h('button', { type: 'button', class: 'btn btn--primary', onclick: restart, text: 'Isi formulir lagi' })]);
+            return;
+        }
+        if (status === 'no_camera') {
+            again('warn', 'Kamera tidak mengirim gambar',
+                ['Periksa apakah kamera tersambung, lalu coba lagi.' + (CFG.adminMode ? '' : ' Data diri Anda sudah tersimpan.')]);
+            return;
+        }
+        if (status === 'models_missing') {
+            again('danger', 'Pengenalan wajah belum siap',
+                ['Model pengenalan wajah belum terpasang di perangkat ini. Hubungi admin.' +
+                    (CFG.adminMode ? '' : ' Data diri Anda sudah tersimpan; perekaman dapat diulang nanti.')]);
+            return;
+        }
+        again('danger', 'Perekaman gagal',
+            [(res && res.error) || ((httpOk ? 'Terjadi kesalahan.' : 'Tidak dapat menghubungi server.') + ' Coba lagi.')]);
     }
-}
 
-function setRFIDStatus(message, type) {
-    const rfidStatus = document.getElementById('rfid-status');
-    rfidStatus.textContent = message;
-    rfidStatus.classList.remove('text-gray-600', 'text-primary-700', 'text-blue-600', 'text-red-600');
-    rfidStatus.classList.add(type === 'error' ? 'text-red-600' : 'text-blue-600');
-}
+    async function enroll() {
+        if (!student) return;
+        const btn = $('face-btn');
+        const panel = $('cam');
+        btn.disabled = true;
+        $('face-busy').hidden = false;
+        $('face-result').hidden = true;
+        panel.classList.add('camera-panel--busy');
+        panel.classList.remove('camera-panel--done');
+        try {
+            const res = await UI.postJSON('/api/face/enroll/' + encodeURIComponent(student.student_id));
+            showResult(res.status, res, true);
+        } catch (e) {
+            showResult('network', null, false);
+        } finally {
+            btn.disabled = false;
+            $('face-busy').hidden = true;
+            panel.classList.remove('camera-panel--busy');
+        }
+    }
 
-function acceptRFID(uid) {
-    const rfidIndicator = document.getElementById('rfid-indicator');
-    const rfidIcon = document.getElementById('rfid-icon');
+    function restart() {
+        student = null;
+        $('face-restart').hidden = true;
+        remember(null);
+        $('reg-form').reset();
+        showForm();
+    }
 
-    currentRFID = uid;
+    // ---------- Init ----------
 
-    rfidIndicator.classList.remove('border-gray-300');
-    rfidIndicator.classList.add('border-blue-500', 'bg-blue-50');
-    rfidIcon.classList.remove('text-gray-400');
-    rfidIcon.classList.add('text-blue-500');
-
-    setRFIDStatus('Kartu tercatat (boleh dilepas). Tap kartu lain untuk mengganti.', 'ok');
-    document.getElementById('rfid-uid-display').classList.remove('hidden');
-    document.getElementById('rfid-uid-text').textContent = uid;
-    document.getElementById('rfid_uid').value = uid;
-
-    checkFormValidity();
-}
-
-/**
- * No card on the reader. The UID is kept once accepted (the user is filling
- * the form), so there is nothing to do.
- */
-function onRFIDRemoved() {}
-
-/**
- * Check if form is valid and enable/disable submit button
- */
-function checkFormValidity() {
-    const form = document.getElementById('registration-form');
-    const submitBtn = document.getElementById('submit-btn');
-    const photoInput = document.getElementById('photo');
-
-    // Check if all required fields are filled and RFID is scanned
-    const isValid = form.checkValidity() &&
-        currentRFID !== null &&
-        photoInput.files.length > 0;
-
-    submitBtn.disabled = !isValid || submitting;
-}
-
-/**
- * Submit registration form. The button stays disabled while the request runs;
- * errors are shown in #form-status and scrolled into view.
- */
-function submitRegistration() {
-    if (submitting) return;
-    const form = document.getElementById('registration-form');
-    const formData = new FormData(form);
-    const submitBtn = document.getElementById('submit-btn');
-
-    submitting = true;
-    submitBtn.disabled = true;
-    showLoading();
-
-    fetchJSON('/api/register', {
-        method: 'POST',
-        headers: {
-            'X-CSRFToken': getCSRFToken()
-        },
-        body: formData
-    })
-        .then(data => {
-            if (data.success) {
-                showFormStatus(
-                    ['Registrasi berhasil!', `Nama: ${data.student.name}`, `NIM: ${data.student.nim}`],
-                    'success'
-                );
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 3000);
-            } else {
-                submitting = false;
-                showFormStatus([`Gagal: ${data.error}`], 'error');
-                checkFormValidity();
-            }
-        })
-        .catch(error => {
-            console.error('Error submitting registration:', error);
-            submitting = false;
-            showFormStatus(['Gagal menghubungi server. Data belum tersimpan, coba lagi.'], 'error');
-            checkFormValidity();
-        })
-        .finally(hideLoading);
-}
-
-function showFormStatus(lines, type) {
-    const status = document.getElementById('form-status');
-    const box = document.createElement('div');
-    box.className = type === 'success'
-        ? 'p-4 bg-blue-100 text-blue-800 rounded-lg'
-        : 'p-4 bg-red-100 text-red-800 rounded-lg';
-    box.setAttribute('role', type === 'success' ? 'status' : 'alert');
-    lines.forEach((text, i) => {
-        const p = document.createElement('p');
-        p.textContent = text;
-        if (i === 0) p.className = 'font-semibold';
-        box.appendChild(p);
+    $('reg-form').addEventListener('submit', submitForm);
+    FIELDS.forEach(function (f) {
+        $(f).addEventListener('input', function () { $(f).removeAttribute('aria-invalid'); });
     });
-    status.replaceChildren(box);
-    status.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
+    $('face-btn').addEventListener('click', enroll);
 
-// Listen for form field changes to update submit button
-document.addEventListener('DOMContentLoaded', function () {
-    const inputs = document.querySelectorAll('#registration-form input');
-    inputs.forEach(input => {
-        input.addEventListener('input', checkFormValidity);
-        input.addEventListener('change', checkFormValidity);
-    });
-});
+    $('face-restart-btn').addEventListener('click', restart);
+
+    if (!student && !CFG.adminMode) {
+        student = recalled();
+        // Someone else's unfinished registration on this kiosk browser.
+        if (student) $('face-restart').hidden = false;
+    }
+    if (student) showFace();
+})();

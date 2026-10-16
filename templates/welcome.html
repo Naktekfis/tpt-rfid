@@ -1,117 +1,37 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
+{% set crumbs = [("Beranda", url_for('index')), ("Mahasiswa", None)] %}
 
-{% block title %}Selamat Datang - Workshop RFID{% endblock %}
+{% block title %}Mahasiswa — Lab Fabrikasi{% endblock %}
+{% block page_class %}page--menu{% endblock %}
 
-{% block content %}
-<div class="flex items-center justify-center min-h-[82vh]">
-    <div class="text-center max-w-4xl w-full">
-        <!-- Hero Section -->
-        <div class="mb-10">
-            <div class="inline-block mb-5">
-                <div
-                    class="w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg">
-                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
-                </div>
-            </div>
-
-            <h1 class="text-4xl font-bold text-primary-900 mb-3">
-                Selamat Datang, Mahasiswa!
-            </h1>
-
-            <p class="text-lg text-primary-700 font-medium">
-                Pilih menu di bawah untuk memulai
-            </p>
-        </div>
-
-        <!-- Action Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Scan/Borrow Tool Card -->
-            <a href="{{ url_for('scan') }}"
-                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
-                <div class="flex flex-col items-center space-y-3">
-                    <div
-                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Pinjam / Kembalikan Alat
-                        </h2>
-                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Sudah terdaftar di sistem
-                        </p>
-                    </div>
-                </div>
-            </a>
-
-            <!-- New Registration Card -->
-            <a href="{{ url_for('register') }}"
-                class="group bg-white hover:bg-gradient-to-br hover:from-primary-600 hover:to-primary-700 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-600">
-                <div class="flex flex-col items-center space-y-3">
-                    <div
-                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Daftar Akun Baru
-                        </h2>
-                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Belum pernah meminjam alat
-                        </p>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Monitor Tools Card -->
-            <a href="{{ url_for('monitor') }}"
-                class="group bg-white hover:bg-gradient-to-br hover:from-primary-500 hover:to-primary-600 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 p-6 border-2 border-primary-100 hover:border-primary-500">
-                <div class="flex flex-col items-center space-y-3">
-                    <div
-                        class="w-14 h-14 bg-primary-100 group-hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors">
-                        <svg class="w-9 h-9 text-primary-600 group-hover:text-white transition-colors" fill="none"
-                            stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                        </svg>
-                    </div>
-                    <div>
-                        <h2 class="text-xl font-bold text-primary-900 group-hover:text-white transition-colors mb-1">
-                            Monitor Alat
-                        </h2>
-                        <p class="text-primary-600 group-hover:text-primary-50 transition-colors text-sm">
-                            Lihat status semua alat
-                        </p>
-                    </div>
-                </div>
-            </a>
-        </div>
-
-        <!-- Back to Landing Button -->
-        <div class="mt-8">
-            <a href="{{ url_for('index') }}"
-                class="inline-flex items-center space-x-2 text-primary-600 hover:text-primary-800 font-semibold transition-colors">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                <span>Kembali ke Menu Utama</span>
-            </a>
-        </div>
-    </div>
+{% block page %}
+<div class="menu-hero">
+    <h1>Mahasiswa</h1>
+    <p>Pilih yang ingin Anda lakukan.</p>
 </div>
-{% endblock %}
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/welcome.js') }}"></script>
+<ul class="menu">
+    <li>
+        <a class="menu__link" href="{{ url_for('kiosk_page') }}">
+            <span class="menu__title">Pinjam / Kembalikan Alat</span>
+            <span class="menu__desc">Lihat ke kamera, lalu ambil atau letakkan alat di rak</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="{{ url_for('register') }}">
+            <span class="menu__title">Daftar</span>
+            <span class="menu__desc">Isi data diri dan rekam wajah Anda satu kali sebelum meminjam</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="{{ url_for('monitor') }}">
+            <span class="menu__title">Monitor Alat</span>
+            <span class="menu__desc">Lihat alat yang ada di rak dan yang sedang dipinjam</span>
+        </a>
+    </li>
+</ul>
+
+<div class="menu-foot">
+    <a href="{{ url_for('index') }}">Kembali ke menu utama</a>
+</div>
 {% endblock %}
