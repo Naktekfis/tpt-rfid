@@ -13,9 +13,10 @@ is decided by the page/route that consumes it.
 from __future__ import annotations
 
 import logging
+import queue
 import threading
 import time
-from typing import Callable, Dict, Iterable, List, Optional
+from typing import Callable, Dict, Iterable, List, Optional, Set
 
 from . import vx6336
 
@@ -65,6 +66,21 @@ class _ScanState:
         self._lock = threading.Lock()
         self._uid: Optional[str] = None
         self._scan_time: Optional[float] = None
+        self._round_listeners: List[Callable[[List[str]], None]] = []
+
+    def add_round_listener(self, callback: Callable[[List[str]], None]) -> None:
+        """Call `callback(epcs)` after every inventory round, also empty ones."""
+        self._round_listeners.append(callback)
+
+    def _emit_round(self, epcs: List[str]) -> None:
+        for callback in list(self._round_listeners):
+            try:
+                callback(list(epcs))
+            except Exception:  # listener boundary: must not kill the reader
+                logger.exception("RFID round listener failed")
+
+    def beep(self, active: int = 2, silent: int = 2, times: int = 3) -> None:
+        pass
 
     def report(self, uid: str) -> None:
         with self._lock:
@@ -109,10 +125,36 @@ class RFIDReaderMock(_ScanState):
 
     def __init__(self, scan_duration: float = 30.0):
         super().__init__(scan_duration)
+        self._present: Set[str] = set()
+        self._present_lock = threading.Lock()
+        self._round_thread: Optional[threading.Thread] = None
+        self._round_stop = threading.Event()
         logger.info("RFID reader: MOCK (RFID_READER_ENABLED=false)")
 
     def simulate_scan(self, uid: str) -> None:
         self.report(uid)
+
+    def beep(self, active: int = 2, silent: int = 2, times: int = 3) -> None:
+        logger.info(f"RFID mock beep ({active}, {silent}, {times})")
+
+    def set_present(self, epcs: Iterable[str]) -> None:
+        """Set the tags "in the field"; rounds are emitted every 0.2 s."""
+        with self._present_lock:
+            self._present = set(epcs)
+            if self._round_thread is None:
+                self._round_thread = threading.Thread(
+                    target=self._emit_loop, name="mock-reader-rounds", daemon=True
+                )
+                self._round_thread.start()
+
+    def _emit_loop(self) -> None:
+        while not self._round_stop.wait(0.2):
+            with self._present_lock:
+                epcs = sorted(self._present)
+            self._emit_round(epcs)
+
+    def stop(self) -> None:
+        self._round_stop.set()
 
 
 class VX6336Reader(_ScanState):
@@ -144,6 +186,7 @@ class VX6336Reader(_ScanState):
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self.connected = False
+        self._commands: "queue.Queue[bytes]" = queue.Queue()
         self.reader_info: Optional[vx6336.ReaderInfo] = None
         # Max wait for one response: ScanTime (default 1 s) + margin.
         self.response_timeout = 1.5
@@ -168,6 +211,10 @@ class VX6336Reader(_ScanState):
         if self._thread:
             self._thread.join(timeout=self.response_timeout + 1)
 
+    def beep(self, active: int = 2, silent: int = 2, times: int = 3) -> None:
+        """Queue a buzzer pattern; the reader thread sends it between rounds."""
+        self._commands.put(vx6336.buzzer_command(active, silent, times, self.addr))
+
     def status(self) -> dict:
         info = self.reader_info
         return {
@@ -184,6 +231,7 @@ class VX6336Reader(_ScanState):
                 ser = self._serial_factory()
                 self.connected = True
                 self._read_info(ser)
+                self._silence_read_beep(ser)
                 while not self._stop.is_set():
                     self.poll_once(ser)
             except (OSError, vx6336.ProtocolError) as e:
@@ -215,13 +263,33 @@ class VX6336Reader(_ScanState):
                 return
         logger.warning("RFID reader did not answer Get Reader Information")
 
+    def _silence_read_beep(self, ser) -> None:
+        """Beep-on-read off (a fresh reader ships with it on); not fatal if it fails."""
+        responses = self._transact(
+            ser,
+            vx6336.beep_mode_command(vx6336.BEEP_MODE_OFF, self.addr),
+            vx6336.CMD_BEEP_MODE,
+        )
+        if not any(r.status == vx6336.STATUS_SUCCESS for r in responses):
+            logger.warning("RFID reader did not confirm beep-on-read off")
+
+    def _send_queued(self, ser) -> None:
+        while True:
+            try:
+                command = self._commands.get_nowait()
+            except queue.Empty:
+                return
+            self._transact(ser, command, vx6336.CMD_ACOUSTO_OPTIC)
+
     def poll_once(self, ser) -> List[str]:
         """Run one inventory round; report and return the newly arrived EPCs."""
+        self._send_queued(ser)
         epcs: List[str] = []
         for r in self._transact(
             ser, vx6336.inventory_command(self.addr), vx6336.CMD_INVENTORY
         ):
             epcs.extend(vx6336.inventory_epcs(r))
+        self._emit_round(epcs)
         new = self.debouncer.update(epcs)
         if len(new) > 1:
             logger.warning(f"RFID: several tags at once {new}; keeping the last")

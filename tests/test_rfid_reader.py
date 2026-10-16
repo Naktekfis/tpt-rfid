@@ -44,6 +44,7 @@ def inv(*epcs, status=0x01):
 
 
 NO_TAG = response_frame(0x01, vx6336.STATUS_NO_TAG)
+BEEP_OK = response_frame(0x35, 0x00)
 
 
 class Clock:
@@ -111,7 +112,7 @@ def test_thread_reads_info_then_polls_and_survives_missing_port():
         attempts.append(1)
         if len(attempts) == 1:
             raise OSError("no such port")
-        return FakeSerial([[info], [inv(EPC_A)]])
+        return FakeSerial([[info], [BEEP_OK], [inv(EPC_A)]])
 
     reader = VX6336Reader(port="fake", retry_delay=0.01, serial_factory=factory)
     reader.start()
@@ -124,6 +125,61 @@ def test_thread_reads_info_then_polls_and_survives_missing_port():
     assert reader.get_current_uid() == EPC_A
     assert reader.reader_info.scan_time == 3
     assert len(attempts) >= 2
+
+
+def test_connect_turns_beep_on_read_off():
+    info = response_frame(0x21, 0x00, bytes((3, 1, 0x0C, 2, 0x4E, 0, 0x1A, 3)))
+    ser = FakeSerial([[info], [BEEP_OK], [NO_TAG]])
+    reader = VX6336Reader(port="fake", retry_delay=0.01, serial_factory=lambda: ser)
+    reader.start()
+    try:
+        deadline = time.monotonic() + 3
+        while len(ser.written) < 3 and time.monotonic() < deadline:
+            time.sleep(0.01)
+    finally:
+        reader.stop()
+    assert ser.written[0] == vx6336.reader_info_command()
+    assert ser.written[1] == vx6336.beep_mode_command(0x80)
+    assert ser.written[2] == vx6336.inventory_command()
+
+
+def test_round_listener_gets_every_round_and_survives_errors():
+    reader, ser = make_reader([[inv(EPC_A, EPC_B)], [NO_TAG]])
+    rounds = []
+
+    def boom(epcs):
+        raise RuntimeError("listener bug")
+
+    reader.add_round_listener(boom)
+    reader.add_round_listener(rounds.append)
+    reader.poll_once(ser)
+    reader.poll_once(ser)
+    assert rounds == [[EPC_A, EPC_B], []]
+
+
+def test_beep_is_queued_and_sent_between_rounds():
+    reader, ser = make_reader([[response_frame(0x33, 0x00)], [NO_TAG]])
+    reader.beep(2, 2, 3)
+    assert ser.written == []
+    reader.poll_once(ser)
+    assert ser.written[0] == vx6336.buzzer_command(2, 2, 3)
+    assert ser.written[1] == vx6336.inventory_command()
+
+
+def test_mock_set_present_emits_rounds_and_stops():
+    reader = RFIDReaderMock()
+    rounds = []
+    reader.add_round_listener(rounds.append)
+    assert reader._round_thread is None
+    reader.set_present([EPC_A])
+    try:
+        deadline = time.monotonic() + 3
+        while not rounds and time.monotonic() < deadline:
+            time.sleep(0.01)
+    finally:
+        reader.stop()
+    assert rounds[0] == [EPC_A]
+    reader.beep()
 
 
 def test_factory_returns_mock_by_default():
