@@ -6,146 +6,137 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/kiosk.css') }}">
 {% endblock %}
 
-{% block header_end %}
-<div class="devices" aria-label="Status perangkat">
-    <span class="dot-status" id="dev-reader">Pembaca RFID</span>
-    <span class="dot-status" id="dev-camera">Kamera</span>
-</div>
-<div class="clock" aria-label="Waktu (WIB)">
-    <span class="clock__time" id="clock-time">--.--</span>
-    <span class="clock__date" id="clock-date">&nbsp;</span>
-</div>
-{% endblock %}
+{# The kiosk draws its own brand line and clock inside the camera side. #}
+{% block header %}{% endblock %}
 
 {% block content %}
-<div class="kiosk">
-    <!-- Tool board -->
-    <section class="panel" aria-labelledby="board-title">
-        <div class="panel__head">
-            <h2 id="board-title">Status alat</h2>
-            <div class="board-summary" id="board-summary"></div>
+<div class="kiosk" id="kiosk" data-state="idle">
+
+    <!-- Camera preview: one element, moved into the [data-camera-slot] of the active screen. -->
+    <div class="camera camera--guide" id="camera">
+        <img class="camera__img" id="camera-img" alt="Tampilan kamera" hidden>
+        <span class="camera__label" id="camera-placeholder" hidden>Kamera tidak tersedia</span>
+        <svg class="camera__guide" viewBox="0 0 300 380" aria-hidden="true">
+            <ellipse cx="150" cy="180" rx="118" ry="158" />
+        </svg>
+        <svg class="camera__turn" id="camera-turn" viewBox="0 0 420 420" aria-hidden="true">
+            <ellipse cx="190" cy="210" rx="118" ry="158" />
+            <path d="M330 210 H400 M372 180 L402 210 L372 240" />
+        </svg>
+        <div class="camera__strip">
+            <span class="camera__ok"><span class="camera__ok-mark" aria-hidden="true"></span>Wajah dikenali</span>
+            <span class="steps" id="id-steps"></span>
         </div>
-        <div class="panel__body board-body" id="board">
-            <p class="empty">Memuat data alat…</p>
+    </div>
+
+    <!-- Idle and unknown face (D1) -->
+    <section class="screen screen--idle" data-screen="idle unknown_face">
+        <div class="side">
+            <div class="brandbar">
+                <span>Lab Fabrikasi · Teknik Fisika ITB</span>
+                <span class="brandbar__clock num" data-clock>--.--</span>
+            </div>
+            <div class="side__camera" data-camera-slot></div>
+            <div class="side__text" aria-live="polite">
+                <p class="side__reason" id="idle-reason" hidden></p>
+                <div class="stack-sm" data-view="idle">
+                    <h1 class="hero">Lihat ke kamera untuk mulai</h1>
+                    <p class="hero-sub">Posisikan wajah di dalam bingkai. Pinjam dan kembalikan alat dimulai dari sini.</p>
+                </div>
+                <div class="unknown" data-view="unknown_face" hidden>
+                    <div class="stack-sm">
+                        <h1 class="hero">Wajah belum terdaftar</h1>
+                        <p class="hero-sub">Daftarkan wajah Anda satu kali agar dapat meminjam alat.</p>
+                    </div>
+                    <div class="unknown__actions">
+                        <a class="btn btn--primary btn--lg" href="/daftar">Daftar sekarang</a>
+                        <span class="hero-note num" id="unknown-ends"></span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="unverified" id="unverified" hidden>
-            <h3>Dikembalikan, belum diverifikasi</h3>
-            <ul id="unverified-list"></ul>
+
+        <div class="rack">
+            <div class="section-head">
+                <h2>Di rak sekarang</h2>
+                <span class="section-head__meta" id="rack-count"></span>
+            </div>
+            <ul class="rack-list" id="rack-list">
+                <li class="empty">Memuat data alat…</li>
+            </ul>
+            <div class="unverified" id="unverified" hidden>
+                <h3>Dikembalikan, belum diverifikasi admin</h3>
+                <ul id="unverified-list"></ul>
+            </div>
+            <div class="legend" id="rack-legend"></div>
+            <div class="rack__foot">
+                <span>Belum terdaftar? <a href="/daftar">Daftar wajah Anda</a></span>
+                <span>Pinjaman berlaku {{ config.get('LOAN_DAYS', 2) }} hari</span>
+            </div>
         </div>
     </section>
 
-    <!-- Interaction panel: one view per kiosk state -->
-    <section class="panel interact" aria-live="polite">
-        <div class="panel__head">
-            <h2 id="interact-title">Selamat datang</h2>
-            <span class="pill" id="interact-pill" hidden></span>
+    <!-- Identifying: head turn (D2) -->
+    <section class="screen screen--identifying" data-screen="identifying" hidden>
+        <div class="ident-cam">
+            <div class="brandbar">
+                <span>Lab Fabrikasi · Teknik Fisika ITB</span>
+                <span class="brandbar__clock num" data-clock>--.--</span>
+            </div>
+            <div class="ident-cam__slot" data-camera-slot></div>
         </div>
-        <div class="panel__body">
-            <!-- Camera preview: moved between the idle and identifying views. -->
-            <div class="camera" id="camera">
-                <img id="camera-img" alt="Tampilan kamera">
-                <div class="camera__placeholder" id="camera-placeholder" hidden>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
-                        <path d="M3 7h3l2-2h8l2 2h3v12H3z" />
-                        <circle cx="12" cy="13" r="3.5" />
-                        <path d="M3 3l18 18" />
-                    </svg>
-                    <span>Kamera tidak tersedia</span>
+        <aside class="ident-panel" aria-live="polite">
+            <div class="person">
+                <img class="person__photo" id="id-photo" alt="">
+                <div class="person__text">
+                    <span class="person__hello">Halo,</span>
+                    <span class="person__name" id="id-name"></span>
+                    <span class="person__nim num" id="id-nim"></span>
                 </div>
             </div>
-
-            <div class="view" id="view-idle" data-view="idle">
-                <div data-camera-slot></div>
-                <div class="view--center stack">
-                    <p class="prompt">Lihat ke kamera untuk mulai</p>
-                    <p class="prompt-sub">Wajah Anda dikenali otomatis. Setelah nama Anda muncul, ambil atau
-                        kembalikan alat di rak.</p>
-                </div>
-                <p class="notice" id="idle-reason" hidden></p>
+            <div class="ident-step">
+                <p class="ident-step__label" id="id-step-label"></p>
+                <p class="ident-step__turn" id="id-turn-text"></p>
+                <p class="ident-step__help" id="id-help"></p>
             </div>
+            <p class="ident-panel__foot">Bukan Anda? Menjauhlah dari kamera untuk membatalkan.</p>
+        </aside>
+    </section>
 
-            <div class="view" id="view-identifying" data-view="identifying" hidden>
-                <div class="person">
-                    <img class="person__photo" id="id-photo" alt="">
-                    <div>
-                        <p class="person__name">Halo, <span id="id-name"></span></p>
-                        <p class="person__nim" id="id-nim"></p>
-                    </div>
-                </div>
-                <div class="steps">
-                    <div class="steps__bar" id="id-steps"></div>
-                    <span id="id-step-label"></span>
-                </div>
-                <div class="turn" id="id-turn">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <path id="id-arrow" d="M4 12h15M13 6l6 6-6 6" />
-                    </svg>
-                    <span class="turn__text" id="id-turn-text"></span>
-                </div>
-                <div data-camera-slot></div>
-                <p class="help">Putar kepala perlahan, lalu kembali menghadap kamera. Bukan Anda? Menjauhlah dari
-                    kamera untuk membatalkan.</p>
+    <!-- Session and summary (D3) -->
+    <section class="screen screen--session" data-screen="session summary" hidden>
+        <div class="side side--narrow">
+            <div class="brandbar">
+                <span>Lab Fabrikasi · TF ITB</span>
+                <span class="brandbar__clock num" data-clock>--.--</span>
             </div>
-
-            <div class="view view--center" id="view-unknown" data-view="unknown_face" hidden>
-                <p class="prompt">Wajah belum terdaftar</p>
-                <p class="prompt-sub">Daftarkan diri Anda satu kali agar dapat meminjam alat.</p>
-                <a class="btn btn--primary btn--lg" href="/daftar">Daftar sekarang</a>
-                <p class="help" id="unknown-ends"></p>
+            <div class="side__camera side__camera--small" data-camera-slot></div>
+            <div class="stack-xs">
+                <span class="side__name" id="ses-name"></span>
+                <span class="side__nim num" id="ses-nim"></span>
             </div>
-
-            <div class="view" id="view-session" data-view="session" hidden>
-                <div class="person">
-                    <img class="person__photo" id="ses-photo" alt="">
-                    <div>
-                        <p class="person__name" id="ses-name"></p>
-                        <p class="person__nim" id="ses-nim"></p>
-                    </div>
-                </div>
-                <div class="countdown">
-                    <div class="countdown__label">
-                        <span>Sesi berakhir otomatis dalam</span>
-                        <span class="countdown__value" id="ses-left"></span>
-                    </div>
-                    <div class="countdown__track">
-                        <div class="countdown__fill" id="ses-fill"></div>
-                    </div>
-                </div>
-                <p class="notice">Ambil alat dari rak untuk meminjam, letakkan kembali untuk mengembalikan.
-                    Setiap alat langsung tercatat atas nama Anda.</p>
-                <div class="session-lists">
-                    <div class="list-box">
-                        <h3>Dipinjam <span class="badge" id="ses-borrowed-n">0</span></h3>
-                        <ul id="ses-borrowed"></ul>
-                    </div>
-                    <div class="list-box">
-                        <h3>Dikembalikan <span class="badge" id="ses-returned-n">0</span></h3>
-                        <ul id="ses-returned"></ul>
-                    </div>
-                </div>
-                <div class="actions">
-                    <button type="button" class="btn btn--secondary btn--lg" id="btn-cancel">Bukan saya</button>
-                    <button type="button" class="btn btn--primary btn--lg" id="btn-end">Selesai</button>
-                </div>
+            <p class="side__copy" data-view="session">Ambil alat dari rak untuk meminjam. Letakkan kembali untuk
+                mengembalikan.</p>
+            <p class="side__copy" data-view="summary" hidden>Transaksi Anda sudah tercatat.</p>
+            <div class="side__bottom" data-view="session">
+                <p class="side__countdown num">Sesi selesai otomatis dalam <strong id="ses-left"></strong></p>
+                <button type="button" class="btn btn--on-dark btn--lg btn--block" id="btn-end">Selesai</button>
+                <button type="button" class="btn btn--on-dark-secondary btn--block" id="btn-cancel">Bukan saya</button>
             </div>
+            <div class="side__bottom" data-view="summary" hidden>
+                <p class="side__countdown num" id="sum-ends"></p>
+            </div>
+        </div>
 
-            <div class="view" id="view-summary" data-view="summary" hidden>
-                <div>
-                    <p class="person__name">Terima kasih, <span id="sum-name"></span></p>
-                    <p class="prompt-sub">Transaksi Anda sudah tercatat.</p>
+        <div class="session-main">
+            <div class="session-lists" id="ses-lists" aria-live="polite"></div>
+            <div class="rack-grid-wrap">
+                <div class="section-head section-head--sm">
+                    <h2>Di rak</h2>
+                    <span class="section-head__meta" id="grid-count"></span>
                 </div>
-                <div class="session-lists">
-                    <div class="list-box">
-                        <h3>Dipinjam <span class="badge" id="sum-borrowed-n">0</span></h3>
-                        <ul id="sum-borrowed"></ul>
-                    </div>
-                    <div class="list-box">
-                        <h3>Dikembalikan <span class="badge" id="sum-returned-n">0</span></h3>
-                        <ul id="sum-returned"></ul>
-                    </div>
-                </div>
-                <p class="help" id="sum-ends"></p>
+                <ul class="rack-grid" id="rack-grid"></ul>
+                <div class="legend" id="grid-legend"></div>
             </div>
         </div>
     </section>
@@ -153,31 +144,40 @@
 {% endblock %}
 
 {% block overlays %}
-<div class="alarm" id="alarm" role="alertdialog" aria-labelledby="alarm-title" hidden>
-    <div class="alarm__layout">
-    <div class="alarm__inner">
-        <h2 id="alarm-title">Alat diambil tanpa verifikasi</h2>
+<div class="alarm overlay" id="alarm" role="alertdialog" aria-labelledby="alarm-title" hidden>
+    <div class="alarm__side">
+        <div class="brandbar">
+            <span>Lab Fabrikasi · Teknik Fisika ITB</span>
+            <span class="brandbar__clock num" data-clock>--.--</span>
+        </div>
+        <div class="side__camera" data-camera-slot></div>
+        <div class="stack-sm">
+            <h2 class="hero" id="alarm-title">Alat diambil tanpa verifikasi</h2>
+            <p class="hero-sub alarm__look">Peminjam: lihat ke kamera untuk mencatat peminjaman.</p>
+        </div>
+    </div>
+    <div class="alarm__main">
+        <strong class="alarm__bar-title">Alat diambil tanpa verifikasi</strong>
+        <div class="section-head alarm__head">
+            <h2>Belum tercatat</h2>
+            <span class="section-head__meta" id="alarm-count"></span>
+        </div>
+        <ul class="alarm__list" id="alarm-list"></ul>
         <p class="alarm__text">Alat diambil tanpa verifikasi wajah. Kembalikan alat, atau lihat ke kamera dalam
             30 detik untuk mencatat peminjaman.</p>
-        <ul class="alarm__list" id="alarm-list"></ul>
         <div class="alarm__admin">
-            <button type="button" class="btn btn--ghost" id="alarm-admin-btn">Admin</button>
-            <form class="alarm__admin" id="alarm-admin-form" hidden autocomplete="off">
+            <button type="button" class="btn btn--secondary" id="alarm-admin-btn">Admin</button>
+            <form class="alarm__form" id="alarm-admin-form" hidden autocomplete="off">
                 <div class="field">
-                    <label for="alarm-pin">PIN admin</label>
+                    <label class="field__label" for="alarm-pin">PIN admin</label>
                     <input class="input" id="alarm-pin" type="password" inputmode="numeric" maxlength="12"
                         autocomplete="off">
                 </div>
-                <button type="submit" class="btn btn--light">Matikan alarm</button>
-                <button type="button" class="btn btn--ghost" id="alarm-admin-close">Batal</button>
+                <button type="submit" class="btn btn--danger">Matikan alarm</button>
+                <button type="button" class="btn btn--secondary" id="alarm-admin-close">Batal</button>
             </form>
             <span class="alarm__error" id="alarm-error" role="alert"></span>
         </div>
-    </div>
-    <div class="alarm__camera">
-        <div data-camera-slot></div>
-        <p>Peminjam: lihat ke kamera</p>
-    </div>
     </div>
 </div>
 {% endblock %}

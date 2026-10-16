@@ -375,6 +375,13 @@ class DatabaseHandler:
             logger.error(f"Error creating tool type: {str(e)}")
             raise
 
+    def get_tool_type_photo(self, type_id: int) -> Optional[tuple]:
+        """(photo_data, mimetype) of a tool type, or None without a photo."""
+        tool_type = db.session.get(ToolType, type_id)
+        if tool_type is None or not tool_type.photo_data:
+            return None
+        return (tool_type.photo_data, tool_type.photo_mimetype)
+
     def get_tool_presence_info(self, rfid_uid: str) -> Optional[Dict]:
         """id, status, presence of the tool with this tag, or None if unknown."""
         tool = Tool.query.filter_by(rfid_uid=rfid_uid).first()

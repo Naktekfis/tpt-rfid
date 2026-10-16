@@ -95,6 +95,18 @@
         return t.d + ' ' + MONTHS[t.mo - 1] + (short ? '' : ' ' + t.y) + ', ' + t.h + '.' + t.mi;
     }
 
+    const DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+    const MONTHS_LONG = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus',
+        'September', 'Oktober', 'November', 'Desember'];
+
+    // "Minggu 18 Oktober, 14.05" (weekday from the WIB date itself).
+    function formatWibDay(value) {
+        const t = parseWib(value);
+        if (!t) return '';
+        const wd = new Date(Date.UTC(t.y, t.mo - 1, t.d)).getUTCDay();
+        return DAYS[wd] + ' ' + t.d + ' ' + MONTHS_LONG[t.mo - 1] + ', ' + t.h + '.' + t.mi;
+    }
+
     window.UI = {
         getCSRFToken: getCSRFToken,
         fetchJSON: fetchJSON,
@@ -104,5 +116,6 @@
         parseWib: parseWib,
         formatWibTime: formatWibTime,
         formatWibDate: formatWibDate,
+        formatWibDay: formatWibDay,
     };
 })();

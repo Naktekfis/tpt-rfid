@@ -1,6 +1,7 @@
 """
 Kiosk API: one polled state (session state + tool board + alarms +
-unverified returns), end/cancel a session, admin verification of returns.
+unverified returns), tool type photos for the board, end/cancel a session,
+admin verification of returns.
 
 Kiosk, database and the admin decorator are passed in by app.py so this
 module does not import app. Not CSRF-exempt: the UI must send the token.
@@ -8,7 +9,7 @@ module does not import app. Not CSRF-exempt: the UI must send the token.
 
 from __future__ import annotations
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, Response, jsonify
 
 
 def create_kiosk_blueprint(database, kiosk, admin_required) -> Blueprint:
@@ -25,6 +26,16 @@ def create_kiosk_blueprint(database, kiosk, admin_required) -> Blueprint:
                 "unverified_returns": database.get_unverified_returns(),
             }
         )
+
+    @bp.route("/api/tool_type/<int:type_id>/photo", methods=["GET"])
+    def api_tool_type_photo(type_id):
+        result = database.get_tool_type_photo(type_id)
+        if result is None:
+            return jsonify({"success": False, "error": "Foto tidak ditemukan"}), 404
+        photo_data, mimetype = result
+        resp = Response(photo_data, mimetype=mimetype or "image/jpeg")
+        resp.cache_control.max_age = 300
+        return resp
 
     @bp.route("/api/kiosk/end", methods=["POST"])
     def api_kiosk_end():

@@ -14,13 +14,14 @@
 
 <body>
     <div class="app">
+        {# Pages with their own top bar (the kiosk) override this block. #}
+        {% block header %}
         <header class="app-header">
             <div class="app-header__logos">
                 <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}"
                     alt="Institut Teknologi Bandung">
                 <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
             </div>
-            <div class="app-header__divider" aria-hidden="true"></div>
             <div class="app-header__title">
                 <h1>{% block header_title %}Lab Fabrikasi — Peminjaman Alat{% endblock %}</h1>
                 <p>{% block header_subtitle %}Program Studi Teknik Fisika, Institut Teknologi Bandung{% endblock %}</p>
@@ -29,6 +30,7 @@
                 {% block header_end %}{% endblock %}
             </div>
         </header>
+        {% endblock %}
 
         <div id="banners">{% block banners %}{% endblock %}</div>
 

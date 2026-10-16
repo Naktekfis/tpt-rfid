@@ -19,10 +19,33 @@ def test_kiosk_static_assets_are_local():
         text = (STATIC / rel).read_text(encoding="utf-8")
         assert not EXTERNAL.search(text), rel
         assert "http://" not in text and "https://" not in text, rel
-    for weight in ("Regular", "Medium", "SemiBold", "Bold"):
-        assert (STATIC / "fonts" / f"IBMPlexSans-{weight}.woff2").stat().st_size > 10000
-    for weight in ("Regular", "Medium"):
-        assert (STATIC / "fonts" / f"IBMPlexMono-{weight}.woff2").stat().st_size > 10000
+    for weight in ("Regular", "Semibold", "Bold"):
+        assert (STATIC / "fonts" / f"SourceSans3-{weight}.woff2").stat().st_size > 10000
+
+
+def test_tool_type_photo_and_board_url(client, database):
+    from utils import db
+    from utils.models import ToolType
+
+    tt = database.create_tool_type("Bor Listrik")
+    database.create_tool(
+        {"name": "Bor Listrik #1", "rfid_uid": "EPC-1", "type_id": int(tt["type_id"]), "unit_no": 1}
+    )
+    url = f"/api/tool_type/{tt['type_id']}/photo"
+    assert client.get(url).status_code == 404
+    assert client.get("/api/kiosk/state").get_json()["board"][0]["photo_url"] == ""
+
+    row = db.session.get(ToolType, int(tt["type_id"]))
+    row.photo_data = b"\x89PNG fake"
+    row.photo_mimetype = "image/png"
+    db.session.commit()
+
+    resp = client.get(url)
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/png"
+    assert resp.data == b"\x89PNG fake"
+    assert client.get("/api/kiosk/state").get_json()["board"][0]["photo_url"] == url
+    assert client.get("/api/tool_type/9999/photo").status_code == 404
 
 
 def test_devices_status(client):
