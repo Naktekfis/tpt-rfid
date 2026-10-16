@@ -14,7 +14,7 @@ Files for running tpt-rfid on the Jetson Nano 4GB (JetPack 4.6.x, Ubuntu 18.04).
 1. Run the device checks in `TARGET_PLATFORM.md` and record their output there.
 2. `git clone` the repo onto the device, then `cd tpt-rfid && DRY_RUN=1 deploy/jetson/install.sh` and read what it would do.
 3. `deploy/jetson/install.sh`, then log out and back in (or reboot).
-4. `curl -s 127.0.0.1:5000/api/rfid/status` should show `"connected": true`. Then tap a card on `/scan`.
+4. `curl -s 127.0.0.1:5000/api/devices/status` should show the reader connected and the camera open. The kiosk browser opens `/kiosk`; register a face via `/daftar`, register tools via Admin › Input Alat.
 
 ## Not verified yet (check on the device)
 - `python3.8` / `python3.8-venv` are installable from the 18.04 apt repos, and every pin in `requirements.txt` installs on aarch64 + 3.8.
