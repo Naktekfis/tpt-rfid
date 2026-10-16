@@ -6,6 +6,7 @@ os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["FLASK_ENV"] = "development"
 os.environ["SECRET_KEY"] = "test"
 os.environ["RFID_READER_ENABLED"] = "false"  # mock reader, whatever .env says
+os.environ["CAMERA_ENABLED"] = "false"  # mock camera, whatever .env says
 
 import pytest  # noqa: E402
 from werkzeug.security import generate_password_hash  # noqa: E402

@@ -60,6 +60,21 @@ class Config:
     # Beep the reader when an unborrowed tool leaves.
     RFID_ALARM_ENABLED = os.getenv("RFID_ALARM_ENABLED", "true").lower() == "true"
 
+    # USB camera for face identification. Disabled = mock camera (no frames).
+    CAMERA_ENABLED = os.getenv("CAMERA_ENABLED", "false").lower() == "true"
+    CAMERA_INDEX = int(os.getenv("CAMERA_INDEX", "0"))
+    # Face engine: "yunet_sface" (default) or "dlib". Models: scripts/fetch_face_models.py
+    FACE_ENGINE = os.getenv("FACE_ENGINE", "yunet_sface")
+    FACE_MODEL_DIR = os.getenv(
+        "FACE_MODEL_DIR", os.path.join(_BASE_DIR, "models", "face")
+    )
+    # Distance threshold override (engine default when unset; scales differ per engine).
+    FACE_MATCH_THRESHOLD = (
+        float(os.environ["FACE_MATCH_THRESHOLD"])
+        if os.getenv("FACE_MATCH_THRESHOLD")
+        else None
+    )
+
     # Loan period in days (Transaction.due_at = borrow_time + LOAN_DAYS).
     LOAN_DAYS = 2
 

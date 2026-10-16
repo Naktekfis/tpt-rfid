@@ -83,3 +83,6 @@ RFID HW/
 
 # deploy/jetson/install.sh DRY_RUN output
 build/
+
+# Downloaded face models (scripts/fetch_face_models.py)
+models/
