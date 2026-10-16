@@ -14,4 +14,4 @@ Stop and confirm with the user before any of these. A `test-review` pass is not 
 - Admin PIN or session/auth logic, CSRF exemptions, and rate-limit changes.
 - Running migrations or schema changes against a database that holds real data.
 - Running anything on the target device (Jetson Nano; installer, systemd, apt, deploy).
-- Sending any RFID reader command other than Inventory `0x01`/`0x0F`, Get Reader Info `0x21`, Set ScanTime `0x25`, or buzzer/LED `0x33` (tag writes, kill, lock, and reader config can be permanent; see `RFID_VX6336.md`).
+- Sending any RFID reader command other than Inventory `0x01`/`0x0F`, Get Reader Info `0x21`, Set ScanTime `0x25`, buzzer/LED `0x33`, or Set Beep Mode `0x35` with data `0x00`/`0x80`/`0x81` only (tag writes, kill, lock, and reader config can be permanent; see `RFID_VX6336.md`).

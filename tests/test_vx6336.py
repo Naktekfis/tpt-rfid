@@ -48,7 +48,32 @@ def test_set_scan_time_frame_and_range():
         vx6336.set_scan_time_command(2)
 
 
-@pytest.mark.parametrize("cmd", [0x03, 0x04, 0x05, 0x06, 0x22, 0x24, 0x28, 0x2F, 0x33])
+def test_buzzer_frame_and_range():
+    frame = vx6336.buzzer_command(2, 1, 3)
+    assert frame[:6] == bytes((0x07, 0x00, 0x33, 2, 1, 3))
+    assert vx6336.parse_response(response_frame(0x33, 0x00)).status == 0
+    with pytest.raises(ValueError):
+        vx6336.buzzer_command(256, 0, 1)
+
+
+def test_beep_mode_frames_match_hardware():
+    # Captured from the reader (firmware 2.32) on 2026-10-16.
+    assert vx6336.beep_mode_command(0x00) == bytes.fromhex("050035006CA5")
+    assert vx6336.beep_mode_command(0x80) == bytes.fromhex("0500358064 21")
+    with pytest.raises(ValueError):
+        vx6336.beep_mode_command(0x01)
+
+
+def test_parse_beep_mode():
+    off = vx6336.parse_response(bytes.fromhex("06003500 0003B4"))
+    on = vx6336.parse_response(response_frame(0x35, 0x00, b"\x01"))
+    assert vx6336.parse_beep_mode(off) is False
+    assert vx6336.parse_beep_mode(on) is True
+    with pytest.raises(vx6336.ProtocolError):
+        vx6336.parse_beep_mode(vx6336.parse_response(response_frame(0x35, 0x00)))
+
+
+@pytest.mark.parametrize("cmd", [0x03, 0x04, 0x05, 0x06, 0x22, 0x24, 0x28, 0x2F])
 def test_dangerous_commands_are_refused(cmd):
     with pytest.raises(ValueError):
         vx6336.build_command(cmd)

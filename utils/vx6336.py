@@ -20,11 +20,20 @@ CMD_INVENTORY = 0x01
 CMD_INVENTORY_SINGLE = 0x0F
 CMD_GET_READER_INFO = 0x21
 CMD_SET_SCAN_TIME = 0x25
+CMD_ACOUSTO_OPTIC = 0x33
+CMD_BEEP_MODE = 0x35  # undocumented in manual v1.2, see RFID_VX6336.md
 
 # Only these commands may be built. Everything else (tag writes, kill, lock,
 # reader config) can be permanent and is gated, see GATES.md.
 SAFE_COMMANDS = frozenset(
-    {CMD_INVENTORY, CMD_INVENTORY_SINGLE, CMD_GET_READER_INFO, CMD_SET_SCAN_TIME}
+    {
+        CMD_INVENTORY,
+        CMD_INVENTORY_SINGLE,
+        CMD_GET_READER_INFO,
+        CMD_SET_SCAN_TIME,
+        CMD_ACOUSTO_OPTIC,
+        CMD_BEEP_MODE,
+    }
 )
 
 STATUS_SUCCESS = 0x00
@@ -44,6 +53,11 @@ INVENTORY_DATA_STATUSES = frozenset(
         STATUS_INVENTORY_BUFFER_FULL,
     }
 )
+
+BEEP_MODE_READ = 0x00
+BEEP_MODE_OFF = 0x80  # write, beep on tag read off (stored in the reader)
+BEEP_MODE_ON = 0x81  # write, factory setting
+BEEP_MODE_VALUES = frozenset({BEEP_MODE_READ, BEEP_MODE_OFF, BEEP_MODE_ON})
 
 MIN_RESPONSE_LEN = 5  # Len byte value for a response with empty Data[]
 
@@ -113,6 +127,39 @@ def set_scan_time_command(scan_time: int, addr: int = DEFAULT_ADDR) -> bytes:
     if not 3 <= scan_time <= 255:
         raise ValueError("scan_time must be 3..255 (x100 ms)")
     return build_command(CMD_SET_SCAN_TIME, bytes((scan_time,)), addr=addr)
+
+
+def buzzer_command(
+    active: int, silent: int, times: int, addr: int = DEFAULT_ADDR
+) -> bytes:
+    """Beep and flash the LED `times` times: on `active` x 50 ms, off `silent` x 50 ms.
+
+    One-shot (protocol 8.4.7), not a stored setting. Each value is 0..255.
+    """
+    for value in (active, silent, times):
+        if not 0 <= value <= 255:
+            raise ValueError("buzzer values must be 0..255")
+    return build_command(CMD_ACOUSTO_OPTIC, bytes((active, silent, times)), addr=addr)
+
+
+def beep_mode_command(value: int, addr: int = DEFAULT_ADDR) -> bytes:
+    """Read (0x00) or write (0x80 off, 0x81 on) the beep-on-tag-read mode.
+
+    Not in protocol manual v1.2; taken from the UHFReader09-family SDK and
+    tested on firmware 2.32. Other values are refused.
+    """
+    if value not in BEEP_MODE_VALUES:
+        raise ValueError("beep mode must be 0x00, 0x80 or 0x81")
+    return build_command(CMD_BEEP_MODE, bytes((value,)), addr=addr)
+
+
+def parse_beep_mode(response: Response) -> bool:
+    """True if beep-on-read is on, from the reply to a 0x00 read."""
+    if response.cmd != CMD_BEEP_MODE or response.status != STATUS_SUCCESS:
+        raise ProtocolError("not a successful beep mode reply")
+    if not response.data:
+        raise ProtocolError("beep mode reply carries no mode")
+    return bool(response.data[0] & 0x01)
 
 
 def parse_response(frame: bytes) -> Response:

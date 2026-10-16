@@ -52,6 +52,15 @@ Recommendation: **passive model + one active challenge**, both on CPU.
 3. Heavier options (later only): YOLOv8n real/fake classifier reported ~20 FPS on a Jetson Nano but on a self-collected dataset (ijcsrr.org 2026 paper); CASO-PAD (arXiv 2602.18965, benchmarked on Orin Nano, code not checked). Hardware option: IR/depth camera.
 Fail closed: if the liveness models are missing, identification refuses with a clear error, it does not silently pass.
 
+## Phase 0 progress (2026-10-16)
+- Done: `0x33` layout read (one-shot `ActiveT, SilentT, Times`, 50 ms units, no stored mode; the manual has no beep-on-read switch). `vx6336.buzzer_command()` and test added. Probe has `--beep A,S,N`, `--duration`, `--stats`, `--quiet`. The reader answered a `--beep 2,2,2` with status `0x00`.
+- Webcam: no USB webcam yet. `/dev/video0` = laptop built-in RGB camera, `/dev/video2` = laptop **IR** camera (useful for liveness experiments only, not the target).
+- **Reader beeps on every read with a tag** (user confirmed, continuous polling, one tag). Continuous presence polling with this reader = constant beeping. `0x33 0,0,0` tried: still beeps. Decision pending with the user (options: undocumented beep-off command, gated; disconnect the buzzer physically and alarm via Jetson speaker; different reader).
+- **`0x0F` (Inventory Single) does not beep** (user confirmed). If repeated `0x0F` rounds see every tag in a multi-tag field often enough, presence can poll with `0x0F` silently and keep `0x33` for the alarm. 2-tag test: `0x0F` saw only the strong tag in 30 s; `0x01` saw both (96.7% / 11%, so the second tag was weak anyway). Retest with two equally close tags: `0x01` 82.5% / 75%, `0x0F` only one tag in 30 s. `0x0F` is ruled out for presence; presence uses `0x01`.
+- **Solved in software: undocumented `0x35` Set Beep Mode** (found via github.com/klks/UHFReader). `35 00` reads (factory `01` = on), `35 80` = beep off, `35 81` = restore. After `35 80`, `0x01` polling is silent and `0x33` still beeps on command (user confirmed both). The original plan stands: silent polling, reader buzzer for alarms. The mode survives unplugging (checked). `0x35` (values `00`/`80`/`81` only) is now allowed (user, 2026-10-16) and in `SAFE_COMMANDS`; probe `--beep-mode`. Phase 1: the reader driver sends `35 80` on connect, so a replacement reader with the factory setting stays quiet. `0x0F`, one still tag: 99.7%, gap 0.05 s.
+- One still tag (`0x01`): read rate 82%, longest gap 0.07 s (an earlier run with the tag being moved: 36%, 2.02 s). `RFID_MISSING_AFTER` of 2-3 s looks safe; confirm with all tags.
+- Still open: did the `--beep 2,2,2` test sound? (b) multi-tag round, (c) still-tag `--stats` run.
+
 ## Buzzer: check this first in phase 0
 The user says the reader beeps when it detects a tag. With continuous inventory polling and ~20 tags always in range, a beep-on-read reader would **beep constantly**. Phase 0 must find out:
 - Does it beep on every inventory round with tags, or only in some mode? (Our probe ran several seconds with tags present; ask the user whether it beeped the whole time.)
