@@ -647,3 +647,116 @@ input[type="date"].input {
 .board-foot {
   margin-top: var(--sp-5);
 }
+
+/* ---------- Input alat ---------- */
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: var(--sp-12);
+  align-items: start;
+}
+.step {
+  margin: 0;
+  padding: 0 0 var(--sp-5);
+  border: 0;
+  border-bottom: var(--hairline);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.step__title {
+  padding: 0;
+  margin-bottom: var(--sp-2);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+}
+.field--grow {
+  flex: 1;
+  min-width: 12rem;
+}
+.row__end {
+  align-self: flex-end;
+}
+.input--unit {
+  width: 7rem;
+}
+.unit-preview {
+  font-size: var(--fs-lg);
+  color: var(--c-text-muted);
+}
+.epc-list {
+  display: flex;
+  flex-direction: column;
+  border-top: var(--hairline);
+  max-height: 14rem;
+  overflow-y: auto;
+}
+.epc-list .empty {
+  padding: var(--sp-3) 0;
+  font-size: var(--fs-md);
+}
+.epc-option {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-2);
+  border-bottom: var(--hairline);
+  cursor: pointer;
+}
+.epc-option:hover {
+  background: var(--c-fill);
+}
+.epc-option.is-selected {
+  outline: 2px solid var(--c-brand);
+  outline-offset: -2px;
+}
+.epc-option input {
+  width: 1.125rem;
+  height: 1.125rem;
+  margin: 0;
+  accent-color: var(--c-brand);
+}
+.epc-option__epc {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.epc-cell {
+  font-size: var(--fs-sm);
+}
+
+.tool-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  min-width: 0;
+}
+.photo-pair {
+  display: flex;
+  gap: var(--sp-5);
+  align-items: flex-start;
+}
+.photo-pair__cam {
+  flex: 1;
+  min-width: 0;
+}
+.photo-cam {
+  width: 100%;
+  max-width: 16rem;
+  aspect-ratio: 4 / 3;
+}
+.units-head {
+  margin-top: var(--sp-6);
+}
+.table--compact {
+  font-size: var(--fs-md);
+}
+.tool-form .step {
+  padding-bottom: var(--sp-4);
+  gap: var(--sp-2);
+}
+.tool-form .lead {
+  font-size: var(--fs-md);
+}

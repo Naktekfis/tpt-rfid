@@ -1,250 +1,355 @@
-/**
- * Input Tool Page Logic
- * Handles form submission and RFID polling for new tools
+/*
+ * /admin/input_tool: register one physical unit. Pick or create a tool type,
+ * pick a tag from the unknown EPCs in the reader field (/api/presence, every
+ * 1 s) or type it, save via POST /api/admin/tool_units. The type photo comes
+ * from the webcam (…/photo/capture) or a file upload (…/photo).
  */
+(function () {
+    'use strict';
 
-let rfidPollInterval;
-let currentRFID = null;
+    const UI = window.UI;
+    const B = window.Board;
+    const h = UI.h;
+    const CFG = window.INPUT_TOOL_CONFIG || {};
+    const POLL_MS = 1000;
+    const CAMERA_RETRY_MS = 8000;
 
-document.addEventListener('DOMContentLoaded', function () {
-    console.log('Input Tool page loaded');
+    const $ = function (id) { return document.getElementById(id); };
 
-    // Get form elements
-    const form = document.getElementById('tool-form');
-    const submitBtn = document.getElementById('submit-btn');
-    const rfidUidInput = document.getElementById('rfid_uid');
+    let types = [];
+    let tools = [];
+    let unknown = [];
+    let selectedEpc = '';
+    let lastEpcKey = null;
+    let photoBust = Date.now();
 
-    // Start RFID polling
-    startRFIDPolling();
+    function normalizeEpc(v) {
+        return String(v || '').replace(/[\s\-:]/g, '').toUpperCase();
+    }
 
-    // Form submission
-    form.addEventListener('submit', function (e) {
-        e.preventDefault();
+    function groupEpc(epc) {
+        return epc.replace(/(.{4})(?=.)/g, '$1 ');
+    }
 
-        // Validate RFID
-        if (!currentRFID) {
-            showToast('Harap scan tag RFID terlebih dahulu', 'error');
+    function currentType() {
+        const id = $('type-select').value;
+        return types.filter(function (t) { return t.type_id === id; })[0] || null;
+    }
+
+    // ---------- Types ----------
+
+    async function loadTypes(selectId) {
+        const res = await UI.fetchJSON('/api/admin/tool_types');
+        if (!res.success) {
+            UI.toast(res.error || 'Jenis alat tidak dapat dimuat', 'danger');
             return;
         }
+        types = res.tool_types;
+        const sel = $('type-select');
+        const keep = selectId || sel.value;
+        sel.textContent = '';
+        if (!types.length) {
+            sel.appendChild(h('option', { value: '', text: 'Belum ada jenis alat' }));
+            toggleNewType(true);
+        } else {
+            types.forEach(function (t) {
+                sel.appendChild(h('option', {
+                    value: t.type_id,
+                    text: t.name + ' (' + t.units + ' unit)',
+                }));
+            });
+            if (keep && types.some(function (t) { return t.type_id === keep; })) sel.value = keep;
+        }
+        onTypeChange();
+    }
 
-        // Validate all fields
-        if (!form.checkValidity()) {
-            showToast('Harap isi semua field yang diperlukan', 'error');
+    function onTypeChange() {
+        const t = currentType();
+        $('unit-no').value = t ? t.next_unit_no : '';
+        updatePreview();
+        renderPhoto();
+        renderUnits();
+    }
+
+    function toggleNewType(open) {
+        const box = $('type-new');
+        const show = open === undefined ? box.hidden : open;
+        box.hidden = !show;
+        $('type-new-btn').setAttribute('aria-expanded', String(show));
+        if (show) $('type-name').focus();
+    }
+
+    async function saveType() {
+        const name = $('type-name').value.trim();
+        if (!name) {
+            $('type-name').focus();
             return;
         }
-
-        // Submit form
-        submitTool();
-    });
-
-    // Clean up on page unload
-    window.addEventListener('beforeunload', function () {
-        stopRFIDPolling();
-    });
-});
-
-/**
- * Start polling for RFID card
- */
-function startRFIDPolling() {
-    console.log('Starting RFID polling');
-
-    // Poll every 2 seconds
-    rfidPollInterval = setInterval(checkRFID, 2000);
-
-    // Initial check
-    checkRFID();
-}
-
-/**
- * Stop RFID polling
- */
-function stopRFIDPolling() {
-    if (rfidPollInterval) {
-        clearInterval(rfidPollInterval);
-        rfidPollInterval = null;
-    }
-}
-
-/**
- * Check for RFID card
- */
-function checkRFID() {
-    fetch('/api/check_rfid')
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.detected && data.uid) {
-                // Card detected
-                onRFIDDetected(data.uid);
-            } else {
-                // No card
-                onRFIDRemoved();
+        $('type-save').disabled = true;
+        try {
+            const res = await UI.postJSON('/api/admin/tool_types', { name: name });
+            if (!res.success) {
+                UI.toast(res.error || 'Jenis alat tidak dapat disimpan', 'danger');
+                return;
             }
-        })
-        .catch(error => {
-            console.error('Error checking RFID:', error);
-        });
-}
-
-/**
- * Handle RFID card detected
- */
-function onRFIDDetected(uid) {
-    const rfidIndicator = document.getElementById('rfid-indicator');
-    const rfidStatus = document.getElementById('rfid-status');
-    const rfidIcon = document.getElementById('rfid-icon');
-    const rfidUidDisplay = document.getElementById('rfid-uid-display');
-    const rfidUidText = document.getElementById('rfid-uid-text');
-    const rfidUidInput = document.getElementById('rfid_uid');
-
-    // Update UI only if UID changed
-    if (currentRFID !== uid) {
-        currentRFID = uid;
-
-        // Update indicator
-        rfidIndicator.classList.remove('border-gray-300');
-        rfidIndicator.classList.add('border-blue-500', 'bg-blue-50');
-
-        // Update icon color
-        rfidIcon.classList.remove('text-gray-400');
-        rfidIcon.classList.add('text-blue-500');
-
-        // Update status
-        rfidStatus.textContent = 'Tag terdeteksi!';
-        rfidStatus.classList.remove('text-gray-600');
-        rfidStatus.classList.add('text-blue-600');
-
-        // Show UID
-        rfidUidDisplay.classList.remove('hidden');
-        rfidUidText.textContent = uid;
-        rfidUidInput.value = uid;
-
-        // Check form validity
-        checkFormValidity();
-
-        console.log('RFID detected:', uid);
+            $('type-name').value = '';
+            toggleNewType(false);
+            await loadTypes(res.tool_type.type_id);
+            UI.toast('Jenis ' + res.tool_type.name + ' dibuat. Tambahkan foto di sebelah kanan.', 'ok');
+            $('unit-no').focus();
+        } catch (e) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        } finally {
+            $('type-save').disabled = false;
+        }
     }
-}
 
-/**
- * Handle RFID card removed
- */
-function onRFIDRemoved() {
-    // If no RFID was ever detected, nothing to do
-    if (currentRFID === null) return;
+    function updatePreview() {
+        const t = currentType();
+        const n = parseInt($('unit-no').value, 10);
+        $('unit-preview').textContent = t && n > 0 ? 'Nama unit: ' + t.name + ' #' + n : '';
+    }
 
-    // Keep currentRFID and rfid_uid input intact
-    const rfidStatus = document.getElementById('rfid-status');
-    rfidStatus.textContent = 'Tag tercatat (boleh dilepas)';
-}
+    // ---------- Tags in the field ----------
 
-/**
- * Check if form is valid and enable/disable submit button
- */
-function checkFormValidity() {
-    const form = document.getElementById('tool-form');
-    const submitBtn = document.getElementById('submit-btn');
-
-    // Check if required fields (name) are filled and RFID is scanned
-    // Note: 'name' input has 'required' attribute, so checkValidity() checks it
-    const isValid = form.checkValidity() && currentRFID !== null;
-
-    submitBtn.disabled = !isValid;
-}
-
-/**
- * Submit tool form
- */
-function submitTool() {
-    const form = document.getElementById('tool-form');
-    // Convert FormData to JSON since our API expects JSON (or make API accept form data)
-    // The current API in app.py handles both (request.json or request.form)
-    // But let's send as JSON to match modern practices, 
-    // OR just use FormData directly as the API supports it.
-    // Using FormData directly supports file uploads if we add them later.
-
-    // BUT: app.py add_tool reads request.json OR request.form.
-    // Let's use JSON for cleaner handling of non-file data for now.
-
-    const formData = new FormData(form);
-    const data = Object.fromEntries(formData.entries());
-
-    // Add Admin Pin header
-    // We need the admin pin. It is not injected into input_tool.html yet.
-    // Wait, admin_input_tool route uses @admin_required but doesn't pass admin_pin to template?
-    // Let's check app.py again.
-
-    // admin_input_tool does NOT pass admin_pin. We need to fix that or use session/cookie.
-    // The previous implementation used URL param or Header. 
-    // admin_monitor.html uses window.ADMIN_PIN injected from template.
-
-    // FIX: I will assume I need to pass admin_pin to the template in app.py first.
-    // For now, I'll attempt sending without pin and see if it fails (it will).
-    // I need to update app.py to pass admin_pin to input_tool.html.
-
-    // Let's just grab the pin if it's in the URL (it might not be).
-    // Actually, let's just make the fetch request.
-    // If I cannot get the pin, I'll rely on the server being lenient or I need to fix app.py to pass it.
-
-    // Let's just do it and then I'll fix app.py in a separate step if needed.
-    // Actually, I should check if I can get the pin.
-    // admin_welcome.html doesn't have the pin.
-    // The user comes from admin_welcome -> input_tool. 
-    // Usually admin auth is done via session or token. Here it seems to be a simple PIN check?
-    // app.py: admin_required checks X-Admin-Pin header OR admin_pin arg.
-
-    showLoading();
-
-    fetch('/api/admin/tools', {
-        method: 'POST',
-        headers: getCSRFHeaders({
-            'Content-Type': 'application/json'
-        }),
-        credentials: 'same-origin',  // Include session cookies
-        body: JSON.stringify(data)
-    })
-        .then(response => response.json())
-        .then(data => {
-            hideLoading();
-
-            if (data.success) {
-                showToast(data.message, 'success');
-
-                // Show success message
-                document.getElementById('form-status').innerHTML =
-                    `<div class="p-4 bg-blue-100 text-blue-800 rounded-lg">
-                    <p class="font-semibold">Berhasil!</p>
-                    <p>Alat: ${data.tool.name}</p>
-                    <p>UID: ${data.tool.rfid_uid}</p>
-                </div>`;
-
-                // Reset form
-                form.reset();
-                currentRFID = null;
-                document.getElementById('rfid-status').textContent = 'Menunggu tag alat...';
-                document.getElementById('rfid-indicator').classList.remove('border-blue-500', 'bg-blue-50');
-                document.getElementById('rfid-uid-display').classList.add('hidden');
-                document.getElementById('submit-btn').disabled = true;
-
-            } else {
-                showToast(data.error, 'error');
-                document.getElementById('form-status').innerHTML =
-                    `<div class="p-4 bg-red-100 text-red-800 rounded-lg">
-                    <p class="font-semibold">Error: ${data.error}</p>
-                </div>`;
-            }
-        })
-        .catch(error => {
-            hideLoading();
-            console.error('Error submitting tool:', error);
-            showToast('Terjadi kesalahan saat menyimpan alat', 'error');
+    function renderEpcs() {
+        const key = JSON.stringify([unknown, selectedEpc]);
+        if (key === lastEpcKey) return;
+        lastEpcKey = key;
+        const box = $('epc-list');
+        box.textContent = '';
+        // A picked tag that left the field stays in the list, marked.
+        const list = unknown.slice();
+        if (selectedEpc && list.indexOf(selectedEpc) < 0) list.unshift(selectedEpc);
+        if (!list.length) {
+            box.appendChild(h('p', { class: 'empty', text: 'Belum ada tag baru yang terbaca.' }));
+            return;
+        }
+        list.forEach(function (epc) {
+            const gone = unknown.indexOf(epc) < 0;
+            const input = h('input', {
+                type: 'radio', name: 'epc', value: epc, checked: epc === selectedEpc,
+                onchange: function () {
+                    selectedEpc = epc;
+                    $('epc-manual').value = '';
+                    renderEpcs();
+                    const again = box.querySelector('input[value="' + epc + '"]');
+                    if (again) again.focus();
+                },
+            });
+            box.appendChild(h('label', { class: 'epc-option' + (epc === selectedEpc ? ' is-selected' : '') },
+                input,
+                h('span', { class: 'epc-option__epc num', text: groupEpc(epc) }),
+                gone ? h('span', { class: 'muted', text: 'tidak terbaca lagi' }) : null));
         });
-}
+    }
 
-// Listen for input changes
-document.addEventListener('DOMContentLoaded', function () {
-    const inputs = document.querySelectorAll('#tool-form input');
-    inputs.forEach(input => {
-        input.addEventListener('input', checkFormValidity);
+    async function pollPresence() {
+        try {
+            const res = await UI.fetchJSON('/api/presence');
+            if (res.success) {
+                unknown = res.unknown_epcs || [];
+                const toolsKey = JSON.stringify(res.tools);
+                if (toolsKey !== JSON.stringify(tools)) {
+                    tools = res.tools || [];
+                    renderUnits();
+                }
+                renderEpcs();
+            }
+        } catch (e) { /* next poll */ }
+        setTimeout(pollPresence, POLL_MS);
+    }
+
+    async function pollDevices() {
+        try {
+            const res = await UI.fetchJSON('/api/devices/status');
+            const r = (res && res.reader) || {};
+            const box = $('banners');
+            box.textContent = '';
+            if (r.mode === 'serial' && !r.connected) {
+                box.appendChild(h('div', { class: 'bar bar--warn', role: 'status' },
+                    'Pembaca RFID tidak terhubung. Tag baru tidak akan muncul; ketik EPC secara manual.'));
+            }
+        } catch (e) { /* next poll */ }
+        setTimeout(pollDevices, 5000);
+    }
+
+    // ---------- Units of the selected type ----------
+
+    function renderUnits() {
+        const t = currentType();
+        const body = $('units-body');
+        body.textContent = '';
+        const mine = t ? tools.filter(function (x) { return x.type_id === t.type_id; }) : [];
+        mine.sort(function (a, b) { return (a.unit_no || 0) - (b.unit_no || 0); });
+        $('units-count').textContent = mine.length ? mine.length + ' unit' : '';
+        if (!mine.length) {
+            body.appendChild(h('tr', null, h('td', { class: 'empty', colspan: '3', text: 'Belum ada unit untuk jenis ini.' })));
+            return;
+        }
+        mine.forEach(function (u) {
+            const kind = B.markOf(u);
+            body.appendChild(h('tr', null,
+                h('td', { text: '#' + (u.unit_no || '-') }),
+                h('td', { class: 'num epc-cell', text: groupEpc(u.rfid_uid || '') }),
+                h('td', null, h('span', { class: 'legend__item' },
+                    h('span', { class: 'unit-mark unit-mark--' + kind, 'aria-hidden': 'true' }), B.labelOf(kind)))));
+        });
+    }
+
+    // ---------- Save unit ----------
+
+    async function saveUnit(ev) {
+        ev.preventDefault();
+        const err = $('unit-error');
+        err.textContent = '';
+        $('unit-result').hidden = true;
+        const t = currentType();
+        if (!t) {
+            err.textContent = 'Pilih atau buat jenis alat dulu.';
+            $('type-select').focus();
+            return;
+        }
+        const unitNo = parseInt($('unit-no').value, 10);
+        if (!(unitNo >= 1 && unitNo <= 999)) {
+            err.textContent = 'Nomor unit 1 sampai 999.';
+            $('unit-no').focus();
+            return;
+        }
+        const manual = normalizeEpc($('epc-manual').value);
+        const epc = manual || selectedEpc;
+        if (!epc) {
+            err.textContent = 'Pilih tag yang terbaca, atau ketik EPC.';
+            $('epc-manual').focus();
+            return;
+        }
+        if (!/^[0-9A-F]{4,64}$/.test(epc)) {
+            err.textContent = 'EPC harus berupa heksadesimal (0-9, A-F), 4 sampai 64 karakter.';
+            $('epc-manual').focus();
+            return;
+        }
+        const btn = $('unit-save');
+        btn.disabled = true;
+        try {
+            const res = await UI.postJSON('/api/admin/tool_units', { type_id: t.type_id, unit_no: unitNo, epc: epc });
+            if (!res.success) {
+                err.textContent = res.error || 'Unit tidak dapat disimpan.';
+                return;
+            }
+            const box = $('unit-result');
+            box.textContent = '';
+            box.appendChild(h('h2', { text: res.tool.name + ' terdaftar.' }));
+            box.appendChild(h('p', { class: 'num', text: 'EPC ' + groupEpc(res.tool.rfid_uid) }));
+            box.appendChild(h('p', { text: 'Letakkan tag berikutnya untuk unit selanjutnya.' }));
+            box.hidden = false;
+            box.scrollIntoView({ block: 'nearest' });
+            UI.toast(res.tool.name + ' terdaftar.', 'ok');
+            selectedEpc = '';
+            $('epc-manual').value = '';
+            unknown = unknown.filter(function (x) { return x !== epc; });
+            lastEpcKey = null;
+            renderEpcs();
+            await loadTypes(t.type_id);
+        } catch (e) {
+            err.textContent = 'Tidak dapat menghubungi server.';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    // ---------- Photo ----------
+
+    function renderPhoto() {
+        const t = currentType();
+        $('photo-type-name').textContent = t ? t.name : '';
+        const box = $('photo-current');
+        const fresh = B.toolPhoto(t && t.photo_url ? t.photo_url + '?t=' + photoBust : '', t ? t.name : '', 'lg');
+        box.replaceWith(fresh);
+        fresh.id = 'photo-current';
+        $('photo-capture').disabled = !t;
+        $('photo-upload').disabled = !t;
+    }
+
+    async function afterPhoto(res, how) {
+        if (!res.success) {
+            UI.toast(res.error || 'Foto tidak dapat disimpan', 'danger');
+            return;
+        }
+        photoBust = Date.now();
+        await loadTypes(currentType().type_id);
+        UI.toast('Foto ' + how + ' disimpan.', 'ok');
+    }
+
+    async function capturePhoto() {
+        const t = currentType();
+        if (!t) return;
+        const btn = $('photo-capture');
+        btn.disabled = true;
+        try {
+            await afterPhoto(await UI.postJSON('/api/admin/tool_types/' + t.type_id + '/photo/capture'), 'dari kamera');
+        } catch (e) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function uploadPhoto() {
+        const t = currentType();
+        const file = $('photo-file').files[0];
+        if (!t || !file) return;
+        const fd = new FormData();
+        fd.append('photo', file);
+        try {
+            await afterPhoto(await UI.postForm('/api/admin/tool_types/' + t.type_id + '/photo', fd), 'dari file');
+        } catch (e) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        } finally {
+            $('photo-file').value = '';
+        }
+    }
+
+    function startCamera() {
+        const img = $('photo-cam-img');
+        const label = $('photo-cam-label');
+        img.onload = function () {
+            label.hidden = true;
+            img.hidden = false;
+        };
+        img.onerror = function () {
+            img.hidden = true;
+            label.hidden = false;
+            label.textContent = 'Kamera tidak tersedia';
+            setTimeout(function () { img.src = CFG.cameraStream + '?t=' + Date.now(); }, CAMERA_RETRY_MS);
+        };
+        img.src = CFG.cameraStream;
+    }
+
+    // ---------- Init ----------
+
+    $('type-select').addEventListener('change', onTypeChange);
+    $('type-new-btn').addEventListener('click', function () { toggleNewType(); });
+    $('type-save').addEventListener('click', saveType);
+    $('type-name').addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            saveType();
+        }
     });
-});
+    $('unit-no').addEventListener('input', updatePreview);
+    $('epc-manual').addEventListener('input', function () {
+        if ($('epc-manual').value && selectedEpc) {
+            selectedEpc = '';
+            renderEpcs();
+        }
+    });
+    $('unit-form').addEventListener('submit', saveUnit);
+    $('photo-capture').addEventListener('click', capturePhoto);
+    $('photo-upload').addEventListener('click', function () { $('photo-file').click(); });
+    $('photo-file').addEventListener('change', uploadPhoto);
+
+    loadTypes();
+    pollPresence();
+    pollDevices();
+    startCamera();
+})();
