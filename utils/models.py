@@ -2,7 +2,8 @@
 SQLAlchemy models for the RFID Workshop Tool Monitoring System
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
+from flask import current_app
 from flask_sqlalchemy import SQLAlchemy
 
 db = SQLAlchemy()
@@ -187,6 +188,23 @@ class Transaction(db.Model):
         db.Index("ix_transactions_tool_status", "tool_id", "status"),
     )
 
+    @property
+    def effective_due_at(self):
+        """due_at, or borrow_time + LOAN_DAYS for old rows without one (UTC)."""
+        if self.due_at is not None:
+            return self.due_at
+        try:
+            days = current_app.config.get("LOAN_DAYS", 2)
+        except RuntimeError:  # no app context
+            days = 2
+        return self.borrow_time + timedelta(days=days)
+
+    def is_overdue(self, now=None):
+        """A borrowed transaction is overdue once now > due_at."""
+        if self.status != "borrowed":
+            return False
+        return (now or datetime.utcnow()) > self.effective_due_at
+
     def to_dict(self):
         """Convert model to dictionary with WIB timezone conversion"""
         utc_to_wib = _get_utc_to_wib()
@@ -201,7 +219,8 @@ class Transaction(db.Model):
             "return_time": utc_to_wib(self.return_time) if self.return_time else None,
             "status": self.status,
             "created_at": utc_to_wib(self.created_at),
-            "due_at": utc_to_wib(self.due_at) if self.due_at else None,
+            "due_at": utc_to_wib(self.effective_due_at),
+            "is_overdue": self.is_overdue(),
             "returned_by_id": str(self.returned_by_id) if self.returned_by_id else None,
             "return_verified": self.return_verified,
         }

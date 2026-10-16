@@ -78,6 +78,15 @@ class Config:
     # Loan period in days (Transaction.due_at = borrow_time + LOAN_DAYS).
     LOAN_DAYS = 2
 
+    # Kiosk session (face + head-turn, then tools leaving/returning are
+    # attributed to the student). Extended on every tool event, capped at
+    # KIOSK_SESSION_MAX_SECONDS from now.
+    KIOSK_SESSION_SECONDS = int(os.getenv("KIOSK_SESSION_SECONDS", "60"))
+    KIOSK_SESSION_EXTEND = int(os.getenv("KIOSK_SESSION_EXTEND", "30"))
+    KIOSK_SESSION_MAX_SECONDS = int(os.getenv("KIOSK_SESSION_MAX_SECONDS", "120"))
+    # An open alarm this young becomes a borrow by the student who identifies.
+    ALARM_GRACE_SECONDS = int(os.getenv("ALARM_GRACE_SECONDS", "30"))
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

@@ -753,6 +753,174 @@ class DatabaseHandler:
             logger.error(f"Error in atomic return: {str(e)}")
             raise
 
+    # ==================== Kiosk session operations ====================
+
+    def close_borrow(
+        self, tool_id: int, returned_by_id: Optional[int], verified: bool
+    ) -> Optional[Dict]:
+        """Close the open borrow of a tool, whoever returns it. None if the
+        tool has no open borrow. Unlike return_tool_atomic this does not
+        require the returner to be the borrower."""
+        try:
+            tool = db.session.execute(
+                db.select(Tool).filter_by(id=int(tool_id)).with_for_update()
+            ).scalar_one_or_none()
+            txn = Transaction.query.filter_by(
+                tool_id=int(tool_id), status="borrowed"
+            ).first()
+            if tool is None or txn is None:
+                db.session.rollback()
+                return None
+            txn.return_time = datetime.utcnow()
+            txn.status = "returned"
+            txn.returned_by_id = returned_by_id
+            txn.return_verified = verified
+            tool.status = "available"
+            db.session.commit()
+            logger.info(
+                f"Close borrow: tool {tool_id} by {returned_by_id} verified={verified}"
+            )
+            return txn.to_dict()
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def get_unverified_returns(self) -> List[Dict]:
+        rows = (
+            Transaction.query.filter_by(status="returned", return_verified=False)
+            .order_by(Transaction.return_time)
+            .all()
+        )
+        return [
+            {
+                "transaction_id": str(t.id),
+                "tool_id": str(t.tool_id),
+                "tool_name": t.tool_name,
+                "borrower_id": str(t.student_id),
+                "borrower_name": t.student_name,
+                "return_time": utc_to_wib(t.return_time).isoformat()
+                if t.return_time
+                else None,
+            }
+            for t in rows
+        ]
+
+    def verify_return(self, transaction_id: int) -> bool:
+        """Admin: mark an unverified return as verified. False if there is none."""
+        try:
+            n = db.session.execute(
+                db.update(Transaction)
+                .where(
+                    Transaction.id == transaction_id,
+                    Transaction.status == "returned",
+                    Transaction.return_verified.is_(False),
+                )
+                .values(return_verified=True)
+            ).rowcount
+            db.session.commit()
+            return n == 1
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def verify_returns_by_borrower(self, student_id: int) -> int:
+        """A student's own unverified returns count as verified by them."""
+        try:
+            n = db.session.execute(
+                db.update(Transaction)
+                .where(
+                    Transaction.student_id == int(student_id),
+                    Transaction.status == "returned",
+                    Transaction.return_verified.is_(False),
+                )
+                .values(return_verified=True, returned_by_id=int(student_id))
+            ).rowcount
+            db.session.commit()
+            return n
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def convert_recent_alarms_to_borrows(
+        self, student_id: int, grace_seconds: float
+    ) -> List[Dict]:
+        """Open alarms that started within the grace window become borrows by
+        the student (alarm ended_by='late_identify'). Returns the transactions."""
+        cutoff = datetime.utcnow() - timedelta(seconds=grace_seconds)
+        alarms = (
+            AlarmEvent.query.filter(
+                AlarmEvent.ended_at.is_(None), AlarmEvent.started_at >= cutoff
+            )
+            .order_by(AlarmEvent.started_at)
+            .all()
+        )
+        converted = []
+        for alarm_id, tool_id in [(a.id, a.tool_id) for a in alarms]:
+            try:
+                txn = self.borrow_tool_atomic(str(student_id), str(tool_id))
+            except ValueError:
+                continue  # tool no longer available: leave the alarm alone
+            try:
+                db.session.execute(
+                    db.update(AlarmEvent)
+                    .where(AlarmEvent.id == alarm_id, AlarmEvent.ended_at.is_(None))
+                    .values(
+                        ended_at=datetime.utcnow(),
+                        ended_by="late_identify",
+                        student_id=int(student_id),
+                    )
+                )
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+                raise
+            converted.append(txn)
+        return converted
+
+    def get_board(self) -> List[Dict]:
+        """Tools grouped by type for the kiosk board, with borrower and
+        overdue info taken from the open transaction's due_at."""
+        now = datetime.utcnow()
+        rows = (
+            db.session.query(Tool, ToolType, Transaction, Student)
+            .outerjoin(ToolType, ToolType.id == Tool.type_id)
+            .outerjoin(
+                Transaction,
+                db.and_(Transaction.tool_id == Tool.id, Transaction.status == "borrowed"),
+            )
+            .outerjoin(Student, Student.id == Transaction.student_id)
+            .all()
+        )
+        groups: Dict[object, Dict] = {}
+        for tool, ttype, txn, student in rows:
+            key = ttype.id if ttype else None
+            group = groups.setdefault(
+                key,
+                {
+                    "type_id": str(ttype.id) if ttype else None,
+                    "type_name": ttype.name if ttype else "Lainnya",
+                    "photo_url": ttype.to_dict()["photo_url"] if ttype else "",
+                    "units": [],
+                },
+            )
+            due = txn.effective_due_at if txn else None
+            group["units"].append(
+                {
+                    "tool_id": str(tool.id),
+                    "name": tool.name,
+                    "unit_no": tool.unit_no,
+                    "presence": tool.presence,
+                    "status": tool.status,
+                    "borrower_name": txn.student_name if txn else None,
+                    "borrower_nim": student.nim if student else None,
+                    "due_at": utc_to_wib(due).isoformat() if due else None,
+                    "is_overdue": bool(txn and txn.is_overdue(now)),
+                }
+            )
+        for group in groups.values():
+            group["units"].sort(key=lambda u: (u["unit_no"] or 0, u["name"]))
+        return sorted(groups.values(), key=lambda g: g["type_name"].lower())
+
     # ==================== Monitor / Batch Operations ====================
 
     def get_all_tools_with_borrowers(
@@ -800,6 +968,8 @@ class DatabaseHandler:
                 tool_dict["borrower_name"] = None
                 tool_dict["borrower_nim"] = None
                 tool_dict["borrow_time"] = None
+                tool_dict["due_at"] = None
+                tool_dict["is_overdue"] = False
 
                 if include_email:
                     tool_dict["borrower_email"] = None
@@ -809,6 +979,8 @@ class DatabaseHandler:
                     tool_dict["borrower_name"] = txn.student_name
                     # Convert borrow_time from UTC to WIB
                     tool_dict["borrow_time"] = utc_to_wib(txn.borrow_time)
+                    tool_dict["due_at"] = utc_to_wib(txn.effective_due_at)
+                    tool_dict["is_overdue"] = txn.is_overdue()
 
                     if student:
                         tool_dict["borrower_nim"] = student.nim
