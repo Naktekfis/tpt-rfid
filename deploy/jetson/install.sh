@@ -60,15 +60,18 @@ if [ ! -x "$APP_DIR/.venv/bin/python" ]; then
 fi
 # 18.04's venv pip is too old for manylinux2014 aarch64 wheels; pip 25.1+ drops 3.8.
 run "$APP_DIR/.venv/bin/pip" install --upgrade "pip<25.1" wheel
-run "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt"
+run "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt" -r "$APP_DIR/requirements-cv.txt"
+
+step "Face models (models/face/, SHA256-pinned download)"
+run "$APP_DIR/.venv/bin/python" "$APP_DIR/scripts/fetch_face_models.py"
 
 step ".env"
 if [ -f "$APP_DIR/.env" ]; then
     echo ".env exists; not touching it. Make sure it has FLASK_ENV=production,"
-    echo "RFID_READER_ENABLED=true, RFID_READER_PORT=/dev/rfid-reader and no"
-    echo "postgresql DATABASE_URL."
+    echo "RFID_READER_ENABLED=true, RFID_READER_PORT=/dev/rfid-reader,"
+    echo "CAMERA_ENABLED=true and no postgresql DATABASE_URL."
 elif [ "$DRY_RUN" = 1 ]; then
-    echo "+ create .env (FLASK_ENV=production, new SECRET_KEY, reader on /dev/rfid-reader)"
+    echo "+ create .env (FLASK_ENV=production, new SECRET_KEY, reader on /dev/rfid-reader, camera on)"
 else
     secret="$("$APP_DIR/.venv/bin/python" -c 'import secrets; print(secrets.token_hex(32))')"
     umask 077
@@ -77,6 +80,8 @@ FLASK_ENV=production
 SECRET_KEY=$secret
 RFID_READER_ENABLED=true
 RFID_READER_PORT=/dev/rfid-reader
+CAMERA_ENABLED=true
+CAMERA_INDEX=0
 EOF
     umask 022
     echo "Created .env (mode 600). Add MAIL_* settings by hand if email is needed."
@@ -89,7 +94,7 @@ else
     echo "Using the default admin PIN 133133 (change it with scripts/set_admin_pin.py)."
 fi
 
-step "Reader access (dialout group, udev rule -> /dev/rfid-reader)"
+step "Reader and camera access (dialout/video groups, udev rule -> /dev/rfid-reader)"
 # brltty claims the reader's CH340 bridge (1a86:7523) and the tty disappears.
 if dpkg-query -W -f='${Status}' brltty 2>/dev/null | grep -q 'ok installed'; then
     run sudo apt-get remove -y brltty
@@ -97,6 +102,10 @@ fi
 if ! id -nG "$APP_USER" | tr ' ' '\n' | grep -qx dialout; then
     run sudo usermod -aG dialout "$APP_USER"
     echo "$APP_USER joins dialout at next login (the service gets it via SupplementaryGroups)."
+fi
+if ! id -nG "$APP_USER" | tr ' ' '\n' | grep -qx video; then
+    run sudo usermod -aG video "$APP_USER"
+    echo "$APP_USER joins video (USB webcam) at next login."
 fi
 render "$HERE/99-tpt-rfid-reader.rules" /etc/udev/rules.d/99-tpt-rfid-reader.rules
 run sudo udevadm control --reload-rules
@@ -132,7 +141,8 @@ Check:
   systemctl status tpt-rfid --no-pager
   journalctl -u tpt-rfid -n 50 --no-pager
   curl -s http://${BIND/0.0.0.0/127.0.0.1}/api/rfid/status
-  ls -l /dev/rfid-reader
+  ls -l /dev/rfid-reader /dev/video0
+  curl -s http://${BIND/0.0.0.0/127.0.0.1}/api/devices/status
 Sample data (optional): .venv/bin/python seed_database.py
 Log out and in again (dialout group, kiosk autostart), or reboot.
 EOF

@@ -101,7 +101,7 @@ try:
 except ImportError as e:
     logger.warning(f"CV Benchmark not available (missing dependencies: {e})")
     logger.info(
-        "To enable CV Benchmark: pip install opencv-python face-recognition psutil"
+        "To enable CV Benchmark: pip install -r requirements-cv.txt -r requirements-dlib.txt"
     )
 
 # RFID reader (USB HW-VX6336, or mock). Pages poll its current UID via

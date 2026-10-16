@@ -1,0 +1,7 @@
+# Optional, not needed on the kiosk: the dlib face engine (FACE_ENGINE=dlib),
+# the blink experiment (scripts/face_bench.py --blink) and the old /cv
+# benchmark. face-recognition builds dlib from source (cmake + C++ compiler,
+# long and memory-hungry on a Jetson Nano).
+#
+#   pip install -r requirements-cv.txt -r requirements-dlib.txt
+face-recognition>=1.3.0

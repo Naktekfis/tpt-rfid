@@ -3,7 +3,7 @@
 # Started from ~/.config/autostart/tpt-rfid-kiosk.desktop at desktop login.
 set -u
 
-URL="${TPT_RFID_URL:-http://127.0.0.1:5000}"
+URL="${TPT_RFID_URL:-http://127.0.0.1:5000/kiosk}"
 
 # Wait up to ~2 minutes for gunicorn (first boot on microSD is slow).
 for _ in $(seq 1 120); do
