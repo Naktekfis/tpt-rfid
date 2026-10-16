@@ -288,5 +288,18 @@ class FaceIndex:
             return None, True
         return Match(ranked[0][0], ranked[0][1]), False
 
+    def nearest_other(self, vec, student_id: int) -> Optional[Match]:
+        """Closest student other than student_id within the threshold, else None."""
+        with self._lock:
+            rows = self._rows
+        best: Optional[Match] = None
+        for sid, stored in rows:
+            if sid == student_id:
+                continue
+            d = self._distance(vec, stored)
+            if d <= self.threshold and (best is None or d < best.distance):
+                best = Match(sid, d)
+        return best
+
     def identify(self, vec) -> Optional[Match]:
         return self.identify_detail(vec)[0]

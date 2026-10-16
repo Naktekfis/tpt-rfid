@@ -45,6 +45,13 @@ class Student(db.Model):
         lazy="dynamic",
         foreign_keys="Transaction.student_id",
     )
+    face_embeddings = db.relationship(
+        "FaceEmbedding",
+        backref="student",
+        lazy="dynamic",
+        foreign_keys="FaceEmbedding.student_id",
+        cascade="all, delete-orphan",
+    )
 
     def to_dict(self, include_photo=False):
         """Convert model to dictionary"""
@@ -63,6 +70,20 @@ class Student(db.Model):
 
     def __repr__(self):
         return f"<Student {self.nim} - {self.name}>"
+
+
+class FaceEmbedding(db.Model):
+    """One face embedding of a student (float32 bytes), per face engine."""
+
+    __tablename__ = "face_embeddings"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    student_id = db.Column(
+        db.Integer, db.ForeignKey("students.id"), nullable=False, index=True
+    )
+    engine = db.Column(db.String(32), nullable=False, index=True)
+    vector = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
 class ToolType(db.Model):

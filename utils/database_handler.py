@@ -12,7 +12,15 @@ from flask import current_app
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from .models import db, Student, Tool, ToolType, Transaction, AlarmEvent
+from .models import (
+    db,
+    Student,
+    Tool,
+    ToolType,
+    Transaction,
+    AlarmEvent,
+    FaceEmbedding,
+)
 from .helpers import utc_to_wib
 
 logger = logging.getLogger(__name__)
@@ -194,6 +202,63 @@ class DatabaseHandler:
         except Exception as e:
             logger.error(f"Error getting student photo: {str(e)}")
             raise
+
+    # ==================== Face Data ====================
+
+    def add_face_embeddings(
+        self,
+        student_id: int,
+        engine: str,
+        vectors: List[bytes],
+        replace: bool = False,
+    ) -> int:
+        """Store float32 embedding bytes; replace=True drops this student's
+        embeddings of the same engine first. Returns how many were stored."""
+        try:
+            if db.session.get(Student, int(student_id)) is None:
+                raise ValueError(f"Student {student_id} not found")
+            if replace:
+                FaceEmbedding.query.filter_by(
+                    student_id=int(student_id), engine=engine
+                ).delete()
+            for vec in vectors:
+                db.session.add(
+                    FaceEmbedding(student_id=int(student_id), engine=engine, vector=vec)
+                )
+            db.session.commit()
+            return len(vectors)
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error adding face embeddings: {str(e)}")
+            raise
+
+    def get_face_embeddings(self, engine: str) -> List[tuple]:
+        """[(student_id, vector bytes)] for one engine."""
+        rows = FaceEmbedding.query.filter_by(engine=engine).all()
+        return [(r.student_id, bytes(r.vector)) for r in rows]
+
+    def delete_face_data(self, student_id: int) -> bool:
+        """Delete all embeddings and the profile photo. False if no such student."""
+        try:
+            student = db.session.get(Student, int(student_id))
+            if student is None:
+                return False
+            FaceEmbedding.query.filter_by(student_id=student.id).delete()
+            student.photo_data = None
+            student.photo_mimetype = None
+            db.session.commit()
+            logger.info(f"Deleted face data for student {student_id}")
+            return True
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error deleting face data: {str(e)}")
+            raise
+
+    def student_has_face(self, student_id: int) -> bool:
+        return (
+            FaceEmbedding.query.filter_by(student_id=int(student_id)).first()
+            is not None
+        )
 
     # ==================== Tool Operations ====================
 

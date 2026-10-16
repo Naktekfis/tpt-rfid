@@ -39,6 +39,8 @@ from utils import (
     validate_record_id,
     create_rfid_reader,
 )
+from utils.camera import create_camera
+from utils.face_service import build_face_service
 from utils.presence import PresenceMonitor
 from utils.tool_presence import ToolPresenceService
 
@@ -117,6 +119,19 @@ presence_service = ToolPresenceService(
     PresenceMonitor(missing_after=app.config.get("RFID_MISSING_AFTER", 5.0)),
     alarm_enabled=app.config.get("RFID_ALARM_ENABLED", True),
 )
+# Camera + face identification (degrades to status codes when models are missing).
+camera = create_camera(
+    enabled=app.config.get("CAMERA_ENABLED", False),
+    index=app.config.get("CAMERA_INDEX", 0),
+)
+face_service = build_face_service(
+    app,
+    database,
+    camera,
+    app.config.get("FACE_MODEL_DIR"),
+    app.config.get("FACE_ENGINE", "yunet_sface"),
+    app.config.get("FACE_MATCH_THRESHOLD"),
+)
 # `python app.py` with debug runs a reloader parent that only watches files
 # and a child (WERKZEUG_RUN_MAIN) that serves; only the child may own the
 # serial port. gunicorn imports this module as "app" and always starts it.
@@ -127,6 +142,7 @@ _reloader_parent = (
 )
 if not _reloader_parent:
     rfid_reader.start()
+    camera.start()
 
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -166,6 +182,12 @@ from routes.presence_routes import create_presence_blueprint  # noqa: E402
 
 app.register_blueprint(
     create_presence_blueprint(database, presence_service, admin_required)
+)
+
+from routes.face_routes import create_face_blueprint  # noqa: E402
+
+app.register_blueprint(
+    create_face_blueprint(database, face_service, camera, admin_required)
 )
 
 
@@ -1278,6 +1300,7 @@ def cleanup():
     """Cleanup resources on application shutdown"""
     logger.info("Shutting down application...")
     rfid_reader.stop()
+    camera.stop()
 
 
 atexit.register(cleanup)
