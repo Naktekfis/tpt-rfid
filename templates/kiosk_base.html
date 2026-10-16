@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{% block title %}Lab Fabrikasi — Peminjaman Alat{% endblock %}</title>
+    {# Offline kiosk: every asset is local (no CDN, no Tailwind). #}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ui.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+
+<body>
+    <div class="app">
+        <header class="app-header">
+            <div class="app-header__logos">
+                <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}"
+                    alt="Institut Teknologi Bandung">
+                <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
+            </div>
+            <div class="app-header__divider" aria-hidden="true"></div>
+            <div class="app-header__title">
+                <h1>{% block header_title %}Lab Fabrikasi — Peminjaman Alat{% endblock %}</h1>
+                <p>{% block header_subtitle %}Program Studi Teknik Fisika, Institut Teknologi Bandung{% endblock %}</p>
+            </div>
+            <div class="app-header__end">
+                {% block header_end %}{% endblock %}
+            </div>
+        </header>
+
+        <div id="banners">{% block banners %}{% endblock %}</div>
+
+        <main class="app-main">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    {% block overlays %}{% endblock %}
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

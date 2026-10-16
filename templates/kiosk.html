@@ -1,0 +1,193 @@
+{% extends "kiosk_base.html" %}
+
+{% block title %}Kiosk — Lab Fabrikasi{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/kiosk.css') }}">
+{% endblock %}
+
+{% block header_end %}
+<div class="devices" aria-label="Status perangkat">
+    <span class="dot-status" id="dev-reader">Pembaca RFID</span>
+    <span class="dot-status" id="dev-camera">Kamera</span>
+</div>
+<div class="clock" aria-label="Waktu (WIB)">
+    <span class="clock__time" id="clock-time">--.--</span>
+    <span class="clock__date" id="clock-date">&nbsp;</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="kiosk">
+    <!-- Tool board -->
+    <section class="panel" aria-labelledby="board-title">
+        <div class="panel__head">
+            <h2 id="board-title">Status alat</h2>
+            <div class="board-summary" id="board-summary"></div>
+        </div>
+        <div class="panel__body board-body" id="board">
+            <p class="empty">Memuat data alat…</p>
+        </div>
+        <div class="unverified" id="unverified" hidden>
+            <h3>Dikembalikan, belum diverifikasi</h3>
+            <ul id="unverified-list"></ul>
+        </div>
+    </section>
+
+    <!-- Interaction panel: one view per kiosk state -->
+    <section class="panel interact" aria-live="polite">
+        <div class="panel__head">
+            <h2 id="interact-title">Selamat datang</h2>
+            <span class="pill" id="interact-pill" hidden></span>
+        </div>
+        <div class="panel__body">
+            <!-- Camera preview: moved between the idle and identifying views. -->
+            <div class="camera" id="camera">
+                <img id="camera-img" alt="Tampilan kamera">
+                <div class="camera__placeholder" id="camera-placeholder" hidden>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                        <path d="M3 7h3l2-2h8l2 2h3v12H3z" />
+                        <circle cx="12" cy="13" r="3.5" />
+                        <path d="M3 3l18 18" />
+                    </svg>
+                    <span>Kamera tidak tersedia</span>
+                </div>
+            </div>
+
+            <div class="view" id="view-idle" data-view="idle">
+                <div data-camera-slot></div>
+                <div class="view--center stack">
+                    <p class="prompt">Lihat ke kamera untuk mulai</p>
+                    <p class="prompt-sub">Wajah Anda dikenali otomatis. Setelah nama Anda muncul, ambil atau
+                        kembalikan alat di rak.</p>
+                </div>
+                <p class="notice" id="idle-reason" hidden></p>
+            </div>
+
+            <div class="view" id="view-identifying" data-view="identifying" hidden>
+                <div class="person">
+                    <img class="person__photo" id="id-photo" alt="">
+                    <div>
+                        <p class="person__name">Halo, <span id="id-name"></span></p>
+                        <p class="person__nim" id="id-nim"></p>
+                    </div>
+                </div>
+                <div class="steps">
+                    <div class="steps__bar" id="id-steps"></div>
+                    <span id="id-step-label"></span>
+                </div>
+                <div class="turn" id="id-turn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path id="id-arrow" d="M4 12h15M13 6l6 6-6 6" />
+                    </svg>
+                    <span class="turn__text" id="id-turn-text"></span>
+                </div>
+                <div data-camera-slot></div>
+                <p class="help">Putar kepala perlahan, lalu kembali menghadap kamera. Bukan Anda? Menjauhlah dari
+                    kamera untuk membatalkan.</p>
+            </div>
+
+            <div class="view view--center" id="view-unknown" data-view="unknown_face" hidden>
+                <p class="prompt">Wajah belum terdaftar</p>
+                <p class="prompt-sub">Daftarkan diri Anda satu kali agar dapat meminjam alat.</p>
+                <a class="btn btn--primary btn--lg" href="/daftar">Daftar sekarang</a>
+                <p class="help" id="unknown-ends"></p>
+            </div>
+
+            <div class="view" id="view-session" data-view="session" hidden>
+                <div class="person">
+                    <img class="person__photo" id="ses-photo" alt="">
+                    <div>
+                        <p class="person__name" id="ses-name"></p>
+                        <p class="person__nim" id="ses-nim"></p>
+                    </div>
+                </div>
+                <div class="countdown">
+                    <div class="countdown__label">
+                        <span>Sesi berakhir otomatis dalam</span>
+                        <span class="countdown__value" id="ses-left"></span>
+                    </div>
+                    <div class="countdown__track">
+                        <div class="countdown__fill" id="ses-fill"></div>
+                    </div>
+                </div>
+                <p class="notice">Ambil alat dari rak untuk meminjam, letakkan kembali untuk mengembalikan.
+                    Setiap alat langsung tercatat atas nama Anda.</p>
+                <div class="session-lists">
+                    <div class="list-box">
+                        <h3>Dipinjam <span class="badge" id="ses-borrowed-n">0</span></h3>
+                        <ul id="ses-borrowed"></ul>
+                    </div>
+                    <div class="list-box">
+                        <h3>Dikembalikan <span class="badge" id="ses-returned-n">0</span></h3>
+                        <ul id="ses-returned"></ul>
+                    </div>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn--secondary btn--lg" id="btn-cancel">Bukan saya</button>
+                    <button type="button" class="btn btn--primary btn--lg" id="btn-end">Selesai</button>
+                </div>
+            </div>
+
+            <div class="view" id="view-summary" data-view="summary" hidden>
+                <div>
+                    <p class="person__name">Terima kasih, <span id="sum-name"></span></p>
+                    <p class="prompt-sub">Transaksi Anda sudah tercatat.</p>
+                </div>
+                <div class="session-lists">
+                    <div class="list-box">
+                        <h3>Dipinjam <span class="badge" id="sum-borrowed-n">0</span></h3>
+                        <ul id="sum-borrowed"></ul>
+                    </div>
+                    <div class="list-box">
+                        <h3>Dikembalikan <span class="badge" id="sum-returned-n">0</span></h3>
+                        <ul id="sum-returned"></ul>
+                    </div>
+                </div>
+                <p class="help" id="sum-ends"></p>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block overlays %}
+<div class="alarm" id="alarm" role="alertdialog" aria-labelledby="alarm-title" hidden>
+    <div class="alarm__layout">
+    <div class="alarm__inner">
+        <h2 id="alarm-title">Alat diambil tanpa verifikasi</h2>
+        <p class="alarm__text">Alat diambil tanpa verifikasi wajah. Kembalikan alat, atau lihat ke kamera dalam
+            30 detik untuk mencatat peminjaman.</p>
+        <ul class="alarm__list" id="alarm-list"></ul>
+        <div class="alarm__admin">
+            <button type="button" class="btn btn--ghost" id="alarm-admin-btn">Admin</button>
+            <form class="alarm__admin" id="alarm-admin-form" hidden autocomplete="off">
+                <div class="field">
+                    <label for="alarm-pin">PIN admin</label>
+                    <input class="input" id="alarm-pin" type="password" inputmode="numeric" maxlength="12"
+                        autocomplete="off">
+                </div>
+                <button type="submit" class="btn btn--light">Matikan alarm</button>
+                <button type="button" class="btn btn--ghost" id="alarm-admin-close">Batal</button>
+            </form>
+            <span class="alarm__error" id="alarm-error" role="alert"></span>
+        </div>
+    </div>
+    <div class="alarm__camera">
+        <div data-camera-slot></div>
+        <p>Peminjam: lihat ke kamera</p>
+    </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    window.KIOSK_CONFIG = {
+        placeholderPhoto: "{{ url_for('static', filename='assets/placeholder_profile.png') }}",
+        cameraStream: "/camera/stream",
+    };
+</script>
+<script src="{{ url_for('static', filename='js/kiosk.js') }}"></script>
+{% endblock %}

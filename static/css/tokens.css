@@ -1,0 +1,131 @@
+/*
+ * Design tokens for the kiosk pages (kiosk_base.html). Plain CSS custom
+ * properties, no build step, no CDN. Components live in ui.css.
+ *
+ * Primary blue is sampled from static/assets/Logo_Institut_Teknologi_Bandung.png
+ * (#005AAB); the navy is a darker shade for headings and the header rule.
+ */
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../fonts/IBMPlexSans-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../fonts/IBMPlexSans-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../fonts/IBMPlexSans-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  src: url("../fonts/IBMPlexSans-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/IBMPlexMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/IBMPlexMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Brand */
+  --c-brand: #005aab;          /* ITB logo blue: primary actions, links */
+  --c-brand-hover: #004a8f;
+  --c-brand-active: #003d76;
+  --c-navy: #1b3c78;           /* headings, header rule */
+  --c-brand-50: #eef4fb;
+  --c-brand-100: #d7e5f5;
+  --c-brand-200: #b3cdea;
+
+  /* Neutrals */
+  --c-bg: #f3f5f8;             /* page */
+  --c-surface: #ffffff;        /* cards, panels */
+  --c-surface-2: #f8f9fb;      /* table header, subtle fills */
+  --c-border: #dde2ea;         /* hairlines */
+  --c-border-strong: #c3cad6;
+  --c-text: #17202e;
+  --c-text-muted: #525e70;
+  --c-text-subtle: #7a8596;
+  --c-on-brand: #ffffff;
+
+  /* Status (used sparingly, always paired with a text label) */
+  --c-ok: #1d7a46;             /* present / available */
+  --c-ok-bg: #e8f4ed;
+  --c-ok-border: #b9dcc6;
+  --c-info: #005aab;           /* borrowed */
+  --c-info-bg: #eef4fb;
+  --c-info-border: #b3cdea;
+  --c-warn: #9a5700;           /* overdue */
+  --c-warn-bg: #fdf3e1;
+  --c-warn-border: #f0d29c;
+  --c-danger: #b42318;         /* missing / alarm */
+  --c-danger-hover: #971c13;
+  --c-danger-bg: #fdecea;
+  --c-danger-border: #f3c0bb;
+  --c-neutral: #5d6878;        /* unknown / inactive */
+  --c-neutral-bg: #eef0f3;
+  --c-neutral-border: #d5dae2;
+
+  /* Type (rem; html font-size is scaled down on small screens in ui.css) */
+  --font-sans: "IBM Plex Sans", "Segoe UI", Roboto, Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "Consolas", "DejaVu Sans Mono", monospace;
+  --fs-xs: 0.8125rem;   /* 13px  captions */
+  --fs-sm: 0.9375rem;   /* 15px  secondary */
+  --fs-md: 1.0625rem;   /* 17px  body */
+  --fs-lg: 1.25rem;     /* 20px  emphasised body, buttons */
+  --fs-xl: 1.625rem;    /* 26px  section titles */
+  --fs-2xl: 2.125rem;   /* 34px  panel headline */
+  --fs-3xl: 2.75rem;    /* 44px  hero prompt */
+  --fs-4xl: 4.5rem;     /* 72px  direction arrow, countdown */
+  --lh-tight: 1.2;
+  --lh-normal: 1.45;
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+
+  /* Spacing (4px grid) */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-3: 0.75rem;
+  --sp-4: 1rem;
+  --sp-5: 1.25rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+  --sp-10: 2.5rem;
+  --sp-12: 3rem;
+
+  /* Shape and depth */
+  --radius-sm: 4px;
+  --radius: 6px;
+  --radius-pill: 999px;   /* status pills only */
+  --border-w: 1px;
+  --shadow-1: 0 1px 2px rgba(23, 32, 46, 0.06);
+  --shadow-2: 0 2px 8px rgba(23, 32, 46, 0.08), 0 1px 2px rgba(23, 32, 46, 0.06);
+  --shadow-3: 0 12px 32px rgba(23, 32, 46, 0.16);
+  --focus-ring: 0 0 0 3px rgba(0, 90, 171, 0.35);
+
+  --dur: 160ms;
+}

@@ -261,6 +261,12 @@ def monitor():
     return render_template("monitor.html")
 
 
+@app.route("/kiosk")
+def kiosk_page():
+    """Face + presence kiosk screen (new design, polls /api/kiosk/state)"""
+    return render_template("kiosk.html")
+
+
 @app.route("/admin")
 @admin_required
 def admin_menu():
@@ -1056,6 +1062,14 @@ def add_tool():
 def rfid_status():
     """Reader mode and connection state (for bring-up and health checks)."""
     return jsonify({"success": True, **rfid_reader.status()})
+
+
+@app.route("/api/devices/status", methods=["GET"])
+def devices_status():
+    """Reader and camera state for the kiosk header (no secrets, no PII)."""
+    return jsonify(
+        {"success": True, "reader": rfid_reader.status(), "camera": camera.status()}
+    )
 
 
 @app.route("/api/rfid/clear", methods=["POST"])
