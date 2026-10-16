@@ -56,7 +56,7 @@ end_session() {
 pause() { echo "... $1"; sleep "$2"; }
 
 case "${1:-walk}" in
-    present) present ;;
+    present) present "${2:-}" ;;
     session) session "${2:-1}" ;;
     borrow) present "$BOR1" ;;
     end) end_session ;;
