@@ -69,15 +69,17 @@ class FaceService:
     # ---- shared per-frame steps ----
 
     def _unavailable(self) -> Optional[str]:
+        # The passive liveness model is optional: the head-turn challenge is
+        # the real gate (MiniFASNet passes phone photos), so only a missing
+        # engine fails closed.
         if self.engine is None:
             return "models_missing"
-        if self.liveness is None:
-            return "liveness_unavailable"
         return None
 
     def _analyse(self, frame) -> Dict[str, Any]:
-        """detect + quality + liveness. Returns {"status": code} on failure,
-        else {"status": "ok", "face", "liveness"}."""
+        """detect + quality (+ passive liveness score, informational only).
+        Returns {"status": code} on failure, else {"status": "ok", "face",
+        "liveness"} with liveness None when the model is missing."""
         faces = self.engine.detect(frame)
         issues = quality_issues(
             frame, faces, self.min_face_px, self.min_sharpness
@@ -85,13 +87,25 @@ class FaceService:
         if issues:
             return {"status": issues[0], "issues": issues}
         face = faces[0]
-        try:
-            is_live, score = self.liveness.check(frame, face)
-        except LivenessUnavailable:
-            return {"status": "liveness_unavailable"}
-        if not is_live:
-            return {"status": "not_live", "liveness": round(score, 3)}
+        score = None
+        if self.liveness is not None:
+            try:
+                _, score = self.liveness.check(frame, face)
+            except LivenessUnavailable:
+                score = None
+        logger.debug("passive liveness score: %s", score)
         return {"status": "ok", "face": face, "liveness": score}
+
+    def landmarks(self, frame):
+        """5-point landmarks of the single face in the frame, else None.
+        Cheap (detect only, no quality/embedding): fed to the head-turn
+        challenge on every frame."""
+        if frame is None or self.engine is None:
+            return None
+        faces = self.engine.detect(frame)
+        if len(faces) != 1:
+            return None
+        return faces[0].landmarks
 
     # ---- identify ----
 
@@ -108,14 +122,15 @@ class FaceService:
         self._ensure_index()
         vec = self.engine.embed(frame, face)
         match, ambiguous = self.index.identify_detail(vec)
+        live = None if liveness is None else round(liveness, 3)
         if ambiguous:
-            return {"status": "ambiguous", "liveness": round(liveness, 3)}
+            return {"status": "ambiguous", "liveness": live}
         if match is None:
-            return {"status": "unknown", "liveness": round(liveness, 3)}
+            return {"status": "unknown", "liveness": live}
         student = self.database.get_student_by_id(str(match.student_id))
         if student is None:  # embeddings of a deleted student: stale index
             self.reload_index()
-            return {"status": "unknown", "liveness": round(liveness, 3)}
+            return {"status": "unknown", "liveness": live}
         return {
             "status": "ok",
             "student": {
@@ -125,7 +140,7 @@ class FaceService:
                 "photo_url": student["photo_url"],
             },
             "distance": round(match.distance, 4),
-            "liveness": round(liveness, 3),
+            "liveness": live,
         }
 
     # ---- enroll ----
@@ -145,8 +160,6 @@ class FaceService:
         problems: Dict[str, int] = {}
         for frame in frames:
             res = self._analyse(frame)
-            if res["status"] == "liveness_unavailable":
-                return {"status": "liveness_unavailable"}  # fail closed
             if res["status"] != "ok":
                 problems[res["status"]] = problems.get(res["status"], 0) + 1
                 continue

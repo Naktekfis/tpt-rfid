@@ -87,15 +87,19 @@ def test_identify_status_codes(service, liveness):
     assert service.identify_frame(make_frame(1, faces=2))["status"] == "multiple_faces"
     assert service.identify_frame(make_frame(1, blurry=True))["status"] == "blurry"
     assert service.identify_frame(make_frame(1))["status"] == "unknown"
+    # The passive score is informational: neither a low score nor a missing
+    # model blocks (the head-turn challenge is the gate).
     liveness.live = False
-    assert service.identify_frame(make_frame(1))["status"] == "not_live"
+    got = service.identify_frame(make_frame(1))
+    assert got["status"] == "unknown" and got["liveness"] == 0.1
     liveness.unavailable = True
-    assert service.identify_frame(make_frame(1))["status"] == "liveness_unavailable"
+    got = service.identify_frame(make_frame(1))
+    assert got["status"] == "unknown" and got["liveness"] is None
 
 
-def test_identify_fails_closed_without_liveness_or_models(service):
+def test_identify_fails_closed_without_models_only(service):
     service.liveness = None
-    assert service.identify_frame(make_frame(1))["status"] == "liveness_unavailable"
+    assert service.identify_frame(make_frame(1))["status"] == "unknown"
     service.engine = None
     assert service.identify_frame(make_frame(1))["status"] == "models_missing"
     assert service.enroll(1, [make_frame(1)])["status"] == "models_missing"
@@ -137,20 +141,19 @@ def test_enroll_rejects_duplicate_of_other_student(service, database):
     assert len(database.get_face_embeddings("fake")) == 3
 
 
-def test_enroll_fails_closed_when_liveness_unavailable(service, database, liveness):
-    sid = int(make_student(database, 1)["student_id"])
-    liveness.unavailable = True
-    res = service.enroll(sid, [make_frame(1) for _ in range(4)])
-    assert res["status"] == "liveness_unavailable"
-    assert not database.student_has_face(sid)
-
-
-def test_enroll_spoof_and_unknown_student(service, database, liveness):
+def test_enroll_ignores_passive_liveness(service, database, liveness):
     sid = int(make_student(database, 1)["student_id"])
     liveness.live = False
     res = service.enroll(sid, [make_frame(1) for _ in range(4)])
-    assert res["status"] == "insufficient" and res["problems"] == {"not_live": 4}
+    assert res["status"] == "ok" and res["stored"] == 4
     assert service.enroll(999, [make_frame(1)])["status"] == "not_found"
+
+
+def test_landmarks_single_face_only(service):
+    assert service.landmarks(None) is None
+    assert service.landmarks(make_frame(1, faces=0)) is None
+    assert service.landmarks(make_frame(1, faces=2)) is None
+    service.landmarks(make_frame(1, faces=1))  # no raise
 
 
 def test_delete_face_data_clears_photo_and_index(service, database):
