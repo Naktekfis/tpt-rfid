@@ -30,6 +30,7 @@ class ToolPresenceService:
         monitor: PresenceMonitor,
         alarm_enabled: bool = True,
         clock: Callable[[], float] = time.monotonic,
+        kiosk=None,
     ):
         self.app = app
         self.database = database
@@ -37,6 +38,7 @@ class ToolPresenceService:
         self.monitor = monitor
         self.alarm_enabled = alarm_enabled
         self._clock = clock
+        self.kiosk = kiosk  # optional Kiosk: gets first look at tool events
         self._lock = threading.Lock()
         self._unknown: Set[str] = set()
         self._known: Dict[str, int] = {}  # epc -> tool id
@@ -65,7 +67,10 @@ class ToolPresenceService:
                 self._known[epc] = info["id"]
                 self._last_write[epc] = now
             self.database.set_tool_presence(info["id"], "present", datetime.utcnow())
-            if event.kind == "back":
+            if event.kind == "back" and not self._kiosk_handled("on_tool_back", info):
+                if info["status"] == "borrowed":
+                    # Nobody identified: record the return, flag it unverified.
+                    self.database.close_borrow(info["id"], None, False)
                 self.database.close_alarms_for_tool(info["id"], "returned")
             return
 
@@ -82,12 +87,23 @@ class ToolPresenceService:
         self.database.set_tool_presence(info["id"], "missing")
         if info["status"] != "available":
             return  # borrowed tools are meant to leave
+        if self._kiosk_handled("on_tool_left", info):
+            return  # a kiosk session borrowed it
         if self.database.open_alarm_for_tool(info["id"]) is not None:
             return
         self.database.create_alarm(info["id"])
         logger.warning(f"ALARM: tool {info['id']} left the reader field")
         if self.alarm_enabled:
             self.reader.beep()
+
+    def _kiosk_handled(self, method: str, info: Dict) -> bool:
+        if self.kiosk is None:
+            return False
+        try:
+            return bool(getattr(self.kiosk, method)(info))
+        except Exception:  # reader-thread boundary: fall back to the no-session path
+            logger.exception("Kiosk %s failed", method)
+            return False
 
     def _touch_last_seen(self, epcs: List[str], now: float) -> None:
         with self._lock:

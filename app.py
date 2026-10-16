@@ -41,6 +41,7 @@ from utils import (
 )
 from utils.camera import create_camera
 from utils.face_service import build_face_service
+from utils.kiosk import Kiosk, KioskLoop
 from utils.presence import PresenceMonitor
 from utils.tool_presence import ToolPresenceService
 
@@ -132,6 +133,18 @@ face_service = build_face_service(
     app.config.get("FACE_ENGINE", "yunet_sface"),
     app.config.get("FACE_MATCH_THRESHOLD"),
 )
+# Kiosk session: face + head-turn identification, then tool events are
+# attributed to the identified student (see utils/kiosk.py).
+kiosk = Kiosk(
+    app,
+    database,
+    face_service,
+    session_seconds=app.config.get("KIOSK_SESSION_SECONDS", 60),
+    extend_seconds=app.config.get("KIOSK_SESSION_EXTEND", 30),
+    max_seconds=app.config.get("KIOSK_SESSION_MAX_SECONDS", 120),
+    alarm_grace_seconds=app.config.get("ALARM_GRACE_SECONDS", 30),
+)
+presence_service.kiosk = kiosk
 # `python app.py` with debug runs a reloader parent that only watches files
 # and a child (WERKZEUG_RUN_MAIN) that serves; only the child may own the
 # serial port. gunicorn imports this module as "app" and always starts it.
@@ -143,6 +156,9 @@ _reloader_parent = (
 if not _reloader_parent:
     rfid_reader.start()
     camera.start()
+    # Frames only exist with a real camera; timeouts do not need the loop.
+    if not camera.status().get("mock"):
+        KioskLoop(camera, kiosk).start()
 
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -189,6 +205,10 @@ from routes.face_routes import create_face_blueprint  # noqa: E402
 app.register_blueprint(
     create_face_blueprint(database, face_service, camera, admin_required)
 )
+
+from routes.kiosk_routes import create_kiosk_blueprint  # noqa: E402
+
+app.register_blueprint(create_kiosk_blueprint(database, kiosk, admin_required))
 
 
 def _serialize_borrow_timestamps(tools_data):
@@ -618,6 +638,20 @@ if app.config.get("DEBUG"):
         epcs = [e.strip() for e in request.args.get("epcs", "").split(",") if e.strip()]
         rfid_reader.set_present(epcs)
         return jsonify({"success": True, "epcs": epcs})
+
+    @app.route("/debug/kiosk/identify", methods=["GET"])
+    def debug_kiosk_identify():
+        """Debug endpoint: start a kiosk session for a student as if the face
+        and both head turns had passed (development only)"""
+        student = None
+        raw = request.args.get("student_id", "")
+        if raw.isdigit():
+            student = database.get_student_by_id(raw)
+        if student is None:
+            return jsonify({"success": False, "error": "Student not found"}), 404
+        if not kiosk.start_session(student):
+            return jsonify({"success": False, "error": "Session already running"}), 409
+        return jsonify({"success": True, "student_id": student["student_id"]})
 
     @app.route("/debug/clear", methods=["GET"])
     def debug_clear():
