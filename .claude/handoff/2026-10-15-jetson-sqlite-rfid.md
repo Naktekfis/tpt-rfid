@@ -52,4 +52,4 @@ The app will run on a **Jetson Nano 4GB (P3450, JetPack 4.6.1, Ubuntu 18.04, aar
 8. Later: CV on device.
 
 ## Questions to raise with the user
-- Student cards: for now assumed UHF on the same reader (user, 2026-10-15). Still to confirm with the hardware team.
+- Student cards: KTM uses a separate scanner (user, 2026-10-16). Not integrated; do not work on it until asked. The VX6336 reads tool tags (verified on the laptop 2026-10-16, see RFID_VX6336.md).

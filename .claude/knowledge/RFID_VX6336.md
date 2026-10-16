@@ -47,9 +47,9 @@ Never send these from app code without explicit approval: Write Data `0x03`, Wri
 - Pure protocol code (frame build/parse, CRC) goes in its own module with unit tests built from the vectors above. The serial loop sits behind a Mock/Real factory, so the app still runs without a reader.
 - Debounce: one tap produces several inventory hits while the tag is in range, so report a given EPC once per presence window.
 - Implemented (step 4): `utils/vx6336.py` (protocol, only the safe commands can be built) and `utils/rfid_reader.py` (`VX6336Reader` thread polls Inventory `0x01`, `ScanDebouncer` with `RFID_ABSENT_TIMEOUT`, reconnects every 3 s if the port is missing). `GET /api/rfid/status` shows mode/connection. Buzzer `0x33` is not used yet (its data layout was not checked).
-- Working assumption (user, 2026-10-15): student cards are UHF too and are read on the **same reader**. `clear()` does not reset the debouncer, so a card left on the reader is not re-reported as the next scan.
+- Student cards (KTM) are read by a **different scanner** (user, 2026-10-16); that scanner is not integrated yet, leave it alone until the user says otherwise. Until then the app still treats every tap on the VX6336 as either a student or a tool. `clear()` does not reset the debouncer, so a card left on the reader is not re-reported as the next scan.
 - Tested on the laptop 2026-10-16 (`scripts/rfid_probe.py`, read-only):
   - Bridge is **CH340 `1a86:7523`**. Ubuntu's `brltty` grabs it and `/dev/ttyUSB0` vanishes a second after plugging; `apt remove brltty` fixes it (install.sh does this).
   - Get Reader Info: firmware 2.32, type 0xD1, power 13 dBm (the max), DMaxFre 0x13 / DMinFre 0x40, ScanTime 0xFF (25.5 s). ScanTime does not slow polling: with no tag the reader answers in ~23 ms with status `0x01`, `Num=0` (not `0xFB`); with 1–3 tags 30–50 ms.
-  - EPCs are 12 bytes (24 hex chars), e.g. `E28068940000401A2C141084`. Several tags in range are reported in one round (up to 3 seen), so the app must decide what to do when a student card and a tool tag are both in the field.
-  - Not yet tested: multi-frame `0x03`, student cards (KTM), tags on metal.
+  - EPCs are 12 bytes (24 hex chars), e.g. `E28068940000401A2C141084`. Several tags in range are reported in one round (up to 3 seen), so the app must decide what to do when several tags are in the field at once.
+  - Not yet tested: multi-frame `0x03`, tags on metal (KTM is out of scope for this reader).
