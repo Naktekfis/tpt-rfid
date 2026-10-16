@@ -67,7 +67,9 @@ class ToolPresenceService:
                 self._known[epc] = info["id"]
                 self._last_write[epc] = now
             self.database.set_tool_presence(info["id"], "present", datetime.utcnow())
-            if event.kind == "back" and not self._kiosk_handled("on_tool_back", info):
+            # "new" counts too: a borrowed tool already in the field at boot
+            # came back while the app was down.
+            if not self._kiosk_handled("on_tool_back", info):
                 if info["status"] == "borrowed":
                     # Nobody identified: record the return, flag it unverified.
                     self.database.close_borrow(info["id"], None, False)

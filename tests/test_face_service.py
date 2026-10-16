@@ -17,9 +17,11 @@ def make_frame(identity, faces=1, blurry=False):
     if blurry:
         frame = np.full((480, 640, 3), 128, np.uint8)
     else:
-        frame = np.random.RandomState(identity).randint(
-            0, 255, (480, 640, 3)
-        ).astype(np.uint8)
+        frame = (
+            np.random.RandomState(identity)
+            .randint(0, 255, (480, 640, 3))
+            .astype(np.uint8)
+        )
     frame[0, 0] = (identity, faces, 0)
     return frame
 
@@ -121,7 +123,12 @@ def test_enroll_then_identify(service, database):
 
 def test_enroll_needs_three_good_frames(service, database):
     sid = int(make_student(database, 1)["student_id"])
-    frames = [make_frame(1), make_frame(1), make_frame(1, faces=0), make_frame(1, blurry=True)]
+    frames = [
+        make_frame(1),
+        make_frame(1),
+        make_frame(1, faces=0),
+        make_frame(1, blurry=True),
+    ]
     res = service.enroll(sid, frames)
     assert res["status"] == "insufficient"
     assert res["good_frames"] == 2
@@ -229,7 +236,25 @@ def test_admin_delete_needs_login(client, wired, database):
 def test_admin_delete_after_login(admin_client, wired, database):
     sid = int(make_student(database, 1)["student_id"])
     wired.enroll(sid, [make_frame(1) for _ in range(3)])
-    assert admin_client.post("/api/admin/login", json={"pin": TEST_PIN}).status_code == 200
+    assert (
+        admin_client.post("/api/admin/login", json={"pin": TEST_PIN}).status_code == 200
+    )
     res = admin_client.post(f"/api/admin/students/{sid}/face/delete")
     assert res.get_json()["success"]
     assert not database.student_has_face(sid)
+
+
+def test_enroll_route_refuses_to_overwrite_without_admin(
+    admin_client, database, student, monkeypatch
+):
+    import routes.face_routes as face_routes
+    from tests.conftest import TEST_PIN
+
+    monkeypatch.setattr(face_routes, "ENROLL_INTERVAL", 0)
+    sid = int(student["student_id"])
+    database.add_face_embeddings(sid, "fake", [b"\x00" * 16])
+    resp = admin_client.post(f"/api/face/enroll/{sid}")
+    assert resp.status_code == 403
+    assert resp.get_json()["status"] == "already_enrolled"
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    assert admin_client.post(f"/api/face/enroll/{sid}").status_code != 403

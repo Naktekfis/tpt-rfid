@@ -2,15 +2,16 @@
 Face API: camera stream, identify, enroll, delete.
 
 The service, camera and admin decorator are passed in by app.py so this module
-does not import app. Enroll takes no admin PIN on purpose (kiosk flow, phase 4
-puts the UI and its guard in front of it).
+does not import app. Enroll is open for a student who has no face data yet
+(self-registration at the kiosk); replacing existing face data needs an admin
+session, so nobody can overwrite another student's face.
 """
 
 from __future__ import annotations
 
 import time
 
-from flask import Blueprint, Response, jsonify
+from flask import Blueprint, Response, jsonify, session
 
 ENROLL_FRAMES = 8
 ENROLL_INTERVAL = 0.3  # s between captured frames (~2 s total)
@@ -46,6 +47,13 @@ def create_face_blueprint(database, service, camera, admin_required) -> Blueprin
 
     @bp.route("/api/face/enroll/<int:student_id>", methods=["POST"])
     def api_face_enroll(student_id):
+        if database.student_has_face(student_id) and not session.get(
+            "admin_logged_in"
+        ):
+            return (
+                jsonify({"success": False, "status": "already_enrolled"}),
+                403,
+            )
         frames = []
         for i in range(ENROLL_FRAMES):
             if i:

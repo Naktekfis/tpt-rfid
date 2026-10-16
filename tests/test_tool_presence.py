@@ -152,3 +152,13 @@ def test_student_without_card(database):
     )
     assert s["rfid_uid"] is None
     assert app_module.database is database
+
+
+def test_borrowed_tool_seen_at_boot_is_unverified_return(env, database, student):
+    service, _, _ = env
+    t = make_tool(database, "T1")
+    database.borrow_tool_atomic(student["student_id"], t["tool_id"])
+    service.on_round(["T1"])  # first sighting since start ("new")
+    assert Tool.query.filter_by(rfid_uid="T1").one().status == "available"
+    unverified = database.get_unverified_returns()
+    assert len(unverified) == 1 and unverified[0]["tool_id"] == t["tool_id"]
