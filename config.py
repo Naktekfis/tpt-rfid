@@ -39,8 +39,10 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
 
-    # werkzeug hash of the admin PIN; written by scripts/set_admin_pin.py
+    # werkzeug hash of the admin PIN; written by scripts/set_admin_pin.py.
+    # Unset means DEFAULT_ADMIN_PIN.
     ADMIN_PIN_HASH = os.getenv("ADMIN_PIN_HASH")
+    DEFAULT_ADMIN_PIN = "133133"
 
     # Session Security Settings
     SESSION_COOKIE_HTTPONLY = True  # Prevent JavaScript access to session cookie

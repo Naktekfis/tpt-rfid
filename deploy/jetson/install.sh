@@ -86,7 +86,7 @@ step "Admin PIN"
 if [ -f "$APP_DIR/.env" ] && grep -q '^ADMIN_PIN_HASH=' "$APP_DIR/.env"; then
     echo "ADMIN_PIN_HASH already set (change it with scripts/set_admin_pin.py)."
 else
-    run "$APP_DIR/.venv/bin/python" "$APP_DIR/scripts/set_admin_pin.py"
+    echo "Using the default admin PIN 133133 (change it with scripts/set_admin_pin.py)."
 fi
 
 step "Reader access (dialout group, udev rule -> /dev/rfid-reader)"

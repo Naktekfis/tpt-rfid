@@ -50,7 +50,7 @@ Lihat [deploy/jetson/README.md](deploy/jetson/README.md). Isinya `install.sh` (b
 | `RFID_ABSENT_TIMEOUT` | `2.5` | Detik tag harus menjauh sebelum dianggap tap baru |
 | `MAIL_*` | Gmail SMTP | Untuk email peringatan dan ekspor dari admin |
 
-**PIN admin:** jalankan `.venv/bin/python scripts/set_admin_pin.py`. Yang disimpan di `.env` hanya hash-nya (`ADMIN_PIN_HASH`). Tanpa itu, login admin ditolak.
+**PIN admin:** ganti dengan `.venv/bin/python scripts/set_admin_pin.py`. PIN default `133133`. Untuk menggantinya jalankan perintah di atas; yang disimpan di `.env` hanya hash-nya (`ADMIN_PIN_HASH`).
 
 ## Data contoh
 `seed_database.py` menambahkan 5 mahasiswa (UID `STUDENT001`–`STUDENT005`) dan 10 alat (`TOOL001`–`TOOL010`). Aman dijalankan berulang.

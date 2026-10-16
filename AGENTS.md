@@ -22,7 +22,7 @@
 - Catch the narrowest exception you can; broad catches only at request and background-thread boundaries, and they must log.
 
 ## Runtime Gotchas
-- `RFID_READER_ENABLED` defaults to false (mock reader; scans via `/debug/scan?uid=` in development). The admin PIN hash comes from `.env` `ADMIN_PIN_HASH` (`scripts/set_admin_pin.py`); without it admin login returns 503.
+- `RFID_READER_ENABLED` defaults to false (mock reader; scans via `/debug/scan?uid=` in development). The admin PIN hash comes from `.env` `ADMIN_PIN_HASH` (`scripts/set_admin_pin.py`); without it the default PIN `133133` (`config.DEFAULT_ADMIN_PIN`) is used.
 - CSRF is on for all POSTs except `cv_bp`; JS must send the token.
 - The rate limiter is in-memory and per IP with no global default (a kiosk is one IP that polls every second); only routes with an explicit `@limiter.limit` are limited.
 - `face_recognition` (dlib) is imported lazily because it takes seconds to load; CV deps are optional.

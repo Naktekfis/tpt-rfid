@@ -27,7 +27,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
-from werkzeug.security import check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from config import get_config
 from utils import (
@@ -121,14 +121,12 @@ if not _reloader_parent:
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-# Admin PIN: werkzeug hash from .env (set it with scripts/set_admin_pin.py).
-# Without it, admin login is refused.
+# Admin PIN: werkzeug hash from .env (set it with scripts/set_admin_pin.py),
+# else the default PIN from config.
 ADMIN_PIN_HASH = app.config.get("ADMIN_PIN_HASH")
 if not ADMIN_PIN_HASH:
-    logger.warning(
-        "ADMIN_PIN_HASH is not set: admin login disabled. "
-        "Run: .venv/bin/python scripts/set_admin_pin.py"
-    )
+    ADMIN_PIN_HASH = generate_password_hash(app.config["DEFAULT_ADMIN_PIN"])
+    logger.info("ADMIN_PIN_HASH not set: using the default admin PIN")
 
 
 def admin_required(f):
@@ -596,11 +594,6 @@ def api_admin_login():
         if not isinstance(data, dict):
             return jsonify({"success": False, "error": "Payload JSON tidak valid"}), 400
         pin = data.get("pin", "")
-
-        if not ADMIN_PIN_HASH:
-            return jsonify(
-                {"success": False, "error": "PIN admin belum diatur di perangkat"}
-            ), 503
 
         if isinstance(pin, str) and check_password_hash(ADMIN_PIN_HASH, pin):
             session["admin_logged_in"] = True

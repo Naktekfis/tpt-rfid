@@ -94,4 +94,4 @@ New logic goes in `utils/` and a blueprint under `routes/` (AGENTS.md rule), not
 - Read-only probe: `.venv/bin/python scripts/rfid_probe.py /dev/ttyUSB0 --raw` (stop the app first; one process per port). Allowed reader commands without asking: Inventory `0x01`/`0x0F`, Get Reader Info `0x21`, Set ScanTime `0x25`, buzzer/LED `0x33` (GATES.md). No-tag rounds answer in ~23 ms with status `0x01`, `Num=0`.
 - Existing CV code: `utils/cv_handler.py` (`CVCamera`, 1:1 reference capture, HOG detection, thresholds 0.50/0.55/0.60, MJPEG generators, system stats) and `routes/cv_routes.py` (`/cv` benchmark pages, CSRF-exempt). `requirements-cv.txt` (opencv-python, face-recognition, psutil), not installed in the laptop `.venv`. No `/dev/video*` on 2026-10-16.
 - `.env` is the user's; the agent has never read it. `.env.example` once went missing from the tree (restored in `bd89163`).
-- Admin PIN: `scripts/set_admin_pin.py`; the old PIN 133133 is in git history and must not be reused.
+- Admin PIN: default `133133` (user decision 2026-10-16, `config.DEFAULT_ADMIN_PIN`); `scripts/set_admin_pin.py` overrides it via `ADMIN_PIN_HASH`.
