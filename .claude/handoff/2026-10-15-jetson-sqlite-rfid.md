@@ -3,6 +3,7 @@
 Written 2026-10-15 by the previous session. Branch `cvtest`. Start by reading this file, then `AGENTS.md` (auto-loaded), `.claude/knowledge/TARGET_PLATFORM.md`, and `.claude/knowledge/RFID_VX6336.md`.
 
 ## Next session: start here (updated 2026-10-15, second session)
+- **2026-10-16: superseded for UX/feature work by `2026-10-16-face-presence-plan.md`** (face identity + tool presence + alarm). This file still holds the Jetson bring-up (step 6) and the UI audit list.
 - Steps 1-3 are done (commits 79524b8..a431b94). Steps 4 and 5 are done too. Next is **step 6 (device bring-up, gated)**, but the Jetson is not ready yet (user, 2026-10-15). The bring-up files are prepared in `deploy/jetson/` (dry-run tested on the laptop), so step 6 is: device checks, then `DRY_RUN=1 deploy/jetson/install.sh`, then the real run. First real-hardware test: set `RFID_READER_ENABLED=true` and `RFID_READER_PORT`, run the app, check `/api/rfid/status`, tap a card.
 - Uncommitted: only `file-baru/`, which duplicates the CV files. The user has not yet said to delete it.
 - Checks: `scripts/check.sh` runs ruff on the whole repo plus pytest (31 tests). For Python 3.8, build a throwaway venv outside the repo with `uv venv --python 3.8 <dir> && uv pip install --python <dir>/bin/python -r requirements.txt -r requirements-dev.txt`, then run `PY38=<dir>/bin/python scripts/check.sh`.
