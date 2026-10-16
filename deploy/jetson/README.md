@@ -18,7 +18,7 @@ Files for running tpt-rfid on the Jetson Nano 4GB (JetPack 4.6.x, Ubuntu 18.04).
 
 ## Not verified yet (check on the device)
 - `python3.8` / `python3.8-venv` are installable from the 18.04 apt repos, and every pin in `requirements.txt` installs on aarch64 + 3.8.
-- Which USB bridge the reader uses (`lsusb`: CP210x `10c4:ea60` or CH340 `1a86:7523`). Delete the other line from the udev rule.
+- The reader tested on the laptop uses a CH340 (`1a86:7523`); confirm with `lsusb` on the device and delete the CP210x line from the udev rule. install.sh removes `brltty`, which otherwise steals the CH340.
 - That the browser keeps the admin session over `http://127.0.0.1`. `FLASK_ENV=production` sets `SESSION_COOKIE_SECURE=True`. Recent Chromium and Firefox accept Secure cookies on localhost, but older builds may not. If admin login does not stick, this is why.
 - That `chromium-browser` exists on the JetPack image, and that the autostart works under its desktop (GNOME/Unity).
 - Backups go to `instance/backups` on the same microSD by default. That protects against a corrupted database, not a dead card. Set `TPT_RFID_BACKUP_DIR` in the backup service to a USB stick for that.

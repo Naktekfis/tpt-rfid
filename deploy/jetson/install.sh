@@ -90,6 +90,10 @@ else
 fi
 
 step "Reader access (dialout group, udev rule -> /dev/rfid-reader)"
+# brltty claims the reader's CH340 bridge (1a86:7523) and the tty disappears.
+if dpkg-query -W -f='${Status}' brltty 2>/dev/null | grep -q 'ok installed'; then
+    run sudo apt-get remove -y brltty
+fi
 if ! id -nG "$APP_USER" | tr ' ' '\n' | grep -qx dialout; then
     run sudo usermod -aG dialout "$APP_USER"
     echo "$APP_USER joins dialout at next login (the service gets it via SupplementaryGroups)."
