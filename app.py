@@ -153,12 +153,14 @@ _reloader_parent = (
     and app.debug
     and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 )
+kiosk_loop = None
 if not _reloader_parent:
     rfid_reader.start()
     camera.start()
     # Frames only exist with a real camera; timeouts do not need the loop.
     if not camera.status().get("mock"):
-        KioskLoop(camera, kiosk).start()
+        kiosk_loop = KioskLoop(camera, kiosk)
+        kiosk_loop.start()
 
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -1373,6 +1375,10 @@ def internal_error(error):
 def cleanup():
     """Cleanup resources on application shutdown"""
     logger.info("Shutting down application...")
+    # Stop the frame consumer before the camera: a daemon thread still inside
+    # OpenCV at interpreter exit aborts the process ("terminate called ...").
+    if kiosk_loop is not None:
+        kiosk_loop.stop()
     rfid_reader.stop()
     camera.stop()
 

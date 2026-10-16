@@ -377,5 +377,7 @@ class KioskLoop(threading.Thread):
                 max(0.01, self.interval - (time.monotonic() - started))
             )
 
-    def stop(self) -> None:
+    def stop(self, timeout: float = 2.0) -> None:
         self._stop_event.set()
+        if self.is_alive():
+            self.join(timeout)
