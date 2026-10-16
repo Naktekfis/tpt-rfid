@@ -39,6 +39,8 @@ from utils import (
     validate_record_id,
     create_rfid_reader,
 )
+from utils.presence import PresenceMonitor
+from utils.tool_presence import ToolPresenceService
 
 # Configure logging
 logging.basicConfig(
@@ -107,6 +109,14 @@ rfid_reader = create_rfid_reader(
     addr=app.config.get("RFID_READER_ADDR", 0),
     absent_timeout=app.config.get("RFID_ABSENT_TIMEOUT", 2.5),
 )
+# Tool presence: "is the tagged tool in the reader field" per inventory round.
+presence_service = ToolPresenceService(
+    app,
+    database,
+    rfid_reader,
+    PresenceMonitor(missing_after=app.config.get("RFID_MISSING_AFTER", 5.0)),
+    alarm_enabled=app.config.get("RFID_ALARM_ENABLED", True),
+)
 # `python app.py` with debug runs a reloader parent that only watches files
 # and a child (WERKZEUG_RUN_MAIN) that serves; only the child may own the
 # serial port. gunicorn imports this module as "app" and always starts it.
@@ -150,6 +160,13 @@ def admin_required(f):
         return jsonify({"success": False, "error": "Unauthorized"}), 401
 
     return decorated
+
+
+from routes.presence_routes import create_presence_blueprint  # noqa: E402
+
+app.register_blueprint(
+    create_presence_blueprint(database, presence_service, admin_required)
+)
 
 
 def _serialize_borrow_timestamps(tools_data):
@@ -570,6 +587,15 @@ if app.config.get("DEBUG"):
             )
         else:
             return jsonify({"success": False, "error": "No UID provided"}), 400
+
+    @app.route("/debug/presence", methods=["GET"])
+    def debug_presence():
+        """Debug endpoint to set which tags are in the field (mock reader only)"""
+        if not hasattr(rfid_reader, "set_present"):
+            return jsonify({"success": False, "error": "Not the mock reader"}), 400
+        epcs = [e.strip() for e in request.args.get("epcs", "").split(",") if e.strip()]
+        rfid_reader.set_present(epcs)
+        return jsonify({"success": True, "epcs": epcs})
 
     @app.route("/debug/clear", methods=["GET"])
     def debug_clear():

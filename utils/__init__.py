@@ -3,7 +3,7 @@ Utils package for RFID Workshop Tool Monitoring System
 """
 
 from .database_handler import DatabaseHandler
-from .models import db, Student, Tool, Transaction
+from .models import db, Student, Tool, ToolType, Transaction, AlarmEvent
 from .rfid_reader import RFIDReaderMock, VX6336Reader, create_rfid_reader
 from .helpers import (
     allowed_file,
@@ -21,7 +21,9 @@ __all__ = [
     "db",
     "Student",
     "Tool",
+    "ToolType",
     "Transaction",
+    "AlarmEvent",
     "RFIDReaderMock",
     "VX6336Reader",
     "create_rfid_reader",

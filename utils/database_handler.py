@@ -5,13 +5,14 @@ Handles all database operations using SQLAlchemy
 
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
+from flask import current_app
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-from .models import db, Student, Tool, Transaction
+from .models import db, Student, Tool, ToolType, Transaction, AlarmEvent
 from .helpers import utc_to_wib
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ class DatabaseHandler:
                 nim=data["nim"],
                 email=data["email"],
                 phone=data["phone"],
-                rfid_uid=data["rfid_uid"],
+                rfid_uid=data.get("rfid_uid"),
             )
             db.session.add(student)
             db.session.commit()
@@ -212,6 +213,8 @@ class DatabaseHandler:
                 rfid_uid=data["rfid_uid"],
                 category=data.get("category", "Uncategorized"),
                 status=data.get("status", "available"),
+                type_id=data.get("type_id"),
+                unit_no=data.get("unit_no"),
             )
             db.session.add(tool)
             db.session.commit()
@@ -294,6 +297,97 @@ class DatabaseHandler:
             logger.error(f"Error updating tool status: {str(e)}")
             raise
 
+    # ==================== Presence / Alarm Operations ====================
+
+    def create_tool_type(self, name: str) -> Dict:
+        try:
+            tool_type = ToolType(name=name)
+            db.session.add(tool_type)
+            db.session.commit()
+            return tool_type.to_dict()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error creating tool type: {str(e)}")
+            raise
+
+    def get_tool_presence_info(self, rfid_uid: str) -> Optional[Dict]:
+        """id, status, presence of the tool with this tag, or None if unknown."""
+        tool = Tool.query.filter_by(rfid_uid=rfid_uid).first()
+        if tool is None:
+            return None
+        return {"id": tool.id, "status": tool.status, "presence": tool.presence}
+
+    def set_tool_presence(
+        self, tool_id: int, presence: str, last_seen_at: Optional[datetime] = None
+    ) -> None:
+        try:
+            values = {"presence": presence}
+            if last_seen_at is not None:
+                values["last_seen_at"] = last_seen_at
+            db.session.execute(
+                db.update(Tool).where(Tool.id == tool_id).values(**values)
+            )
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def open_alarm_for_tool(self, tool_id: int) -> Optional[AlarmEvent]:
+        return AlarmEvent.query.filter_by(tool_id=tool_id, ended_at=None).first()
+
+    def create_alarm(self, tool_id: int) -> Dict:
+        try:
+            alarm = AlarmEvent(tool_id=tool_id)
+            db.session.add(alarm)
+            db.session.commit()
+            return alarm.to_dict()
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def close_alarms_for_tool(self, tool_id: int, ended_by: str) -> int:
+        """Close every open alarm of a tool; returns how many were closed."""
+        try:
+            closed = db.session.execute(
+                db.update(AlarmEvent)
+                .where(AlarmEvent.tool_id == tool_id, AlarmEvent.ended_at.is_(None))
+                .values(ended_at=datetime.utcnow(), ended_by=ended_by)
+            ).rowcount
+            db.session.commit()
+            return closed
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def get_open_alarms(self) -> List[Dict]:
+        alarms = (
+            AlarmEvent.query.filter_by(ended_at=None)
+            .order_by(AlarmEvent.started_at)
+            .all()
+        )
+        return [a.to_dict() for a in alarms]
+
+    def acknowledge_alarm(self, alarm_id: int, ended_by: str = "admin") -> bool:
+        """Close one open alarm; False if it does not exist or is already closed."""
+        try:
+            closed = db.session.execute(
+                db.update(AlarmEvent)
+                .where(AlarmEvent.id == alarm_id, AlarmEvent.ended_at.is_(None))
+                .values(ended_at=datetime.utcnow(), ended_by=ended_by)
+            ).rowcount
+            db.session.commit()
+            return closed == 1
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def get_tools_presence(self) -> List[Dict]:
+        return [t.to_dict() for t in Tool.query.order_by(Tool.name).all()]
+
+    @staticmethod
+    def _loan_period() -> timedelta:
+        return timedelta(days=current_app.config.get("LOAN_DAYS", 2))
+
     # ==================== Transaction Operations ====================
 
     def create_transaction(self, data: Dict) -> Dict:
@@ -307,12 +401,14 @@ class DatabaseHandler:
             dict: Created transaction data with ID
         """
         try:
+            borrow_time = data.get("borrow_time", datetime.utcnow())
             transaction = Transaction(
                 student_id=int(data["student_id"]),
                 student_name=data["student_name"],
                 tool_id=int(data["tool_id"]),
                 tool_name=data["tool_name"],
-                borrow_time=data.get("borrow_time", datetime.utcnow()),
+                borrow_time=borrow_time,
+                due_at=borrow_time + self._loan_period(),
                 return_time=data.get("return_time"),
                 status=data.get("status", "borrowed"),
             )
@@ -514,6 +610,7 @@ class DatabaseHandler:
                 tool_id=tool.id,
                 tool_name=tool.name,
                 borrow_time=now,
+                due_at=now + self._loan_period(),
                 return_time=None,
                 status="borrowed",
             )

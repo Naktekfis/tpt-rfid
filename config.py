@@ -55,6 +55,13 @@ class Config:
     RFID_READER_ADDR = int(os.getenv("RFID_READER_ADDR", "0"), 0)
     # A tag must be away this long (s) before the same tag is reported again.
     RFID_ABSENT_TIMEOUT = float(os.getenv("RFID_ABSENT_TIMEOUT", "2.5"))
+    # A tool tag not seen for this long (s) counts as gone from the reader field.
+    RFID_MISSING_AFTER = float(os.getenv("RFID_MISSING_AFTER", "5.0"))
+    # Beep the reader when an unborrowed tool leaves.
+    RFID_ALARM_ENABLED = os.getenv("RFID_ALARM_ENABLED", "true").lower() == "true"
+
+    # Loan period in days (Transaction.due_at = borrow_time + LOAN_DAYS).
+    LOAN_DAYS = 2
 
 
 class DevelopmentConfig(Config):

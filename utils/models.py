@@ -30,7 +30,7 @@ class Student(db.Model):
     nim = db.Column(db.String(20), unique=True, nullable=False, index=True)
     email = db.Column(db.String(200), nullable=False)
     phone = db.Column(db.String(20), nullable=False)
-    rfid_uid = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    rfid_uid = db.Column(db.String(100), unique=True, nullable=True, index=True)
     photo_data = db.Column(db.LargeBinary, nullable=True)
     photo_mimetype = db.Column(db.String(50), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -39,7 +39,12 @@ class Student(db.Model):
     )
 
     # Relationships
-    transactions = db.relationship("Transaction", backref="student", lazy="dynamic")
+    transactions = db.relationship(
+        "Transaction",
+        backref="student",
+        lazy="dynamic",
+        foreign_keys="Transaction.student_id",
+    )
 
     def to_dict(self, include_photo=False):
         """Convert model to dictionary"""
@@ -60,6 +65,31 @@ class Student(db.Model):
         return f"<Student {self.nim} - {self.name}>"
 
 
+class ToolType(db.Model):
+    """A kind of tool (e.g. "Obeng"); each physical unit is a Tool."""
+
+    __tablename__ = "tool_types"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(200), unique=True, nullable=False)
+    photo_data = db.Column(db.LargeBinary, nullable=True)
+    photo_mimetype = db.Column(db.String(50), nullable=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    tools = db.relationship("Tool", backref="tool_type", lazy="dynamic")
+
+    def to_dict(self):
+        return {
+            "type_id": str(self.id),
+            "name": self.name,
+            "photo_url": f"/api/tool_type/{self.id}/photo" if self.photo_data else "",
+            "created_at": self.created_at,
+        }
+
+    def __repr__(self):
+        return f"<ToolType {self.name}>"
+
+
 class Tool(db.Model):
     """Tool model - represents workshop tools with RFID tags"""
 
@@ -70,6 +100,13 @@ class Tool(db.Model):
     rfid_uid = db.Column(db.String(100), unique=True, nullable=False, index=True)
     category = db.Column(db.String(100), nullable=False, default="Uncategorized")
     status = db.Column(db.String(20), nullable=False, default="available", index=True)
+    type_id = db.Column(db.Integer, db.ForeignKey("tool_types.id"), nullable=True)
+    unit_no = db.Column(db.Integer, nullable=True)
+    photo_data = db.Column(db.LargeBinary, nullable=True)
+    photo_mimetype = db.Column(db.String(50), nullable=True)
+    # unknown | present | missing: whether the tag is in the reader field
+    presence = db.Column(db.String(10), nullable=False, default="unknown")
+    last_seen_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -86,6 +123,11 @@ class Tool(db.Model):
             "rfid_uid": self.rfid_uid,
             "category": self.category,
             "status": self.status,
+            "type_id": str(self.type_id) if self.type_id else None,
+            "unit_no": self.unit_no,
+            "photo_url": f"/api/tool/{self.id}/photo" if self.photo_data else "",
+            "presence": self.presence,
+            "last_seen_at": self.last_seen_at,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
@@ -112,6 +154,9 @@ class Transaction(db.Model):
     return_time = db.Column(db.DateTime, nullable=True)
     status = db.Column(db.String(20), nullable=False, default="borrowed", index=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    due_at = db.Column(db.DateTime, nullable=True)
+    returned_by_id = db.Column(db.Integer, db.ForeignKey("students.id"), nullable=True)
+    return_verified = db.Column(db.Boolean, nullable=False, default=True)
 
     # Composite index for common queries
     __table_args__ = (
@@ -135,7 +180,43 @@ class Transaction(db.Model):
             "return_time": utc_to_wib(self.return_time) if self.return_time else None,
             "status": self.status,
             "created_at": utc_to_wib(self.created_at),
+            "due_at": utc_to_wib(self.due_at) if self.due_at else None,
+            "returned_by_id": str(self.returned_by_id) if self.returned_by_id else None,
+            "return_verified": self.return_verified,
         }
 
     def __repr__(self):
         return f"<Transaction {self.id} - {self.status}>"
+
+
+class AlarmEvent(db.Model):
+    """A tool left the reader field while it was not borrowed."""
+
+    __tablename__ = "alarm_events"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    tool_id = db.Column(
+        db.Integer, db.ForeignKey("tools.id"), nullable=False, index=True
+    )
+    started_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    ended_at = db.Column(db.DateTime, nullable=True)
+    # returned | admin | late_identify
+    ended_by = db.Column(db.String(20), nullable=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("students.id"), nullable=True)
+
+    tool = db.relationship("Tool", backref="alarm_events")
+
+    def to_dict(self):
+        utc_to_wib = _get_utc_to_wib()
+        return {
+            "alarm_id": str(self.id),
+            "tool_id": str(self.tool_id),
+            "tool_name": self.tool.name if self.tool else None,
+            "started_at": utc_to_wib(self.started_at),
+            "ended_at": utc_to_wib(self.ended_at) if self.ended_at else None,
+            "ended_by": self.ended_by,
+            "student_id": str(self.student_id) if self.student_id else None,
+        }
+
+    def __repr__(self):
+        return f"<AlarmEvent {self.id} tool={self.tool_id}>"
