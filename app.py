@@ -210,6 +210,18 @@ from routes.kiosk_routes import create_kiosk_blueprint  # noqa: E402
 
 app.register_blueprint(create_kiosk_blueprint(database, kiosk, admin_required))
 
+from routes.admin_routes import create_admin_blueprint  # noqa: E402
+
+app.register_blueprint(
+    create_admin_blueprint(
+        database,
+        presence_service,
+        camera,
+        admin_required,
+        app.config["ALLOWED_EXTENSIONS"],
+    )
+)
+
 
 def _serialize_borrow_timestamps(tools_data):
     """Convert datetime timestamps in tool list to JSON-serializable dicts."""
@@ -1140,6 +1152,8 @@ def get_admin_transactions():
                 trans["return_time"] = trans["return_time"].strftime(
                     "%Y-%m-%d %H:%M:%S"
                 )
+            if isinstance(trans.get("due_at"), datetime):
+                trans["due_at"] = trans["due_at"].strftime("%Y-%m-%d %H:%M:%S")
 
         return jsonify({"success": True, "data": transactions})
 

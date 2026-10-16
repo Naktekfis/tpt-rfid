@@ -121,6 +121,18 @@ class ToolPresenceService:
         for _, tool_id in due:
             self.database.set_tool_presence(tool_id, "present", datetime.utcnow())
 
+    def tool_registered(self, epc: str, tool_id: int) -> None:
+        """A unit was just created for this EPC (admin, in a request). If the
+        tag is in the field as "unknown", the monitor will not report it again,
+        so take it over here: known, present now, not listed as unknown."""
+        with self._lock:
+            if epc not in self._unknown:
+                return
+            self._unknown.discard(epc)
+            self._known[epc] = tool_id
+            self._last_write[epc] = self._clock()
+        self.database.set_tool_presence(tool_id, "present", datetime.utcnow())
+
     def unknown_epcs(self) -> List[str]:
         with self._lock:
             return sorted(self._unknown)

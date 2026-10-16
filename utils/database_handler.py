@@ -382,6 +382,103 @@ class DatabaseHandler:
             return None
         return (tool_type.photo_data, tool_type.photo_mimetype)
 
+    def get_tool_types(self) -> List[Dict]:
+        """Tool types with their unit count and the next free unit number."""
+        rows = (
+            db.session.query(
+                ToolType,
+                db.func.count(Tool.id),
+                db.func.max(Tool.unit_no),
+            )
+            .outerjoin(Tool, Tool.type_id == ToolType.id)
+            .group_by(ToolType.id)
+            .order_by(db.func.lower(ToolType.name))
+            .all()
+        )
+        result = []
+        for tool_type, units, max_unit in rows:
+            data = tool_type.to_dict()
+            data.pop("created_at", None)
+            data["units"] = units
+            data["next_unit_no"] = (max_unit or 0) + 1
+            result.append(data)
+        return result
+
+    def get_tool_type_by_name(self, name: str) -> Optional[Dict]:
+        tool_type = ToolType.query.filter(ToolType.name.ilike(name)).first()
+        return tool_type.to_dict() if tool_type else None
+
+    def set_tool_type_photo(
+        self, type_id: int, photo_data: bytes, mimetype: str
+    ) -> bool:
+        """Store the display photo of a tool type. False if there is no such type."""
+        try:
+            tool_type = db.session.get(ToolType, int(type_id))
+            if tool_type is None:
+                return False
+            tool_type.photo_data = photo_data
+            tool_type.photo_mimetype = mimetype
+            db.session.commit()
+            logger.info(f"Updated photo for tool type {type_id}")
+            return True
+        except Exception:
+            db.session.rollback()
+            raise
+
+    def create_tool_unit(self, type_id: int, unit_no: int, epc: str) -> Dict:
+        """One physical unit of a type: name "<Type> #<n>", tag = EPC.
+        Raises ValueError for an unknown type, a taken EPC or unit number."""
+        tool_type = db.session.get(ToolType, int(type_id))
+        if tool_type is None:
+            raise ValueError("Jenis alat tidak ditemukan")
+        if Tool.query.filter_by(rfid_uid=epc).first() is not None:
+            raise ValueError("Tag ini sudah terdaftar pada alat lain")
+        if (
+            Tool.query.filter_by(type_id=tool_type.id, unit_no=int(unit_no)).first()
+            is not None
+        ):
+            raise ValueError(f"{tool_type.name} #{unit_no} sudah ada")
+        # Category is legacy (exports still show it): reuse the type's.
+        sibling = Tool.query.filter_by(type_id=tool_type.id).first()
+        return self.create_tool(
+            {
+                "name": f"{tool_type.name} #{unit_no}",
+                "rfid_uid": epc,
+                "category": sibling.category if sibling else tool_type.name,
+                "status": "available",
+                "type_id": tool_type.id,
+                "unit_no": int(unit_no),
+            }
+        )
+
+    def get_students_admin(self) -> List[Dict]:
+        """Students for the admin list: contact data, face data yes/no,
+        open loans. Newest first."""
+        face_ids = {
+            sid for (sid,) in db.session.query(FaceEmbedding.student_id).distinct()
+        }
+        loans = dict(
+            db.session.query(Transaction.student_id, db.func.count(Transaction.id))
+            .filter(Transaction.status == "borrowed")
+            .group_by(Transaction.student_id)
+            .all()
+        )
+        students = Student.query.order_by(Student.created_at.desc()).all()
+        return [
+            {
+                "student_id": str(s.id),
+                "name": s.name,
+                "nim": s.nim,
+                "email": s.email,
+                "phone": s.phone,
+                "photo_url": f"/api/student/{s.id}/photo" if s.photo_data else "",
+                "has_face": s.id in face_ids,
+                "open_loans": loans.get(s.id, 0),
+                "created_at": utc_to_wib(s.created_at).isoformat(),
+            }
+            for s in students
+        ]
+
     def get_tool_presence_info(self, rfid_uid: str) -> Optional[Dict]:
         """id, status, presence of the tool with this tag, or None if unknown."""
         tool = Tool.query.filter_by(rfid_uid=rfid_uid).first()
@@ -893,7 +990,9 @@ class DatabaseHandler:
             .outerjoin(ToolType, ToolType.id == Tool.type_id)
             .outerjoin(
                 Transaction,
-                db.and_(Transaction.tool_id == Tool.id, Transaction.status == "borrowed"),
+                db.and_(
+                    Transaction.tool_id == Tool.id, Transaction.status == "borrowed"
+                ),
             )
             .outerjoin(Student, Student.id == Transaction.student_id)
             .all()
@@ -1023,6 +1122,8 @@ class DatabaseHandler:
                   (timestamps converted to WIB timezone)
         """
         try:
+            returner = db.aliased(Student)
+            now = datetime.utcnow()
             # Build query with JOINs to get student and tool info
             query = (
                 db.session.query(
@@ -1032,11 +1133,15 @@ class DatabaseHandler:
                     Transaction.borrow_time,
                     Transaction.return_time,
                     Transaction.status,
+                    Transaction.due_at,
+                    Transaction.return_verified,
                     Student.nim.label("student_nim"),
                     Tool.category.label("tool_category"),
+                    returner.name.label("returned_by_name"),
                 )
                 .join(Student, Student.id == Transaction.student_id)
                 .join(Tool, Tool.id == Transaction.tool_id)
+                .outerjoin(returner, returner.id == Transaction.returned_by_id)
             )
 
             # Apply date filters if provided
@@ -1053,6 +1158,7 @@ class DatabaseHandler:
             # Convert to list of dicts with timezone conversion
             transactions = []
             for row in results:
+                due = row.due_at or row.borrow_time + self._loan_period()
                 transactions.append(
                     {
                         "id": row.id,
@@ -1066,6 +1172,10 @@ class DatabaseHandler:
                         if row.return_time
                         else None,
                         "status": row.status,
+                        "due_at": utc_to_wib(due),
+                        "is_overdue": row.status == "borrowed" and now > due,
+                        "returned_by_name": row.returned_by_name,
+                        "return_verified": bool(row.return_verified),
                     }
                 )
 
