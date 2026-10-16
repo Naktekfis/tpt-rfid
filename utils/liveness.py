@@ -163,3 +163,154 @@ class HeadTurnChallenge:
         elif self._seen_frontal and yaw * self._sign > self.yaw_threshold:
             self.state = "passed"
         return self.state
+
+
+# ---- Blink (eye aspect ratio on 68-point landmarks) ----
+
+# dlib 68-point indices: eyes as p1..p6 (Soukupova & Cech 2016), mouth centre.
+RIGHT_EYE = range(36, 42)
+LEFT_EYE = range(42, 48)
+UPPER_LIP, LOWER_LIP = 51, 57
+
+
+def eye_aspect_ratio(pts) -> float:
+    """EAR = (|p2-p6| + |p3-p5|) / (2 |p1-p4|) for six eye points."""
+    import math
+
+    def d(a, b):
+        return math.hypot(float(a[0]) - float(b[0]), float(a[1]) - float(b[1]))
+
+    p1, p2, p3, p4, p5, p6 = pts
+    width = d(p1, p4)
+    if width < 1e-6:
+        return 0.0
+    return (d(p2, p6) + d(p3, p5)) / (2.0 * width)
+
+
+def blink_metrics(lm68) -> Tuple[float, float]:
+    """(raw EAR, EAR normalised by face proportions), averaged over both eyes.
+
+    Tilting a phone photo forward or back squashes the whole face vertically,
+    which lowers the raw EAR like a blink would. Dividing by the face's own
+    height/width ratio (eye line to mouth centre over eye distance) cancels
+    that: a real blink only moves the eyelids.
+    """
+    import math
+
+    ear = (
+        eye_aspect_ratio([lm68[i] for i in RIGHT_EYE])
+        + eye_aspect_ratio([lm68[i] for i in LEFT_EYE])
+    ) / 2.0
+
+    def centre(idx):
+        xs = [float(lm68[i][0]) for i in idx]
+        ys = [float(lm68[i][1]) for i in idx]
+        return sum(xs) / len(xs), sum(ys) / len(ys)
+
+    re, le = centre(RIGHT_EYE), centre(LEFT_EYE)
+    eye_mid = ((re[0] + le[0]) / 2.0, (re[1] + le[1]) / 2.0)
+    mouth = centre((UPPER_LIP, LOWER_LIP))
+    eye_dist = math.hypot(le[0] - re[0], le[1] - re[1])
+    face_h = math.hypot(mouth[0] - eye_mid[0], mouth[1] - eye_mid[1])
+    if eye_dist < 1e-6 or face_h < 1e-6:
+        return ear, 0.0
+    return ear, ear / (face_h / eye_dist)
+
+
+class Landmarks68:
+    """dlib's 68-point shape predictor run on a box from any detector."""
+
+    def __init__(self, model_path: str = ""):
+        try:
+            import dlib
+        except ImportError as exc:
+            raise LivenessUnavailable(f"dlib not installed: {exc}") from exc
+        if not model_path:
+            try:
+                import face_recognition_models
+            except ImportError as exc:
+                raise LivenessUnavailable(
+                    f"face_recognition_models not installed: {exc}"
+                ) from exc
+            model_path = face_recognition_models.pose_predictor_model_location()
+        if not os.path.isfile(model_path):
+            raise LivenessUnavailable(f"Landmark model missing: {model_path}")
+        self._dlib = dlib
+        self._predictor = dlib.shape_predictor(model_path)
+
+    def __call__(self, frame, box) -> List[Tuple[int, int]]:
+        x, y, w, h = box
+        rect = self._dlib.rectangle(int(x), int(y), int(x + w), int(y + h))
+        shape = self._predictor(frame, rect)
+        return [(shape.part(i).x, shape.part(i).y) for i in range(68)]
+
+
+class BlinkChallenge:
+    """Pass after `blinks_needed` blinks within `timeout` seconds.
+
+    Fed one value per frame (normalised EAR from blink_metrics, or None when
+    there is no face). The open-eye level is learnt as a running maximum-ish
+    baseline (90th percentile of recent open values), so it adapts to each
+    face. A blink = the value falls below `close_ratio` x baseline and comes
+    back above `open_ratio` x baseline within `max_closed_frames` frames
+    (longer closures are eyes shut / looking down, not a blink).
+    """
+
+    def __init__(
+        self,
+        clock: Callable[[], float] = time.monotonic,
+        timeout: float = 8.0,
+        blinks_needed: int = 1,
+        close_ratio: float = 0.65,
+        open_ratio: float = 0.85,
+        max_closed_frames: int = 12,
+        warmup_frames: int = 5,
+    ):
+        self._clock = clock
+        self.timeout = timeout
+        self.blinks_needed = blinks_needed
+        self.close_ratio = close_ratio
+        self.open_ratio = open_ratio
+        self.max_closed_frames = max_closed_frames
+        self.warmup_frames = warmup_frames
+        self._started = clock()
+        self._open: List[float] = []
+        self._closed_frames = 0
+        self.blinks = 0
+        self.state = "pending"
+
+    @property
+    def baseline(self) -> float:
+        if not self._open:
+            return 0.0
+        ordered = sorted(self._open[-30:])
+        return ordered[int(0.9 * (len(ordered) - 1))]
+
+    def update(self, value) -> str:
+        if self.state != "pending":
+            return self.state
+        if self._clock() - self._started > self.timeout:
+            self.state = "timeout"
+            return self.state
+        if value is None:
+            self._closed_frames = 0
+            return self.state
+        base = self.baseline
+        if len(self._open) < self.warmup_frames or base <= 0:
+            self._open.append(value)
+            return self.state
+        if self._closed_frames:
+            if value >= self.open_ratio * base:
+                if self._closed_frames <= self.max_closed_frames:
+                    self.blinks += 1
+                self._closed_frames = 0
+                self._open.append(value)
+                if self.blinks >= self.blinks_needed:
+                    self.state = "passed"
+            else:
+                self._closed_frames += 1
+        elif value < self.close_ratio * base:
+            self._closed_frames = 1
+        else:
+            self._open.append(value)
+        return self.state

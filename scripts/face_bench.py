@@ -14,6 +14,10 @@ test phase (liveness scores should drop and distances may still be low).
 --challenge runs the head-turn check instead (YuNet only), once per
 direction, and prints the yaw range it saw. With --spoof, hold the phone photo
 and try to pass it by tilting or turning the phone.
+
+--blink runs for --blink-seconds and counts blinks two ways: on the raw eye
+aspect ratio and on the EAR normalised by face proportions (robust to a
+tilted phone). With --spoof, hold the phone photo and tilt it forward/back.
 """
 
 from __future__ import annotations
@@ -28,13 +32,17 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from utils.face import (  # noqa: E402
+    Face,
     FaceModelsMissing,
     create_face_engine,
     quality_issues,
     sharpness,
 )
 from utils.liveness import (  # noqa: E402
+    BlinkChallenge,
     HeadTurnChallenge,
+    Landmarks68,
+    blink_metrics,
     LivenessUnavailable,
     PassiveLiveness,
 )
@@ -253,6 +261,66 @@ def run_challenge(cap, liveness, spoof, timeout):
     return 0
 
 
+def run_blink(cap, liveness, spoof, seconds):
+    import cv2
+
+    engine = create_face_engine("yunet_sface", MODEL_DIR)
+    lm68 = Landmarks68()
+    label = "SPOOF" if spoof else "genuine"
+    if spoof:
+        task = "Pegang FOTO di ponsel, miringkan maju/mundur pelan-pelan"
+    else:
+        task = "Lihat ke kamera dan berkedip biasa"
+    print(f"\n[{label}] {task} ({seconds:.0f} detik)...")
+    pause(cap, 1.5, task)
+    big = 10**6  # count, never pass
+    raw_ch = BlinkChallenge(timeout=seconds + 60, blinks_needed=big)
+    norm_ch = BlinkChallenge(timeout=seconds + 60, blinks_needed=big)
+    raws, norms, lm_ms = [], [], []
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        frame = read_frame(cap)
+        if frame is None:
+            continue
+        faces = engine.detect(frame)
+        if len(faces) != 1:
+            raw_ch.update(None)
+            norm_ch.update(None)
+            show(frame, faces, [f"{label}: wajah {len(faces)}"], (0, 0, 255))
+            continue
+        t0 = time.perf_counter()
+        pts = lm68(frame, faces[0].box)
+        lm_ms.append((time.perf_counter() - t0) * 1000)
+        raw, norm = blink_metrics(pts)
+        raws.append(raw)
+        norms.append(norm)
+        raw_ch.update(raw)
+        norm_ch.update(norm)
+        # Draw only the 12 eye points (show() takes Face objects).
+        eyes = Face(box=faces[0].box, landmarks=pts[36:48], score=faces[0].score)
+        _, score = liveness.check(frame, faces[0])
+        show(
+            frame,
+            [eyes],
+            [
+                f"{label}: {task[:40]}",
+                f"EAR {raw:.3f}  kedip {raw_ch.blinks}",
+                f"EAR norm {norm:.3f} (base {norm_ch.baseline:.3f})  kedip {norm_ch.blinks}",
+                f"liveness {score:.2f}   sisa {end - time.monotonic():.0f} s",
+            ],
+        )
+    cv2.waitKey(1)
+    print("\n=== Blink ===")
+    print(
+        f"{label:8} frames={len(raws):3} landmarks68 {med(lm_ms):.1f} ms | "
+        f"EAR min/med/max {min(raws, default=float('nan')):.3f}/{med(raws):.3f}/"
+        f"{max(raws, default=float('nan')):.3f} kedip={raw_ch.blinks} | "
+        f"norm min/med/max {min(norms, default=float('nan')):.3f}/{med(norms):.3f}/"
+        f"{max(norms, default=float('nan')):.3f} kedip={norm_ch.blinks}"
+    )
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--camera", type=int, default=0)
@@ -266,6 +334,8 @@ def main():
     ap.add_argument("--challenge", action="store_true", help="head-turn check instead")
     ap.add_argument("--challenge-timeout", type=float, default=8.0)
     ap.add_argument("--show", action="store_true", help="preview window (q = quit)")
+    ap.add_argument("--blink", action="store_true", help="count blinks instead")
+    ap.add_argument("--blink-seconds", type=float, default=15.0)
     args = ap.parse_args()
     global SHOW
     SHOW = args.show
@@ -287,6 +357,17 @@ def main():
     except LivenessUnavailable as exc:
         print(f"{exc}")
         return 2
+
+    if args.blink:
+        try:
+            return run_blink(cap, liveness, args.spoof, args.blink_seconds)
+        except (Quit, LivenessUnavailable) as exc:
+            print(exc or "Dihentikan (q).")
+            return 1
+        finally:
+            cap.release()
+            if SHOW:
+                cv2.destroyAllWindows()
 
     if args.challenge:
         try:

@@ -162,7 +162,9 @@ def _need_models(*files):
 
 
 def test_yunet_blank_frame_has_no_face():
-    _need_models("face_detection_yunet_2023mar.onnx", "face_recognition_sface_2021dec.onnx")
+    _need_models(
+        "face_detection_yunet_2023mar.onnx", "face_recognition_sface_2021dec.onnx"
+    )
     import numpy as np
 
     from utils.face import YuNetSFaceEngine
@@ -200,3 +202,46 @@ def test_engine_missing_models_raise(tmp_path):
 
     with pytest.raises(FaceModelsMissing):
         YuNetSFaceEngine(str(tmp_path))
+
+
+# ---- Blink ----
+
+
+def test_eye_aspect_ratio_open_vs_closed():
+    from utils.liveness import eye_aspect_ratio
+
+    open_eye = [(0, 0), (3, -2), (7, -2), (10, 0), (7, 2), (3, 2)]
+    closed = [(0, 0), (3, -0.3), (7, -0.3), (10, 0), (7, 0.3), (3, 0.3)]
+    assert eye_aspect_ratio(open_eye) == pytest.approx(0.4)
+    assert eye_aspect_ratio(closed) == pytest.approx(0.06)
+
+
+def _blink_run(values, **kw):
+    from utils.liveness import BlinkChallenge
+
+    clock = FakeClock()
+    ch = BlinkChallenge(clock, **kw)
+    for v in values:
+        clock.t += 0.033
+        ch.update(v)
+    return ch
+
+
+def test_blink_passes_on_one_blink():
+    ch = _blink_run([0.3] * 10 + [0.1, 0.08, 0.1] + [0.3] * 3)
+    assert ch.state == "passed" and ch.blinks == 1
+
+
+def test_blink_steady_photo_never_passes():
+    ch = _blink_run([0.3, 0.29, 0.31] * 30)
+    assert ch.state == "pending" and ch.blinks == 0
+
+
+def test_blink_long_closure_is_not_a_blink():
+    ch = _blink_run([0.3] * 10 + [0.1] * 20 + [0.3] * 3)
+    assert ch.blinks == 0
+
+
+def test_blink_times_out():
+    ch = _blink_run([0.3] * 300, timeout=2.0)
+    assert ch.state == "timeout"
