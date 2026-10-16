@@ -1,6 +1,6 @@
 /*
  * Design tokens for the kiosk pages (kiosk_base.html), design "D".
- * Plain CSS custom properties, no build step, no CDN. Components live in ui.css.
+ * Plain CSS custom properties, no build step, all local. Components live in ui.css.
  *
  * One family (Source Sans 3, self-hosted), square corners, hairlines instead
  * of shadows. Dark is only for the camera side; everything else is white.

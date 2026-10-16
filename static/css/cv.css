@@ -1,0 +1,156 @@
+/*
+ * CV benchmark pages (/cv, experimental): a small subset of utility classes
+ * so their existing markup stays readable with local CSS only. Generated
+ * from the classes the cv_* templates use; corners, shadows and gradients
+ * are dropped on purpose (design D). Do not use these classes elsewhere.
+ */
+.p-4 { padding: 1rem; }
+.p-5 { padding: 1.25rem; }
+.px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+.px-2\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
+.px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+.px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+.px-8 { padding-left: 2rem; padding-right: 2rem; }
+.py-0\.5 { padding-top: 0.125rem; padding-bottom: 0.125rem; }
+.py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+.py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+.py-2\.5 { padding-top: 0.625rem; padding-bottom: 0.625rem; }
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+.pt-2 { padding-top: 0.5rem; }
+.pt-6 { padding-top: 1.5rem; }
+.pb-0\.5 { padding-bottom: 0.125rem; }
+.mt-0\.5 { margin-top: 0.125rem; }
+.mt-1 { margin-top: 0.25rem; }
+.mt-2 { margin-top: 0.5rem; }
+.mb-1 { margin-bottom: 0.25rem; }
+.mb-2 { margin-bottom: 0.5rem; }
+.mb-3 { margin-bottom: 0.75rem; }
+.ml-1 { margin-left: 0.25rem; }
+.gap-1 { gap: 0.25rem; }
+.gap-2 { gap: 0.5rem; }
+.gap-2\.5 { gap: 0.625rem; }
+.gap-3 { gap: 0.75rem; }
+.gap-4 { gap: 1rem; }
+.w-2\.5 { width: 0.625rem; }
+.w-4 { width: 1rem; }
+.w-10 { width: 2.5rem; }
+.w-12 { width: 3rem; }
+.w-48 { width: 12rem; }
+.w-56 { width: 14rem; }
+.w-64 { width: 16rem; }
+.h-1\.5 { height: 0.375rem; }
+.h-2\.5 { height: 0.625rem; }
+.h-4 { height: 1rem; }
+.h-10 { height: 2.5rem; }
+.h-12 { height: 3rem; }
+.h-56 { height: 14rem; }
+.top-3 { top: 0.75rem; }
+.left-3 { left: 0.75rem; }
+.right-3 { right: 0.75rem; }
+.space-y-2\.5 > * + * { margin-top: 0.625rem; }
+.space-y-3 > * + * { margin-top: 0.75rem; }
+.absolute { position: absolute; }
+.relative { position: relative; }
+.inset-0 { inset: 0; }
+.flex { display: flex; }
+.flex-1 { flex: 1 1 0%; min-width: 0; }
+.flex-col { flex-direction: column; }
+.flex-wrap { flex-wrap: wrap; }
+.shrink-0 { flex-shrink: 0; }
+.items-center { align-items: center; }
+.items-end { align-items: flex-end; }
+.items-start { align-items: flex-start; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+.w-full { width: 100%; }
+.h-full { height: 100%; }
+.max-w-\[220px\] { max-width: 220px; }
+.mt-auto { margin-top: auto; }
+.overflow-hidden { overflow: hidden; }
+.object-contain { object-fit: contain; }
+.object-cover { object-fit: cover; }
+.pointer-events-none { pointer-events: none; }
+.cursor-pointer { cursor: pointer; }
+.cursor-not-allowed { cursor: not-allowed; }
+.text-xs { font-size: var(--fs-xs); }
+.text-sm { font-size: var(--fs-sm); }
+.text-lg { font-size: var(--fs-lg); }
+.text-2xl { font-size: var(--fs-xl); }
+.text-4xl { font-size: var(--fs-3xl); }
+.font-medium { font-weight: 600; }
+.font-semibold { font-weight: 600; }
+.font-bold { font-weight: 700; }
+.font-extrabold { font-weight: 700; }
+.font-mono { font-variant-numeric: tabular-nums; }
+.tabular-nums { font-variant-numeric: tabular-nums; }
+.uppercase { text-transform: uppercase; }
+.tracking-widest { letter-spacing: 0.08em; }
+.leading-none { line-height: 1; }
+.leading-relaxed { line-height: 1.6; }
+.text-center { text-align: center; }
+.line-through { text-decoration: line-through; }
+.border { border: var(--hairline); }
+.border-2 { border: 2px solid var(--c-hairline); }
+.border-4 { border: 4px solid var(--c-hairline); }
+.border-primary-100 { border-color: var(--c-hairline); }
+.border-primary-200 { border-color: var(--c-hairline); }
+.border-amber-300 { border-color: var(--c-warn); }
+.border-emerald-400\/60 { border-color: rgba(63, 179, 127, 0.6); }
+.border-t-emerald-500 { border-top-color: var(--c-face-ok); }
+.border-t-primary-600 { border-top-color: var(--c-brand); }
+.rounded-full { border-radius: 9999px; }
+.bg-white { background: #ffffff; }
+.bg-gray-900 { background: var(--c-dark-2); }
+.bg-black\/60 { background: rgba(0, 0, 0, 0.6); }
+.bg-black\/70 { background: rgba(0, 0, 0, 0.7); }
+.bg-primary-50 { background: var(--c-fill); }
+.bg-primary-100 { background: var(--c-fill); }
+.bg-primary-200 { background: var(--c-hairline); }
+.bg-primary-500 { background: var(--c-brand); }
+.bg-amber-50 { background: #fff6e8; }
+.bg-red-50 { background: #fdeceb; }
+.bg-red-100 { background: #fbdad7; }
+.bg-emerald-100 { background: #e3f4ec; }
+.bg-emerald-500 { background: var(--c-face-ok); }
+.bg-emerald-600 { background: #2f9467; }
+.bg-violet-500 { background: var(--c-brand); }
+.bg-violet-600 { background: var(--c-brand); }
+.bg-blue-500 { background: var(--c-brand); }
+.bg-teal-500 { background: var(--c-ink); }
+.bg-red-500 { background: var(--c-danger); }
+.bg-orange-500 { background: var(--c-warn); }
+.bg-yellow-500 { background: var(--c-warn); }
+.text-white { color: #ffffff; }
+.text-primary-300 { color: var(--c-text-subtle); }
+.text-primary-400 { color: var(--c-text-subtle); }
+.text-primary-500 { color: var(--c-text-muted); }
+.text-primary-600 { color: var(--c-text-muted); }
+.text-primary-700 { color: var(--c-ink); }
+.text-primary-900 { color: var(--c-ink); }
+.text-violet-600 { color: var(--c-brand); }
+.text-emerald-400 { color: var(--c-face-ok); }
+.text-emerald-500 { color: var(--c-face-ok); }
+.text-emerald-600 { color: #2f9467; }
+.text-red-400 { color: var(--c-danger); }
+.text-red-500 { color: var(--c-danger); }
+.text-red-600 { color: var(--c-danger); }
+.text-orange-600 { color: var(--c-warn); }
+.text-amber-700 { color: var(--c-warn); }
+.hover\:bg-primary-50:hover { background: var(--c-fill); }
+.hover\:bg-primary-200:hover { background: var(--c-hairline); }
+.hover\:bg-primary-600:hover { background: var(--c-brand-hover); }
+.hover\:bg-violet-600:hover { background: var(--c-brand-hover); }
+.hover\:bg-emerald-600:hover { background: #2f9467; }
+.hover\:bg-amber-100:hover { background: #fdecd0; }
+.hover\:border-primary-400:hover { border-color: var(--c-ink); }
+.hover\:text-white:hover { color: #ffffff; }
+.disabled\:opacity-40:disabled { opacity: 0.4; }
+.disabled\:cursor-not-allowed:disabled { cursor: not-allowed; }
+.animate-spin { animation: cv-spin 1s linear infinite; }
+@keyframes cv-spin { to { transform: rotate(360deg); } }
+.bg-gradient-to-r.from-emerald-500 { background: var(--c-face-ok); }
+.bg-gradient-to-r.from-emerald-500:hover:not(:disabled) { background: #2f9467; }
+.bg-gradient-to-br.from-primary-50 { background: var(--c-fill); }
+/* Last, so "hidden flex" means hidden. */
+.hidden { display: none; }

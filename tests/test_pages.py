@@ -66,3 +66,23 @@ def test_admin_pages_have_no_external_assets(admin_client):
         resp = admin_client.get(path)
         assert resp.status_code == 200, path
         _assert_local(resp.get_data(as_text=True), path)
+
+
+def test_cv_pages_have_no_external_assets(app, client):
+    if "cv" not in app.blueprints:
+        pytest.skip("CV benchmark blueprint not registered (optional deps)")
+    for path in ("/cv/", "/cv/live", "/cv/face-rec"):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        _assert_local(resp.get_data(as_text=True), path)
+
+
+def test_static_css_js_are_local():
+    from pathlib import Path
+
+    static = Path(__file__).resolve().parent.parent / "static"
+    for f in list(static.glob("css/*.css")) + list(static.glob("js/*.js")):
+        text = f.read_text(encoding="utf-8")
+        assert not EXTERNAL.search(text), f.name
+        assert "http://" not in text and "https://" not in text, f.name
+        assert "tailwind" not in text.lower(), f.name

@@ -1,16 +1,9 @@
-{% extends "base.html" %}
+{% extends "app_base.html" %}
+{% set crumbs = [("Beranda", url_for('index')), ("CV Benchmark", url_for('cv.cv_index')), ("Live Monitor", None)] %}
+{% block page_head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/cv.css') }}">{% endblock %}
 {% block title %}Live Monitor — CV Benchmark{% endblock %}
 
-{% block content %}
-<style>
-  /* Full-width layout without base container padding */
-  body > div.container {
-    max-width: 100% !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-</style>
-
+{% block page %}
 <!-- Main layout -->
 <div class="flex gap-4 p-4 pt-6" style="height: calc(100vh - 100px);">
 
