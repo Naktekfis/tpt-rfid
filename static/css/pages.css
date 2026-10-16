@@ -557,7 +557,7 @@ input[type="date"].input {
 }
 .board__loans li {
   display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  grid-template-columns: 11rem minmax(0, 1fr) auto;
   gap: var(--sp-4);
   padding: var(--sp-1) 0;
 }
@@ -631,4 +631,19 @@ input[type="date"].input {
   margin-top: auto;
   font-size: var(--fs-md);
   color: var(--c-text-muted);
+}
+
+/* ---------- Monitor ---------- */
+
+.board--grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--sp-10);
+  margin-top: var(--sp-4);
+}
+.board--grid .board__type:only-child {
+  grid-column: 1 / -1;
+}
+.board-foot {
+  margin-top: var(--sp-5);
 }
