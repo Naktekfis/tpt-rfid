@@ -11,5 +11,11 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(scripts/deploy_jetson.sh *)",
+      "Bash(./scripts/deploy_jetson.sh *)"
+    ]
   }
 }
