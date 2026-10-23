@@ -12,6 +12,7 @@
 ## Commands
 - Run (dev): `.venv/bin/python app.py` (port 5000). `start-app.sh` uses `.venv/` if present, else `venv/` (the installer's).
 - Quick check after Python edits: `ruff check .` and `.venv/bin/python -m py_compile app.py config.py utils/*.py routes/*.py`
+- Deploy: commit, `git tag -a vYYYY.MM.DD[.N]`, push main + tag, then `scripts/deploy_jetson.sh <tag>` (runs the tag's `deploy/jetson/update.sh` on the Jetson: staging pytest, backup to `~/tpt-deploys/`, checkout, HUP, health check, rollback). Never rsync code to the device.
 - Tests: .venv/bin/python -m pytest -q (tests/, SQLite in-memory, CSRF+limiter off). Full check: scripts/check.sh; `PY38=<py38 python> scripts/check.sh` also runs tests on 3.8.
 
 ## Code Direction

@@ -130,3 +130,16 @@ Nothing in this file is implemented yet. Previous state: see
    step 3 (remove `/mahasiswa` and `/` landing), step 4 (admin UI), step 5 (face login:
    start with the anti-spoofing research on Jetson-capable models), step 6 later.
 Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the agent.
+
+## Progress 2026-10-24 (later session)
+- Step 0 DONE. Baseline `dbf1606` tagged `v2026.10.24`, pushed. Deploy tooling
+  `deploy/jetson/update.sh` + `scripts/deploy_jetson.sh` + allow rule in
+  `.claude/settings.json`; fixed for the Jetson's git 2.17. Deployed `v2026.10.24.2`
+  (`be05128`) with it: staging 358 passed/1 skipped (64 s), DB+code backup in
+  `~/tpt-deploys/20261024-010629-v2026.10.24.2/`, HUP, master 4648, NRestarts 0,
+  camera/pn532/vx6336 connected, Jetson tree clean (detached at the tag).
+- User approved push + deploy without asking for the rest of this roadmap.
+- `Scanner.zip` left out and git-ignored (user choice).
+- Laptop `.env` has placeholder SECRET_KEY/MAIL_PASSWORD (values equal .env.example):
+  the email step needs a real Gmail app password in the Jetson `.env` (gated).
+- Next: step 1 (logos + alarm timeout/exit button).
