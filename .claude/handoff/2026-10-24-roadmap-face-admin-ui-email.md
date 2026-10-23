@@ -142,4 +142,13 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
 - `Scanner.zip` left out and git-ignored (user choice).
 - Laptop `.env` has placeholder SECRET_KEY/MAIL_PASSWORD (values equal .env.example):
   the email step needs a real Gmail app password in the Jetson `.env` (gated).
-- Next: step 1 (logos + alarm timeout/exit button).
+- Step 1 DONE, deployed `v2026.10.24.3` (`93bdf26`). Alarm overlay hides after
+  `ALARM_OVERLAY_SECONDS` (user chose 30 s) or on "Tutup"; the alarm stays open for admin
+  and the board still shows the tool as hilang. The UHF buzzer only beeps once per alarm,
+  so there is nothing to stop. TF + ITB logos in the bottom-right corner of the session
+  screen. Checked with headless Chrome at 1440x810 on mock hardware. Jetson: staging
+  360 passed/1 skipped, healthy, NRestarts 0, reader/NFC/camera connected.
+- Dev-server tip: the laptop `.env` enables the real reader; for demos run with
+  `RFID_READER_ENABLED=false NFC_READER_ENABLED=false CAMERA_ENABLED=false` and a scratch
+  `DATABASE_URL`.
+- Next: step 2 (emails on due and due+2 days); needs a real Gmail app password on the Jetson.
