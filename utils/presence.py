@@ -10,8 +10,11 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, List
+
+from .rfid_diagnostics import SAMPLE_LIMIT, timing_summary
 
 PRESENT = "present"
 MISSING = "missing"
@@ -41,6 +44,8 @@ class PresenceMonitor:
         self._lock = threading.Lock()
         self._last_seen: Dict[str, float] = {}
         self._state: Dict[str, str] = {}
+        self._sighting_gaps = deque(maxlen=SAMPLE_LIMIT)
+        self._departure_delays = deque(maxlen=SAMPLE_LIMIT)
 
     def update(self, epcs: Iterable[str]) -> List[PresenceEvent]:
         """Record one inventory round (may be empty); return the events."""
@@ -56,9 +61,12 @@ class PresenceMonitor:
                     and now - seen > self.missing_after
                 ):
                     self._state[epc] = MISSING
+                    self._departure_delays.append(now - seen)
                     events.append(PresenceEvent("left", epc, now))
             for epc in sorted(seen_now):
                 previous = self._state.get(epc)
+                if epc in self._last_seen:
+                    self._sighting_gaps.append(now - self._last_seen[epc])
                 if previous is None:
                     events.append(PresenceEvent("new", epc, now))
                 elif previous == MISSING:
@@ -66,6 +74,27 @@ class PresenceMonitor:
                 self._state[epc] = PRESENT
                 self._last_seen[epc] = now
         return events
+
+    def diagnostics(self) -> dict:
+        """Aggregate observed gaps; never expose the EPC-keyed tracking maps."""
+        now = self._clock()
+        with self._lock:
+            return {
+                "missing_after_s": self.missing_after,
+                "sample_limit": SAMPLE_LIMIT,
+                "tracked_tags": len(self._state),
+                "present_tags": sum(state == PRESENT for state in self._state.values()),
+                "missing_tags": sum(state == MISSING for state in self._state.values()),
+                "oldest_sighting_age_s": round(
+                    max(
+                        (max(0, now - seen) for seen in self._last_seen.values()),
+                        default=0,
+                    ),
+                    3,
+                ),
+                "sighting_gap": timing_summary(self._sighting_gaps),
+                "departure_delay": timing_summary(self._departure_delays),
+            }
 
     def snapshot(self) -> Dict[str, Dict[str, object]]:
         with self._lock:

@@ -25,7 +25,14 @@ fi
 
 for browser in chromium-browser chromium; do
     if command -v "$browser" >/dev/null; then
+        # The kiosk polls on timers; never let Chromium throttle or park the
+        # page as "hidden/occluded"; GPU compositing on the Jetson can leave the
+        # screen stale until the mouse moves.
         exec "$browser" --kiosk --incognito --noerrdialogs --no-first-run \
+            --disable-background-timer-throttling \
+            --disable-renderer-backgrounding \
+            --disable-backgrounding-occluded-windows \
+            --disable-gpu-compositing \
             --disable-session-crashed-bubble --disable-infobars \
             --disable-translate --check-for-update-interval=31536000 "$URL"
     fi

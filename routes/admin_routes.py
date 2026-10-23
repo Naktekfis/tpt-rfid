@@ -1,7 +1,7 @@
 """
 Admin API for tool registration and the student list: tool types (list,
 create, photo upload or webcam capture), physical units from an EPC, and
-students with their face-data state.
+students with their NFC binding state.
 
 Database, presence service, camera and the admin decorator are passed in by
 app.py so this module does not import app. Every route is admin-only and not
@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import re
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, render_template, request
 
 from utils.helpers import allowed_file, sanitize_input
 
@@ -56,6 +56,50 @@ def create_admin_blueprint(
             if tool_type["type_id"] == str(type_id):
                 return tool_type
         return None
+
+    @bp.route("/admin/students")
+    @admin_required
+    def students_page():
+        return render_template("admin_students.html")
+
+    @bp.route("/api/admin/tool_types/<int:type_id>/edit", methods=["POST"])
+    @admin_required
+    def api_edit_tool_type(type_id):
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return _error("Payload JSON tidak valid")
+        if not isinstance(data.get("name"), str):
+            return _error("Nama harus berupa teks")
+        name = sanitize_input(data["name"])
+        if not name or len(name) > 200:
+            return _error("Nama jenis alat harus diisi, maksimal 200 karakter")
+        try:
+            found = database.rename_tool_type(type_id, name)
+        except ValueError as exc:
+            return _error(str(exc))
+        if not found:
+            return _error("Jenis alat tidak ditemukan", 404)
+        return jsonify({"success": True})
+
+    @bp.route("/api/admin/tool_units/<int:tool_id>/edit", methods=["POST"])
+    @admin_required
+    def api_edit_tool_unit(tool_id):
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return _error("Payload JSON tidak valid")
+        if not isinstance(data.get("name"), str) or not isinstance(
+            data.get("category"), str
+        ):
+            return _error("Nama dan kategori harus berupa teks")
+        name = sanitize_input(data["name"])
+        category = sanitize_input(data["category"])
+        if not name or len(name) > 200:
+            return _error("Nama alat harus diisi, maksimal 200 karakter")
+        if not category or len(category) > 100:
+            return _error("Kategori harus diisi, maksimal 100 karakter")
+        if not database.update_tool_details(tool_id, name, category):
+            return _error("Alat tidak ditemukan", 404)
+        return jsonify({"success": True})
 
     @bp.route("/api/admin/tool_types", methods=["GET"])
     @admin_required

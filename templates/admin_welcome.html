@@ -13,25 +13,37 @@
 <ul class="menu">
     <li>
         <a class="menu__link" href="{{ url_for('admin_monitor') }}">
-            <span class="menu__title">Monitor &amp; Kelola</span>
-            <span class="menu__desc">Alarm, pengembalian yang belum diverifikasi, peminjaman, data wajah mahasiswa</span>
+            <span class="menu__title">Monitor Alat</span>
+            <span class="menu__desc">Status rak, peminjaman, pengingat, dan pengelolaan alat</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="{{ url_for('admin_api.students_page') }}">
+            <span class="menu__title">Monitor Mahasiswa</span>
+            <span class="menu__desc">Kartu NFC, kontak, pinjaman aktif, dan pengingat pengembalian</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="/admin/security">
+            <span class="menu__title">Keamanan</span>
+            <span class="menu__desc">Foto alarm, status kamera, dan tindak lanjut kejadian</span>
         </a>
     </li>
     <li>
         <a class="menu__link" href="{{ url_for('admin_input_tool') }}">
-            <span class="menu__title">Input Alat</span>
+            <span class="menu__title">Tambah alat</span>
             <span class="menu__desc">Daftarkan unit alat baru dengan tag RFID dan foto</span>
         </a>
     </li>
     <li>
         <a class="menu__link" href="{{ url_for('admin_history') }}">
-            <span class="menu__title">Riwayat &amp; Export</span>
+            <span class="menu__title">Riwayat &amp; Ekspor</span>
             <span class="menu__desc">Lihat riwayat peminjaman, unduh CSV atau Excel, kirim lewat email</span>
         </a>
     </li>
 </ul>
 
 <div class="menu-foot">
-    <a href="{{ url_for('admin_logout') }}">Logout</a>
+    <a href="{{ url_for('admin_logout') }}">Keluar</a>
 </div>
 {% endblock %}

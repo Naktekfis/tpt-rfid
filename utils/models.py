@@ -73,6 +73,18 @@ class Student(db.Model):
         return f"<Student {self.nim} - {self.name}>"
 
 
+class StudentNFCCard(db.Model):
+    """Dedicated NFC identity; old Student.rfid_uid values remain untouched."""
+
+    __tablename__ = "student_nfc_cards"
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(
+        db.Integer, db.ForeignKey("students.id"), nullable=False, unique=True
+    )
+    uid = db.Column(db.String(20), nullable=False, unique=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class FaceEmbedding(db.Model):
     """One face embedding of a student (float32 bytes), per face engine."""
 

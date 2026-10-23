@@ -60,7 +60,7 @@
             const kind = markOf(u);
             let title = u.name + ': ' + labelOf(kind);
             if (u.borrower_name) title += ' (' + u.borrower_name + ')';
-            row.appendChild(h('span', { class: 'unit-mark unit-mark--' + kind, title: title }));
+            row.appendChild(h('span', { class: 'unit-mark unit-mark--' + kind, title: title, role: 'img', 'aria-label': title }));
         });
         return row;
     }

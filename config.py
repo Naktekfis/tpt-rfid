@@ -51,34 +51,36 @@ class Config:
 
     # USB UHF reader (HW-VX6336). Disabled = mock reader (debug routes only).
     RFID_READER_ENABLED = os.getenv("RFID_READER_ENABLED", "false").lower() == "true"
+    RFID_READER_MODEL = os.getenv("RFID_READER_MODEL", "vx6336")
     RFID_READER_PORT = os.getenv("RFID_READER_PORT", "/dev/ttyUSB0")
     RFID_READER_ADDR = int(os.getenv("RFID_READER_ADDR", "0"), 0)
     # A tag must be away this long (s) before the same tag is reported again.
     RFID_ABSENT_TIMEOUT = float(os.getenv("RFID_ABSENT_TIMEOUT", "2.5"))
     # A tool tag not seen for this long (s) counts as gone from the reader field.
-    RFID_MISSING_AFTER = float(os.getenv("RFID_MISSING_AFTER", "5.0"))
+    RFID_MISSING_AFTER = float(os.getenv("RFID_MISSING_AFTER", "1.5"))
+    # An unborrowed tool must stay gone this much longer (s) before the alarm,
+    # so weak reads at the edge of the field do not raise false alarms.
+    RFID_ALARM_CONFIRM_SECONDS = float(os.getenv("RFID_ALARM_CONFIRM_SECONDS", "2"))
     # Beep the reader when an unborrowed tool leaves.
     RFID_ALARM_ENABLED = os.getenv("RFID_ALARM_ENABLED", "true").lower() == "true"
 
-    # USB camera for face identification. Disabled = mock camera (no frames).
+    NFC_READER_ENABLED = os.getenv("NFC_READER_ENABLED", "false").lower() == "true"
+
+    # Camera remains available for tool photography.
     CAMERA_ENABLED = os.getenv("CAMERA_ENABLED", "false").lower() == "true"
     CAMERA_INDEX = int(os.getenv("CAMERA_INDEX", "0"))
-    # Face engine: "yunet_sface" (default) or "dlib". Models: scripts/fetch_face_models.py
-    FACE_ENGINE = os.getenv("FACE_ENGINE", "yunet_sface")
-    FACE_MODEL_DIR = os.getenv(
-        "FACE_MODEL_DIR", os.path.join(_BASE_DIR, "models", "face")
+    # Private alarm evidence; no automatic deletion of older captures.
+    SECURITY_STORAGE_DIR = os.getenv("SECURITY_STORAGE_DIR")
+    SECURITY_MAX_STORAGE_BYTES = int(
+        os.getenv("SECURITY_MAX_STORAGE_BYTES", "209715200")
     )
-    # Distance threshold override (engine default when unset; scales differ per engine).
-    FACE_MATCH_THRESHOLD = (
-        float(os.environ["FACE_MATCH_THRESHOLD"])
-        if os.getenv("FACE_MATCH_THRESHOLD")
-        else None
-    )
+    CAMERA_OBSTRUCTION_SECONDS = float(os.getenv("CAMERA_OBSTRUCTION_SECONDS", "5"))
+    CAMERA_RECOVERY_SECONDS = float(os.getenv("CAMERA_RECOVERY_SECONDS", "3"))
 
     # Loan period in days (Transaction.due_at = borrow_time + LOAN_DAYS).
     LOAN_DAYS = 2
 
-    # Kiosk session (face + head-turn, then tools leaving/returning are
+    # Kiosk session (NFC tap, then tools leaving/returning are
     # attributed to the student). Extended on every tool event, capped at
     # KIOSK_SESSION_MAX_SECONDS from now.
     KIOSK_SESSION_SECONDS = int(os.getenv("KIOSK_SESSION_SECONDS", "60"))

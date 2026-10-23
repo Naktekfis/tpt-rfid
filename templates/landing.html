@@ -13,7 +13,7 @@
     <li>
         <a class="menu__link" href="{{ url_for('mahasiswa_menu') }}">
             <span class="menu__title">Mahasiswa</span>
-            <span class="menu__desc">Pinjam dan kembalikan alat, daftar wajah, lihat ketersediaan alat</span>
+            <span class="menu__desc">Pinjam dan kembalikan alat, daftar kartu NFC, lihat ketersediaan alat</span>
         </a>
     </li>
     <li>
@@ -24,15 +24,5 @@
     </li>
 </ul>
 
-{% if cv_benchmark_available %}
-<p class="menu-label">Alat pengembang</p>
-<ul class="menu menu--minor">
-    <li>
-        <a class="menu__link" href="{{ url_for('cv.cv_index') }}">
-            <span class="menu__title">CV Benchmark</span>
-            <span class="menu__desc">Uji kamera dan pengenalan wajah (eksperimen)</span>
-        </a>
-    </li>
-</ul>
-{% endif %}
+
 {% endblock %}

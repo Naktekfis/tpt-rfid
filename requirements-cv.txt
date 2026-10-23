@@ -1,12 +1,2 @@
-# Face identification for the kiosk (utils/face.py YuNet + SFace, utils/liveness.py).
-# Needed on the kiosk; the app still starts without it (face APIs then report
-# models_missing). After installing, fetch the ONNX models:
-#
-#   pip install -r requirements-cv.txt
-#   python scripts/fetch_face_models.py
-#
-# pip picks the newest opencv-python/numpy that still support the running
-# Python (3.8 on the Jetson -> OpenCV 4.x, numpy 1.24). The code only uses
-# OpenCV APIs available since 4.5.4.
+# Optional camera support for tool photography.
 opencv-python>=4.9.0
-psutil>=5.9.0  # /cv benchmark pages only

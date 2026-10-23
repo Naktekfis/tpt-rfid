@@ -9,12 +9,15 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from flask import current_app
-from sqlalchemy import event
+from sqlalchemy import event, func
 from sqlalchemy.engine import Engine
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import defer, joinedload
 
 from .models import (
     db,
     Student,
+    StudentNFCCard,
     Tool,
     ToolType,
     Transaction,
@@ -83,6 +86,11 @@ class DatabaseHandler:
                 rfid_uid=data.get("rfid_uid"),
             )
             db.session.add(student)
+            if data.get("nfc_uid"):
+                db.session.flush()
+                db.session.add(
+                    StudentNFCCard(student_id=student.id, uid=data["nfc_uid"])
+                )
             db.session.commit()
 
             result = student.to_dict()
@@ -93,8 +101,34 @@ class DatabaseHandler:
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Error creating student: {str(e)}")
+            logger.error("Error creating student (%s)", type(e).__name__)
             raise
+
+    def get_student_by_nfc(self, uid):
+        student = (
+            Student.query.join(StudentNFCCard, Student.id == StudentNFCCard.student_id)
+            .filter(StudentNFCCard.uid == uid)
+            .first()
+        )
+        return student.to_dict() if student else None
+
+    def bind_student_nfc(self, student_id, uid):
+        """Bind an unbound account, preserving all legacy student-card fields."""
+        from sqlalchemy.exc import IntegrityError
+
+        student = db.session.get(Student, int(student_id))
+        if student is None:
+            raise ValueError("Mahasiswa tidak ditemukan")
+        if StudentNFCCard.query.filter_by(student_id=student.id).first():
+            raise ValueError(
+                "Mahasiswa sudah memiliki kartu; penggantian perlu prosedur terpisah"
+            )
+        db.session.add(StudentNFCCard(student_id=student.id, uid=uid))
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ValueError("Kartu NFC sudah terdaftar") from None
 
     def get_student_by_uid(self, rfid_uid: str) -> Optional[Dict]:
         """
@@ -110,10 +144,8 @@ class DatabaseHandler:
             student = Student.query.filter_by(rfid_uid=rfid_uid).first()
 
             if student:
-                logger.info(f"Found student by UID {rfid_uid}: {student.name[:3]}***")
                 return student.to_dict()
 
-            logger.warning(f"No student found with UID: {rfid_uid}")
             return None
 
         except Exception as e:
@@ -386,7 +418,9 @@ class DatabaseHandler:
         """Tool types with their unit count and the next free unit number."""
         rows = (
             db.session.query(
-                ToolType,
+                ToolType.id,
+                ToolType.name,
+                (func.length(ToolType.photo_data) > 0).label("type_has_photo"),
                 db.func.count(Tool.id),
                 db.func.max(Tool.unit_no),
             )
@@ -396,12 +430,16 @@ class DatabaseHandler:
             .all()
         )
         result = []
-        for tool_type, units, max_unit in rows:
-            data = tool_type.to_dict()
-            data.pop("created_at", None)
-            data["units"] = units
-            data["next_unit_no"] = (max_unit or 0) + 1
-            result.append(data)
+        for type_id, name, has_photo, units, max_unit in rows:
+            result.append(
+                {
+                    "type_id": str(type_id),
+                    "name": name,
+                    "photo_url": f"/api/tool_type/{type_id}/photo" if has_photo else "",
+                    "units": units,
+                    "next_unit_no": (max_unit or 0) + 1,
+                }
+            )
         return result
 
     def get_tool_type_by_name(self, name: str) -> Optional[Dict]:
@@ -451,9 +489,44 @@ class DatabaseHandler:
             }
         )
 
+    def rename_tool_type(self, type_id: int, name: str) -> bool:
+        """Rename a type and its current units, preserving transaction snapshots."""
+        tool_type = db.session.get(ToolType, type_id)
+        if tool_type is None:
+            return False
+        duplicate = ToolType.query.filter(
+            ToolType.name.ilike(name), ToolType.id != type_id
+        ).first()
+        if duplicate is not None:
+            raise ValueError("Jenis alat dengan nama ini sudah ada")
+        try:
+            tool_type.name = name
+            for unit in tool_type.tools.all():
+                unit.name = f"{name} #{unit.unit_no}" if unit.unit_no else name
+            db.session.commit()
+            return True
+        except SQLAlchemyError:
+            db.session.rollback()
+            raise
+
+    def update_tool_details(self, tool_id: int, name: str, category: str) -> bool:
+        """Edit current display details without changing tags, loans or history."""
+        tool = db.session.get(Tool, tool_id)
+        if tool is None:
+            return False
+        try:
+            tool.name = name
+            tool.category = category
+            db.session.commit()
+            return True
+        except SQLAlchemyError:
+            db.session.rollback()
+            raise
+
     def get_students_admin(self) -> List[Dict]:
-        """Students for the admin list: contact data, face data yes/no,
+        """Students for the admin list: contact data, NFC/legacy face data state,
         open loans. Newest first."""
+        nfc_ids = {sid for (sid,) in db.session.query(StudentNFCCard.student_id)}
         face_ids = {
             sid for (sid,) in db.session.query(FaceEmbedding.student_id).distinct()
         }
@@ -473,6 +546,7 @@ class DatabaseHandler:
                 "phone": s.phone,
                 "photo_url": f"/api/student/{s.id}/photo" if s.photo_data else "",
                 "has_face": s.id in face_ids,
+                "has_nfc": s.id in nfc_ids,
                 "open_loans": loans.get(s.id, 0),
                 "created_at": utc_to_wib(s.created_at).isoformat(),
             }
@@ -481,7 +555,11 @@ class DatabaseHandler:
 
     def get_tool_presence_info(self, rfid_uid: str) -> Optional[Dict]:
         """id, status, presence of the tool with this tag, or None if unknown."""
-        tool = Tool.query.filter_by(rfid_uid=rfid_uid).first()
+        tool = (
+            db.session.query(Tool.id, Tool.status, Tool.presence)
+            .filter(Tool.rfid_uid == rfid_uid)
+            .first()
+        )
         if tool is None:
             return None
         return {"id": tool.id, "status": tool.status, "presence": tool.presence}
@@ -531,10 +609,21 @@ class DatabaseHandler:
     def get_open_alarms(self) -> List[Dict]:
         alarms = (
             AlarmEvent.query.filter_by(ended_at=None)
+            .options(joinedload(AlarmEvent.tool).load_only(Tool.name))
             .order_by(AlarmEvent.started_at)
             .all()
         )
         return [a.to_dict() for a in alarms]
+
+    def get_alarm_history(self, limit: int = 100) -> List[Dict]:
+        alarms = (
+            AlarmEvent.query.order_by(
+                AlarmEvent.started_at.desc(), AlarmEvent.id.desc()
+            )
+            .limit(max(1, min(int(limit), 500)))
+            .all()
+        )
+        return [alarm.to_dict() for alarm in alarms]
 
     def acknowledge_alarm(self, alarm_id: int, ended_by: str = "admin") -> bool:
         """Close one open alarm; False if it does not exist or is already closed."""
@@ -986,7 +1075,19 @@ class DatabaseHandler:
         overdue info taken from the open transaction's due_at."""
         now = datetime.utcnow()
         rows = (
-            db.session.query(Tool, ToolType, Transaction, Student)
+            db.session.query(
+                Tool,
+                ToolType,
+                Transaction,
+                Student,
+                (func.length(ToolType.photo_data) > 0).label("type_has_photo"),
+            )
+            # Board polls need photo URLs, never the image bytes themselves.
+            .options(
+                defer(Tool.photo_data),
+                defer(ToolType.photo_data),
+                defer(Student.photo_data),
+            )
             .outerjoin(ToolType, ToolType.id == Tool.type_id)
             .outerjoin(
                 Transaction,
@@ -998,14 +1099,16 @@ class DatabaseHandler:
             .all()
         )
         groups: Dict[object, Dict] = {}
-        for tool, ttype, txn, student in rows:
+        for tool, ttype, txn, student, type_has_photo in rows:
             key = ttype.id if ttype else None
             group = groups.setdefault(
                 key,
                 {
                     "type_id": str(ttype.id) if ttype else None,
                     "type_name": ttype.name if ttype else "Lainnya",
-                    "photo_url": ttype.to_dict()["photo_url"] if ttype else "",
+                    "photo_url": f"/api/tool_type/{ttype.id}/photo"
+                    if ttype and type_has_photo
+                    else "",
                     "units": [],
                 },
             )
@@ -1049,7 +1152,14 @@ class DatabaseHandler:
         try:
             # Build query with LEFT JOIN to get active transactions and student info
             query = (
-                db.session.query(Tool, Transaction, Student)
+                db.session.query(
+                    Tool,
+                    Transaction,
+                    Student,
+                    (func.length(Tool.photo_data) > 0).label("tool_has_photo"),
+                    (func.length(Student.photo_data) > 0).label("student_has_photo"),
+                )
+                .options(defer(Tool.photo_data), defer(Student.photo_data))
                 .outerjoin(
                     Transaction,
                     db.and_(
@@ -1068,8 +1178,23 @@ class DatabaseHandler:
             rows = query.all()
 
             tools = []
-            for tool, txn, student in rows:
-                tool_dict = tool.to_dict()
+            for tool, txn, student, tool_has_photo, student_has_photo in rows:
+                # Tool.to_dict() reads photo_data. Keep the same response while
+                # leaving image BLOBs in SQLite on every monitor poll.
+                tool_dict = {
+                    "tool_id": str(tool.id),
+                    "name": tool.name,
+                    "rfid_uid": tool.rfid_uid,
+                    "category": tool.category,
+                    "status": tool.status,
+                    "type_id": str(tool.type_id) if tool.type_id else None,
+                    "unit_no": tool.unit_no,
+                    "photo_url": f"/api/tool/{tool.id}/photo" if tool_has_photo else "",
+                    "presence": tool.presence,
+                    "last_seen_at": tool.last_seen_at,
+                    "created_at": tool.created_at,
+                    "updated_at": tool.updated_at,
+                }
 
                 tool_dict["borrower_name"] = None
                 tool_dict["borrower_nim"] = None
@@ -1094,7 +1219,7 @@ class DatabaseHandler:
                             tool_dict["borrower_email"] = student.email
                             tool_dict["borrower_photo_url"] = (
                                 f"/api/student/{student.id}/photo"
-                                if student.photo_data
+                                if student_has_photo
                                 else ""
                             )
 

@@ -27,6 +27,18 @@ def create_kiosk_blueprint(database, kiosk, admin_required) -> Blueprint:
             }
         )
 
+    @bp.route("/api/admin/kiosk/alerts", methods=["GET"])
+    @admin_required
+    def api_admin_kiosk_alerts():
+        """Small admin poll for alarms/returns; avoids rebuilding the full board."""
+        return jsonify(
+            {
+                "success": True,
+                "alarms": database.get_open_alarms(),
+                "unverified_returns": database.get_unverified_returns(),
+            }
+        )
+
     @bp.route("/api/tool_type/<int:type_id>/photo", methods=["GET"])
     def api_tool_type_photo(type_id):
         result = database.get_tool_type_photo(type_id)
@@ -55,7 +67,9 @@ def create_kiosk_blueprint(database, kiosk, admin_required) -> Blueprint:
         )
         return jsonify({"success": False, "error": error}), 409
 
-    @bp.route("/api/admin/transactions/<int:transaction_id>/verify_return", methods=["POST"])
+    @bp.route(
+        "/api/admin/transactions/<int:transaction_id>/verify_return", methods=["POST"]
+    )
     @admin_required
     def api_verify_return(transaction_id):
         if database.verify_return(transaction_id):

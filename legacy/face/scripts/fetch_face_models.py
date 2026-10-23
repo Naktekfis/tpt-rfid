@@ -16,7 +16,11 @@ import sys
 import urllib.request
 
 MODEL_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "face"
+    os.path.dirname(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    ),
+    "models",
+    "face",
 )
 
 _ZOO = "https://github.com/opencv/opencv_zoo/raw/main/models/"

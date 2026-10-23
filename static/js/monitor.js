@@ -1,6 +1,6 @@
 /*
  * /monitor (public, read-only): the kiosk board from /api/kiosk/state,
- * polled every 3 s. Per tool type: photo, unit marks, and one line per unit
+ * polled every second. Per tool type: photo, unit marks, and one line per unit
  * that is not on the rack (borrower + due date, overdue in amber, missing in red).
  */
 (function () {
@@ -9,10 +9,12 @@
     const UI = window.UI;
     const B = window.Board;
     const h = UI.h;
-    const POLL_MS = 3000;
+    const POLL_MS = 500;
 
     const $ = function (id) { return document.getElementById(id); };
     let lastKey = '';
+    let loaded = false;
+    let serverDown = false;
 
     function loanLine(u) {
         const kind = B.markOf(u);
@@ -76,19 +78,29 @@
         if (alarms.length) {
             banners.appendChild(h('div', { class: 'bar bar--danger', role: 'alert' },
                 'Alarm: ' + alarms.map(function (a) { return a.tool_name; }).join(', ') +
-                ' diambil tanpa verifikasi wajah.'));
+                ' diambil tanpa sesi NFC.'));
         }
     }
 
     async function poll() {
         try {
             const s = await UI.fetchJSON('/api/kiosk/state');
-            if (s.success) render(s.board || [], s.alarms || []);
+            if (!s.success) throw new Error('State unavailable');
+            loaded = true;
+            serverDown = false;
+            render(s.board || [], s.alarms || []);
         } catch (e) {
-            $('banners').textContent = '';
-            $('banners').appendChild(h('div', { class: 'bar bar--danger', role: 'alert' },
-                'Koneksi ke server terputus. Data di layar mungkin tidak terbaru.'));
-            lastKey = '';
+            if (!loaded) {
+                $('board').textContent = '';
+                $('board').appendChild(h('li', { class: 'empty board__type', text: 'Data alat belum tersedia. Mencoba kembali otomatis…' }));
+            }
+            if (!serverDown) {
+                serverDown = true;
+                $('banners').textContent = '';
+                $('banners').appendChild(h('div', { class: 'bar bar--danger', role: 'alert' },
+                    'Koneksi ke server terputus. Data di layar mungkin tidak terbaru.'));
+                lastKey = '';
+            }
         }
         setTimeout(poll, POLL_MS);
     }

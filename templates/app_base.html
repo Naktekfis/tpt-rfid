@@ -32,6 +32,13 @@
     {% endif %}
     <span class="topbar__clock num" data-clock>--.--</span>
 </header>
+{% if request.path.startswith('/admin') and request.path != '/admin/login' %}
+<nav class="admin-nav" aria-label="Navigasi admin">
+    {% for label, path in [('Ringkasan', '/admin'), ('Alat', '/admin/monitor'), ('Mahasiswa', '/admin/students'), ('Keamanan', '/admin/security'), ('Tambah alat', '/admin/input_tool'), ('Riwayat', '/admin/history')] %}
+    <a href="{{ path }}"{% if request.path == path %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% endfor %}
+</nav>
+{% endif %}
 {% endblock %}
 
 {% block content %}

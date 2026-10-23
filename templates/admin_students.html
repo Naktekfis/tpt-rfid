@@ -1,0 +1,69 @@
+{% extends "app_base.html" %}
+{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Monitor Mahasiswa", None)] %}
+{% block title %}Monitor Mahasiswa — Admin Lab Fabrikasi{% endblock %}
+{% block page %}
+<div class="page-head">
+    <div><h1>Monitor Mahasiswa</h1><p>Kartu NFC, kontak, dan tindak lanjut peminjaman mahasiswa.</p></div>
+    <span class="section-head__meta num" id="updated"></span>
+</div>
+
+<div class="load-notice" id="students-error" role="status" hidden></div>
+
+<section class="section" aria-labelledby="students-title">
+    <div class="section-head">
+        <h2 id="students-title">Mahasiswa</h2>
+        <span class="section-head__meta" id="students-count"></span>
+    </div>
+    <div class="toolbar">
+        <div class="field field--grow">
+            <label class="field__label" for="student-search">Cari</label>
+            <input class="input input--sm" id="student-search" type="search" placeholder="Nama, NIM, atau email">
+        </div>
+        <div class="field">
+            <label class="field__label" for="student-filter">Tampilkan</label>
+            <select class="input input--sm" id="student-filter">
+                <option value="all">Semua mahasiswa</option>
+                <option value="borrowed">Dengan pinjaman aktif</option>
+                <option value="overdue">Dengan pinjaman terlambat</option>
+                <option value="no-card">Belum punya kartu NFC</option>
+            </select>
+        </div>
+    </div>
+    <p class="field__hint">Pinjaman aktif menampilkan alat dan batas kembali. Pengingat dikirim setelah konfirmasi email.</p>
+    <table class="table">
+        <thead>
+            <tr>
+                <th scope="col">Mahasiswa</th>
+                <th scope="col">Kontak</th>
+                <th scope="col">Kartu NFC</th>
+                <th scope="col">Pinjaman aktif</th>
+                <th scope="col"><span class="visually-hidden">Tindakan</span></th>
+            </tr>
+        </thead>
+        <tbody id="students-body">
+            <tr><td class="empty" colspan="5">Memuat…</td></tr>
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+{% block overlays %}
+<dialog class="dialog" id="reminder" aria-labelledby="reminder-title">
+    <form method="dialog">
+        <h2 id="reminder-title">Kirim pengingat?</h2>
+        <p id="reminder-text"></p>
+        <div class="dialog__actions">
+            <button class="btn btn--secondary" value="cancel">Batal</button>
+            <button class="btn btn--primary" value="ok">Kirim email</button>
+        </div>
+    </form>
+</dialog>
+{% endblock %}
+{% block page_scripts %}
+<script>
+window.ADMIN_STUDENTS_CONFIG = {
+    registerUrl: {{ url_for('register') | tojson }},
+    placeholderPhoto: {{ url_for('static', filename='assets/placeholder_profile.png') | tojson }},
+};
+</script>
+<script src="{{ url_for('static', filename='js/admin_students.js') }}"></script>
+{% endblock %}

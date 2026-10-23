@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 RECONNECT_INTERVAL = 3.0  # s between attempts to reopen a failed camera
+MAX_FRAME_AGE = 3.0  # never serve a frozen frame as current evidence
 
 
 class MockCamera:
@@ -88,7 +89,7 @@ class OpenCVCamera:
     def read(self):
         """Latest frame (a copy, BGR) or None."""
         with self._lock:
-            if self._frame is None:
+            if self._frame is None or time.monotonic() - self._frame_time > MAX_FRAME_AGE:
                 return None
             return self._frame.copy()
 

@@ -1,0 +1,8 @@
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+
+[mcp_servers.codebase-memory]
+command = "codebase-memory-mcp"
+
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"

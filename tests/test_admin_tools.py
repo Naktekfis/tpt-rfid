@@ -193,3 +193,123 @@ def test_students_list_has_face_flag(admin, database, student):
     assert rows[student["nim"]]["has_face"] is True
     assert rows[other["nim"]]["has_face"] is False
     assert rows[other["nim"]]["open_loans"] == 0
+
+
+def test_monitor_destinations_are_separate(admin):
+    menu = admin.get("/admin").get_data(as_text=True)
+    assert "Monitor Alat" in menu and "Monitor Mahasiswa" in menu
+    assert "/admin/students" in menu and "/admin/security" in menu
+    tools_page = admin.get("/admin/monitor").get_data(as_text=True)
+    assert 'id="loans-body"' in tools_page
+    assert 'id="students-body"' not in tools_page
+    student_page = admin.get("/admin/students").get_data(as_text=True)
+    assert 'id="students-body"' in student_page
+    assert 'id="student-filter"' in student_page
+    assert "js/admin_students.js" in student_page
+    assert 'id="loans-body"' not in student_page
+
+
+def test_students_page_requires_admin(client):
+    response = client.get("/admin/students", headers={"Accept": "text/html"})
+    assert response.status_code == 302
+    assert "/admin/login" in response.headers["Location"]
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/admin/tool_types/1/edit",
+        "/api/admin/tool_units/1/edit",
+    ],
+)
+def test_edit_tools_requires_admin(client, path):
+    assert (
+        client.post(path, json={"name": "New", "category": "Tools"}).status_code == 401
+    )
+
+
+def test_edit_tool_preserves_history_tag_and_loan(admin, database, student, tool):
+    from utils.models import Transaction
+
+    borrowed = database.borrow_tool_atomic(student["student_id"], tool["tool_id"])
+    response = admin.post(
+        "/api/admin/tool_units/" + tool["tool_id"] + "/edit",
+        json={
+            "name": "Obeng presisi",
+            "category": "Perkakas tangan",
+            "rfid_uid": "REPLACE",
+            "status": "available",
+        },
+    )
+    assert response.status_code == 200
+    row = db.session.get(Tool, int(tool["tool_id"]))
+    assert row.name == "Obeng presisi" and row.category == "Perkakas tangan"
+    assert row.rfid_uid == "TOOL-001" and row.status == "borrowed"
+    transaction = db.session.get(Transaction, int(borrowed["transaction_id"]))
+    assert transaction.tool_name == "Obeng" and transaction.status == "borrowed"
+    assert admin.get("/api/admin/students").get_json()["students"][0]["open_loans"] == 1
+
+
+def test_rename_type_updates_units_preserves_history(
+    admin, database, tool_type, student
+):
+    from utils.models import Transaction
+
+    unit = database.create_tool_unit(int(tool_type["type_id"]), 1, EPC)
+    loan = database.borrow_tool_atomic(student["student_id"], unit["tool_id"])
+    response = admin.post(
+        "/api/admin/tool_types/" + tool_type["type_id"] + "/edit",
+        json={"name": "Bor Tangan"},
+    )
+    assert response.status_code == 200
+    assert db.session.get(Tool, int(unit["tool_id"])).name == "Bor Tangan #1"
+    assert (
+        db.session.get(Transaction, int(loan["transaction_id"])).tool_name
+        == "Bor Listrik #1"
+    )
+    database.create_tool_type("Obeng")
+    assert (
+        admin.post(
+            "/api/admin/tool_types/" + tool_type["type_id"] + "/edit",
+            json={"name": "obeng"},
+        ).status_code
+        == 400
+    )
+    assert db.session.get(ToolType, int(tool_type["type_id"])).name == "Bor Tangan"
+
+
+@pytest.mark.parametrize(
+    "payload", [None, [], {}, {"name": ""}, {"name": None}, {"name": "a" * 201}]
+)
+def test_rename_type_rejects_invalid_payload(admin, tool_type, payload):
+    assert (
+        admin.post(
+            "/api/admin/tool_types/" + tool_type["type_id"] + "/edit", json=payload
+        ).status_code
+        == 400
+    )
+
+
+@pytest.mark.parametrize(
+    "payload", [None, [], {}, {"name": "x"}, {"name": "x", "category": "a" * 101}]
+)
+def test_edit_tool_rejects_invalid_payload(admin, tool, payload):
+    assert (
+        admin.post(
+            "/api/admin/tool_units/" + tool["tool_id"] + "/edit", json=payload
+        ).status_code
+        == 400
+    )
+
+
+def test_edit_missing_records(admin):
+    assert (
+        admin.post("/api/admin/tool_types/999/edit", json={"name": "New"}).status_code
+        == 404
+    )
+    assert (
+        admin.post(
+            "/api/admin/tool_units/999/edit", json={"name": "New", "category": "Tools"}
+        ).status_code
+        == 404
+    )

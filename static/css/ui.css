@@ -34,11 +34,10 @@
   box-sizing: border-box;
 }
 
-/* The comps are 1440x810 at 16px. Scale the root with the viewport so the
- * same rem layout fills 1920x1080 and still fits 1366x768 without scroll. */
+/* Keep body text readable at every viewport; layouts reflow on small screens. */
 html {
   font-size: 16px;
-  font-size: clamp(13px, min(calc(100vw / 90), calc(100vh / 50.625)), 24px);
+  font-size: clamp(16px, calc(100vw / 90), 20px);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -119,6 +118,7 @@ a:hover {
 
 .app {
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -190,6 +190,7 @@ a:hover {
   align-items: center;
   justify-content: center;
   gap: var(--sp-2);
+  min-height: 44px;
   height: 2.75rem;
   padding: 0 var(--sp-5);
   border: 1px solid transparent;
@@ -273,6 +274,7 @@ a:hover {
   font-weight: 600;
 }
 .input {
+  min-height: 44px;
   height: 2.75rem;
   padding: 0 var(--sp-3);
   border: 1px solid var(--c-text-subtle);
@@ -477,4 +479,21 @@ a:hover {
 }
 .toast--danger {
   background: var(--c-danger);
+}
+
+/* Feedback stays readable until the next successful update. */
+.load-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-danger);
+  background: #fff5f3;
+  color: var(--c-danger);
+}
+.btn[aria-busy="true"] { cursor: progress; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }

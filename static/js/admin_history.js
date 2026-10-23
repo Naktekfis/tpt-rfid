@@ -11,6 +11,8 @@
     const $ = function (id) { return document.getElementById(id); };
 
     let range = '30';
+    let loadVersion = 0;
+    let loaded = false;
 
     // YYYY-MM-DD of today minus `days` in WIB.
     function wibDate(daysAgo) {
@@ -88,15 +90,22 @@
             UI.toast('Tanggal mulai harus sebelum tanggal akhir.', 'warn');
             return;
         }
+        const version = ++loadVersion;
+        $('history-count').textContent = 'Memuat…';
         try {
             const res = await UI.fetchJSON('/api/admin/transactions?' + query());
+            if (version !== loadVersion) return;
             if (!res.success) {
-                UI.toast(res.error || 'Data tidak dapat dimuat', 'danger');
-                return;
+                throw new Error('History unavailable');
             }
+            UI.loadNotice('history-error', '');
+            loaded = true;
             render(res.data || []);
         } catch (err) {
-            UI.toast('Tidak dapat menghubungi server.', 'danger');
+            if (version !== loadVersion) return;
+            $('history-count').textContent = 'Belum diperbarui';
+            UI.loadNotice('history-error', 'Riwayat untuk periode ini belum dapat dimuat. Data terakhir tetap ditampilkan.', load);
+            if (!loaded) $('history-body').querySelector('.empty').textContent = 'Data riwayat belum tersedia. Coba muat kembali.';
         }
     }
 
@@ -108,7 +117,7 @@
             const resp = await fetch('/api/admin/export?format=' + format + (query() ? '&' + query() : ''),
                 { credentials: 'same-origin' });
             if (!resp.ok) {
-                let msg = 'Export gagal';
+                let msg = 'Ekspor gagal';
                 try { msg = (await resp.json()).error || msg; } catch (e) { /* not JSON */ }
                 UI.toast(msg, 'danger');
                 return;
@@ -120,7 +129,7 @@
             a.click();
             a.remove();
             setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
-            UI.toast('File ' + format.toUpperCase() + ' diunduh.', 'ok');
+            UI.toast('Berkas ' + format.toUpperCase() + ' diunduh.', 'ok');
         } catch (e) {
             UI.toast('Tidak dapat menghubungi server.', 'danger');
         } finally {

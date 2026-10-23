@@ -1,8 +1,7 @@
 /*
  * /admin/monitor: open alarms (acknowledge), unverified returns (verify),
- * tools and loans (search, filters, warning email), students (face data:
- * record again, delete). Alarms and returns poll /api/kiosk/state every
- * 3 s; tools and students reload every 15 s and after each action.
+ * tools and loans (search, filters, editing, warning email). Alarms and returns
+ * poll alerts every 500 ms, tools every second and types every minute/after edits.
  */
 (function () {
     'use strict';
@@ -11,8 +10,9 @@
     const B = window.Board;
     const h = UI.h;
     const CFG = window.ADMIN_MONITOR_CONFIG || {};
-    const STATE_MS = 3000;
-    const LIST_MS = 15000;
+    const STATE_MS = 500;
+    const LIST_MS = 1000;
+    const TYPES_MS = 60000;
     const DAY = 24 * 3600 * 1000;
     const CLOCK = new Intl.DateTimeFormat('id-ID', {
         timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', hour12: false,
@@ -21,8 +21,14 @@
     const $ = function (id) { return document.getElementById(id); };
 
     let tools = [];
-    let students = [];
+    let types = [];
+    let editing = null;
     let lastStateKey = '';
+    let toolsLoaded = false;
+    let listsLoading = false;
+    let stateLoading = false;
+    let typesLoading = false;
+    let lastToolsKey = '';
 
     // ---------- Helpers ----------
 
@@ -60,6 +66,7 @@
 
     async function act(button, url, body, okText) {
         button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
         try {
             const res = await UI.postJSON(url, body);
             if (res.success) {
@@ -71,6 +78,7 @@
             UI.toast('Tidak dapat menghubungi server.', 'danger');
         } finally {
             button.disabled = false;
+            button.removeAttribute('aria-busy');
         }
         return false;
     }
@@ -130,16 +138,26 @@
     }
 
     async function refreshState() {
+        if (stateLoading) return;
+        stateLoading = true;
         try {
-            const s = await UI.fetchJSON('/api/kiosk/state');
-            if (!s.success) return;
+            const s = await UI.fetchJSON('/api/admin/kiosk/alerts');
+            if (!s.success) throw new Error('State unavailable');
+            UI.loadNotice('state-error', '');
             const key = JSON.stringify([s.alarms, s.unverified_returns]);
             if (key !== lastStateKey) {
                 lastStateKey = key;
                 renderAlarms(s.alarms || []);
                 renderUnverified(s.unverified_returns || []);
             }
-        } catch (e) { /* next poll */ }
+        } catch (e) {
+            UI.loadNotice('state-error', 'Alarm dan pengembalian belum dapat diperbarui. Data terakhir tetap ditampilkan; mencoba kembali otomatis.', refreshState);
+            if (!lastStateKey) {
+                ['alarms-body', 'unverified-body'].forEach(function (id) {
+                    $(id).querySelector('.empty').textContent = 'Data belum tersedia. Periksa pesan di atas.';
+                });
+            }
+        } finally { stateLoading = false; }
     }
 
     // ---------- Tools and loans ----------
@@ -172,6 +190,16 @@
         const q = $('loan-search').value.trim().toLowerCase();
         const status = $('loan-status').value;
         const range = $('loan-date').value;
+        // Inventory timestamps change every scan, without changing anything shown.
+        // Include fields used by button closures as well as visible/filter fields.
+        const key = JSON.stringify([q, status, range, range ? Math.floor(nowWib() / DAY) : null,
+            tools.map(function (t) {
+                return [t.tool_id, t.type_id, t.name, t.category, t.rfid_uid,
+                    t.status, t.presence, t.is_overdue, t.borrower_name, t.borrower_nim,
+                    t.borrower_email, t.borrower_photo_url, t.borrow_time_wib, t.due_at];
+            }), types.map(function (t) { return [t.type_id, t.name]; })]);
+        if (key === lastToolsKey) return;
+        lastToolsKey = key;
         const rows = tools.filter(function (t) {
             if (status === 'borrowed' && t.status !== 'borrowed') return false;
             if (status === 'overdue' && !t.is_overdue) return false;
@@ -198,13 +226,21 @@
                 action = h('button', { type: 'button', class: 'linkbtn', text: 'Kirim pengingat' });
                 action.addEventListener('click', function () { sendWarning(t, action); });
             }
+            const edit = h('button', { type: 'button', class: 'linkbtn', text: 'Edit alat' });
+            edit.addEventListener('click', function () { editTool(t, null); });
+            const type = types.find(function (entry) { return String(entry.type_id) === String(t.type_id); });
+            let rename = null;
+            if (type) {
+                rename = h('button', { type: 'button', class: 'linkbtn', text: 'Edit jenis' });
+                rename.addEventListener('click', function () { editTool(t, type); });
+            }
             body.appendChild(h('tr', null,
-                h('td', null, h('strong', { text: t.name })),
+                h('td', null, h('strong', { text: t.name }), h('span', { class: 'sub num', text: t.rfid_uid || '' })),
                 h('td', null, borrowed ? personCell(t.borrower_name, t.borrower_nim, t.borrower_photo_url) : h('span', { class: 'muted', text: '-' })),
                 h('td', { class: 'num', text: borrowed ? UI.formatWibDate(t.borrow_time_wib, true) : '' }),
                 h('td', { class: 'num' + (t.is_overdue ? ' status status--warn' : ''), text: borrowed ? UI.formatWibDate(t.due_at, true) : '' }),
                 h('td', null, toolStatus(t)),
-                h('td', { class: 'actions' }, action)));
+                h('td', { class: 'actions' }, edit, rename, action)));
         });
     }
 
@@ -224,85 +260,86 @@
         button.textContent = original;
     }
 
-    // ---------- Students ----------
+    // ---------- Tool editing ----------
 
-    function renderStudents() {
-        const q = $('student-search').value.trim().toLowerCase();
-        const rows = students.filter(function (s) {
-            if (!q) return true;
-            return [s.name, s.nim, s.email].some(function (v) { return v && v.toLowerCase().indexOf(q) >= 0; });
-        });
-        const withFace = students.filter(function (s) { return s.has_face; }).length;
-        $('students-count').textContent = students.length + ' mahasiswa · ' + withFace + ' dengan data wajah';
-        const body = $('students-body');
-        body.textContent = '';
-        if (!rows.length) {
-            emptyRow(body, 5, students.length ? 'Tidak ada mahasiswa yang cocok.' : 'Belum ada mahasiswa terdaftar.');
-            return;
+    function editTool(tool, type) {
+        editing = { tool: tool, type: type };
+        $('edit-title').textContent = type ? 'Edit jenis alat' : 'Edit alat';
+        $('edit-name').value = type ? type.name : tool.name;
+        $('edit-category').value = tool.category || '';
+        $('edit-category-field').hidden = !!type;
+        $('edit-category').required = !type;
+        $('edit-hint').textContent = type
+            ? 'Nama baru berlaku untuk semua unit dalam jenis ini.'
+            : 'EPC, status rak, dan status peminjaman tetap dikelola sistem.';
+        $('edit-tool').showModal();
+        $('edit-name').focus();
+    }
+
+    $('edit-cancel').addEventListener('click', function () { $('edit-tool').close(); });
+    $('edit-form').addEventListener('submit', async function (event) {
+        event.preventDefault();
+        const current = editing;
+        const url = current.type
+            ? '/api/admin/tool_types/' + current.type.type_id + '/edit'
+            : '/api/admin/tool_units/' + current.tool.tool_id + '/edit';
+        if (await act($('edit-save'), url, {
+            name: $('edit-name').value.trim(), category: $('edit-category').value.trim(),
+        }, 'Data alat diperbarui.')) {
+            $('edit-tool').close();
+            loadLists();
+            loadTypes();
+            refreshState();
         }
-        rows.forEach(function (s) {
-            const record = h('a', {
-                href: CFG.registerUrl + '?student_id=' + encodeURIComponent(s.student_id),
-                text: s.has_face ? 'Rekam ulang wajah' : 'Rekam wajah',
-            });
-            let del = null;
-            if (s.has_face) {
-                del = h('button', { type: 'button', class: 'linkbtn linkbtn--danger', text: 'Hapus data wajah' });
-                del.addEventListener('click', function () { deleteFace(s, del); });
-            }
-            body.appendChild(h('tr', null,
-                h('td', null, personCell(s.name, s.nim, s.photo_url)),
-                h('td', null, h('span', { text: s.email }), h('span', { class: 'sub num', text: s.phone })),
-                h('td', null, s.has_face
-                    ? h('span', { class: 'status', text: 'Ada' })
-                    : h('span', { class: 'status status--muted', text: 'Belum ada' })),
-                h('td', { class: 'num', text: String(s.open_loans) }),
-                h('td', { class: 'actions' }, record, del)));
-        });
-    }
-
-    async function deleteFace(s, button) {
-        const ok = await confirmDialog('Hapus data wajah?',
-            'Data pengenalan wajah dan foto profil ' + s.name + ' (' + s.nim + ') akan dihapus. ' +
-            'Mahasiswa ini perlu merekam wajah lagi sebelum dapat meminjam alat.',
-            'Hapus data wajah', true);
-        if (!ok) return;
-        if (await act(button, '/api/admin/students/' + s.student_id + '/face/delete', undefined,
-            'Data wajah ' + s.name + ' dihapus.')) loadLists();
-    }
+    });
 
     // ---------- Load ----------
 
-    async function loadLists() {
+    async function loadTypes() {
+        if (typesLoading) return;
+        typesLoading = true;
         try {
-            const res = await Promise.all([
-                UI.fetchJSON('/api/admin/tools_status'),
-                UI.fetchJSON('/api/admin/students'),
-            ]);
-            if (res[0].success) {
-                tools = res[0].tools || [];
-                renderTools();
-            } else if (res[0].error === 'Unauthorized') {
+            const result = await UI.fetchJSON('/api/admin/tool_types');
+            if (!result.success) return;
+            types = result.tool_types || [];
+            if (toolsLoaded) renderTools();
+        } catch (e) {
+            // Keep the last type metadata; live tool status loads independently.
+        } finally { typesLoading = false; }
+    }
+
+    async function loadLists() {
+        if (listsLoading) return;
+        listsLoading = true;
+        try {
+            const res = await UI.fetchJSON('/api/admin/tools_status');
+            if (res.error === 'Unauthorized') {
                 window.location.href = '/admin/login';
                 return;
             }
-            if (res[1].success) {
-                students = res[1].students || [];
-                renderStudents();
-            }
+            if (!res.success) throw new Error('Lists unavailable');
+            UI.loadNotice('tools-error', '');
+            toolsLoaded = true;
+            tools = res.tools || [];
+            renderTools();
             $('updated').textContent = 'Diperbarui ' + CLOCK.format(new Date()).replace(':', '.');
         } catch (e) {
-            UI.toast('Data tidak dapat dimuat. Periksa koneksi.', 'danger');
-        }
+            UI.loadNotice('tools-error', 'Daftar alat belum dapat diperbarui. Data terakhir tetap ditampilkan; mencoba kembali otomatis.', loadLists);
+            if (!toolsLoaded) {
+                $('loans-body').textContent = '';
+                emptyRow($('loans-body'), 6, 'Data alat belum tersedia. Coba muat kembali.');
+            }
+        } finally { listsLoading = false; }
     }
 
     $('loan-search').addEventListener('input', renderTools);
     $('loan-status').addEventListener('change', renderTools);
     $('loan-date').addEventListener('change', renderTools);
-    $('student-search').addEventListener('input', renderStudents);
 
     refreshState();
     loadLists();
+    loadTypes();
     setInterval(refreshState, STATE_MS);
     setInterval(loadLists, LIST_MS);
+    setInterval(loadTypes, TYPES_MS);
 })();

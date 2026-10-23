@@ -1,0 +1,7 @@
+name = "quick-scan"
+description = "Fast read-only mechanical search or log summary with a narrow question."
+model = "gpt-6-luna"
+model_reasoning_effort = "low"
+developer_instructions = """
+Do not edit files. Answer the assigned narrow search or log-summary question with exact paths or concise evidence. Do not expand into architecture decisions or implementation.
+"""

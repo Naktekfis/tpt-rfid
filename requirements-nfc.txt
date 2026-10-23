@@ -1,0 +1,7 @@
+# Optional PN532 I2C support, verified on Jetson Nano / Python 3.8.
+Adafruit-Blinka==9.1.0
+adafruit-circuitpython-pn532==2.4.9
+adafruit-circuitpython-busdevice==5.2.17
+Adafruit-PlatformDetect==3.89.1
+Jetson.GPIO==2.0.17; platform_machine == "aarch64"
+typing-extensions==4.13.2

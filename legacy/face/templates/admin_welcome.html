@@ -1,0 +1,37 @@
+{% extends "app_base.html" %}
+{% set crumbs = [("Beranda", url_for('index')), ("Admin", None)] %}
+
+{% block title %}Admin — Lab Fabrikasi{% endblock %}
+{% block page_class %}page--menu{% endblock %}
+
+{% block page %}
+<div class="menu-hero">
+    <h1>Panel Admin</h1>
+    <p>Kelola dan pantau peminjaman alat Lab Fabrikasi.</p>
+</div>
+
+<ul class="menu">
+    <li>
+        <a class="menu__link" href="{{ url_for('admin_monitor') }}">
+            <span class="menu__title">Monitor &amp; Kelola</span>
+            <span class="menu__desc">Alarm, pengembalian yang belum diverifikasi, peminjaman, data wajah mahasiswa</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="{{ url_for('admin_input_tool') }}">
+            <span class="menu__title">Input Alat</span>
+            <span class="menu__desc">Daftarkan unit alat baru dengan tag RFID dan foto</span>
+        </a>
+    </li>
+    <li>
+        <a class="menu__link" href="{{ url_for('admin_history') }}">
+            <span class="menu__title">Riwayat &amp; Export</span>
+            <span class="menu__desc">Lihat riwayat peminjaman, unduh CSV atau Excel, kirim lewat email</span>
+        </a>
+    </li>
+</ul>
+
+<div class="menu-foot">
+    <a href="{{ url_for('admin_logout') }}">Logout</a>
+</div>
+{% endblock %}

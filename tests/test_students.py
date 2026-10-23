@@ -5,12 +5,14 @@ FORM = {
     "nim": "12345678",
     "email": "budi@example.com",
     "phone": "08123456789",
-    "rfid_uid": "STU-001",
+    "rfid_uid": "01020304",
 }
 
 
 def test_register_student_without_photo(client):
-    resp = client.post("/api/register", data=FORM)
+    token = client.post("/api/nfc/registration/start").get_json()["token"]
+    app_module.nfc_reader.simulate_scan("01020304")
+    resp = client.post("/api/register", data=dict(FORM, nfc_token=token))
     assert resp.status_code == 200
     body = resp.get_json()
     assert body["success"] is True
@@ -35,7 +37,7 @@ def test_register_duplicate_nim_and_uid(client, student):
     resp = client.post("/api/register", data=dict(FORM, rfid_uid="OTHER"))
     assert resp.status_code == 400
     resp = client.post("/api/register", data=dict(FORM, nim="99999999"))
-    assert resp.status_code == 400
+    assert resp.status_code == 409
 
 
 def test_check_rfid_idle_and_detected(client):
@@ -63,7 +65,9 @@ def test_scan_student(client, student):
 
 
 def test_scan_student_unknown_and_empty(client):
-    assert client.post("/api/scan_student", json={"rfid_uid": "nope"}).status_code == 404
+    assert (
+        client.post("/api/scan_student", json={"rfid_uid": "nope"}).status_code == 404
+    )
     assert client.post("/api/scan_student", json={"rfid_uid": ""}).status_code == 400
 
 
@@ -78,13 +82,10 @@ def test_student_photo_missing(client, student):
     assert client.get(f"/api/student/{student['student_id']}/photo").status_code == 404
 
 
-def test_register_without_card_twice(client):
-    """Face flow: no rfid_uid; two students without a card must not collide."""
-    data = {k: v for k, v in FORM.items() if k != "rfid_uid"}
-    first = client.post("/api/register", data=data)
-    assert first.status_code == 200
-    second = client.post("/api/register", data=dict(data, nim="87654321"))
-    assert second.status_code == 200
-    s1, s2 = first.get_json()["student"], second.get_json()["student"]
-    assert s1["student_id"] != s2["student_id"]
-    assert app_module.database.get_student_by_id(s1["student_id"])["rfid_uid"] is None
+def test_register_requires_fresh_card(client):
+    assert client.post("/api/register", data=FORM).status_code == 409
+    token = client.post("/api/nfc/registration/start").get_json()["token"]
+    assert (
+        client.post("/api/register", data=dict(FORM, nfc_token=token)).status_code
+        == 409
+    )

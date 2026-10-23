@@ -40,10 +40,13 @@ from utils import (
     create_rfid_reader,
 )
 from utils.camera import create_camera
-from utils.face_service import build_face_service
-from utils.kiosk import Kiosk, KioskLoop
+from utils.kiosk import Kiosk
+from utils.nfc_reader import create_nfc_reader
+from utils.nfc_service import NFCService, NFCCaptureError
+from routes.nfc_routes import create_nfc_blueprint, capture_owner
 from utils.presence import PresenceMonitor
 from utils.tool_presence import ToolPresenceService
+from utils.security import SecurityService
 
 # Configure logging
 logging.basicConfig(
@@ -88,26 +91,12 @@ database = DatabaseHandler(app)
 migrate = Migrate(app, db)
 logger.info("PostgreSQL database handler initialized successfully")
 
-# Import and register CV Benchmark blueprint (optional, requires opencv)
 CV_BENCHMARK_AVAILABLE = False
-try:
-    from routes.cv_routes import cv_bp
 
-    app.register_blueprint(cv_bp)
-    # Exempt CV blueprint from CSRF (all POST endpoints are API)
-    csrf.exempt(cv_bp)
-    CV_BENCHMARK_AVAILABLE = True
-    logger.info("CV Benchmark blueprint registered")
-except ImportError as e:
-    logger.warning(f"CV Benchmark not available (missing dependencies: {e})")
-    logger.info(
-        "To enable CV Benchmark: pip install -r requirements-cv.txt -r requirements-dlib.txt"
-    )
-
-# RFID reader (USB HW-VX6336, or mock). Pages poll its current UID via
-# /api/check_rfid; student cards and tool tags come through the same reader.
+# UHF handles tool presence only.
 rfid_reader = create_rfid_reader(
     enabled=app.config.get("RFID_READER_ENABLED", False),
+    model=app.config.get("RFID_READER_MODEL", "vx6336"),
     port=app.config.get("RFID_READER_PORT", "/dev/ttyUSB0"),
     addr=app.config.get("RFID_READER_ADDR", 0),
     absent_timeout=app.config.get("RFID_ABSENT_TIMEOUT", 2.5),
@@ -117,34 +106,37 @@ presence_service = ToolPresenceService(
     app,
     database,
     rfid_reader,
-    PresenceMonitor(missing_after=app.config.get("RFID_MISSING_AFTER", 5.0)),
+    PresenceMonitor(missing_after=app.config.get("RFID_MISSING_AFTER", 1.5)),
     alarm_enabled=app.config.get("RFID_ALARM_ENABLED", True),
+    alarm_confirm_seconds=app.config.get("RFID_ALARM_CONFIRM_SECONDS", 2.0),
+    background=True,
 )
-# Camera + face identification (degrades to status codes when models are missing).
+# Camera for tool photographs.
 camera = create_camera(
     enabled=app.config.get("CAMERA_ENABLED", False),
     index=app.config.get("CAMERA_INDEX", 0),
 )
-face_service = build_face_service(
-    app,
-    database,
-    camera,
-    app.config.get("FACE_MODEL_DIR"),
-    app.config.get("FACE_ENGINE", "yunet_sface"),
-    app.config.get("FACE_MATCH_THRESHOLD"),
-)
-# Kiosk session: face + head-turn identification, then tool events are
-# attributed to the identified student (see utils/kiosk.py).
 kiosk = Kiosk(
     app,
     database,
-    face_service,
     session_seconds=app.config.get("KIOSK_SESSION_SECONDS", 60),
     extend_seconds=app.config.get("KIOSK_SESSION_EXTEND", 30),
     max_seconds=app.config.get("KIOSK_SESSION_MAX_SECONDS", 120),
     alarm_grace_seconds=app.config.get("ALARM_GRACE_SECONDS", 30),
 )
 presence_service.kiosk = kiosk
+security_service = SecurityService(
+    camera,
+    rfid_reader,
+    storage_dir=app.config.get("SECURITY_STORAGE_DIR")
+    or os.path.join(app.instance_path, "security"),
+    enabled=app.config.get("CAMERA_ENABLED", False),
+    alarm_enabled=app.config.get("RFID_ALARM_ENABLED", True),
+    debounce_seconds=app.config.get("CAMERA_OBSTRUCTION_SECONDS", 5.0),
+    recovery_seconds=app.config.get("CAMERA_RECOVERY_SECONDS", 3.0),
+    max_storage_bytes=app.config.get("SECURITY_MAX_STORAGE_BYTES", 209715200),
+)
+presence_service.alarm_observer = security_service.record_tool_alarm
 # `python app.py` with debug runs a reloader parent that only watches files
 # and a child (WERKZEUG_RUN_MAIN) that serves; only the child may own the
 # serial port. gunicorn imports this module as "app" and always starts it.
@@ -153,14 +145,13 @@ _reloader_parent = (
     and app.debug
     and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 )
-kiosk_loop = None
+nfc_reader = create_nfc_reader(enabled=app.config.get("NFC_READER_ENABLED", False))
+nfc_service = NFCService(app, nfc_reader, kiosk)
 if not _reloader_parent:
     rfid_reader.start()
     camera.start()
-    # Frames only exist with a real camera; timeouts do not need the loop.
-    if not camera.status().get("mock"):
-        kiosk_loop = KioskLoop(camera, kiosk)
-        kiosk_loop.start()
+    nfc_reader.start()
+    security_service.start()
 
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -202,10 +193,19 @@ app.register_blueprint(
     create_presence_blueprint(database, presence_service, admin_required)
 )
 
-from routes.face_routes import create_face_blueprint  # noqa: E402
+from routes.camera_routes import create_camera_blueprint  # noqa: E402
+
+app.register_blueprint(create_camera_blueprint(camera))
+app.register_blueprint(create_nfc_blueprint(nfc_service, database, admin_required))
+
+from routes.security_routes import create_security_blueprint  # noqa: E402
+from routes.diagnostics_routes import create_diagnostics_blueprint  # noqa: E402
 
 app.register_blueprint(
-    create_face_blueprint(database, face_service, camera, admin_required)
+    create_security_blueprint(security_service, database, admin_required)
+)
+app.register_blueprint(
+    create_diagnostics_blueprint(rfid_reader, presence_service, admin_required)
 )
 
 from routes.kiosk_routes import create_kiosk_blueprint  # noqa: E402
@@ -265,8 +265,7 @@ def mahasiswa_menu():
 @app.route("/register")
 @app.route("/daftar")
 def register():
-    """Self-registration: form, then face capture. An admin can open it as
-    /daftar?student_id=<id> to record a student's face again."""
+    """NFC self-registration; admins can bind a card to an unbound student."""
     enroll_student = None
     raw = request.args.get("student_id", "")
     if session.get("admin_logged_in") and raw.isdigit():
@@ -288,7 +287,7 @@ def monitor():
 
 @app.route("/kiosk")
 def kiosk_page():
-    """Face + presence kiosk screen (new design, polls /api/kiosk/state)"""
+    """NFC + presence kiosk screen (new design, polls /api/kiosk/state)"""
     return render_template("kiosk.html")
 
 
@@ -374,16 +373,14 @@ def check_rfid():
 @app.route("/api/register", methods=["POST"])
 @limiter.limit("10 per minute")
 def api_register():
-    """Register a new student (name, NIM, email, phone; card and photo
-    optional). The face is recorded afterwards via /api/face/enroll/<id>."""
+    """Register a student using a fresh server-side NFC capture."""
     try:
         # Get form data
         name = sanitize_input(request.form.get("name", ""))
         nim = sanitize_input(request.form.get("nim", ""))
         email = sanitize_input(request.form.get("email", ""))
         phone = sanitize_input(request.form.get("phone", ""))
-        # Optional since the face flow (students no longer need a card).
-        rfid_uid = request.form.get("rfid_uid", "").strip() or None
+        nfc_token = request.form.get("nfc_token", "")
 
         # Validate required fields
         if not all([name, nim, email, phone]):
@@ -398,20 +395,7 @@ def api_register():
         if existing_student:
             return jsonify({"success": False, "error": "NIM sudah terdaftar"}), 400
 
-        # Check if RFID UID already exists
-        if rfid_uid and database.get_student_by_uid(rfid_uid):
-            return jsonify(
-                {"success": False, "error": "Kartu RFID sudah terdaftar"}
-            ), 400
-
-        # Prepare student data
-        student_data = {
-            "name": name,
-            "nim": nim,
-            "email": email,
-            "phone": phone,
-            "rfid_uid": rfid_uid,
-        }
+        student_data = {"name": name, "nim": nim, "email": email, "phone": phone}
 
         # Handle photo upload
         photo = request.files.get("photo")
@@ -430,7 +414,15 @@ def api_register():
             ), 400
 
         # Create student
-        student = database.create_student(student_data)
+        def create_with_card(uid):
+            if database.get_student_by_nfc(uid):
+                raise NFCCaptureError("Kartu NFC sudah terdaftar")
+            return database.create_student(dict(student_data, nfc_uid=uid))
+
+        try:
+            student = nfc_service.submit(capture_owner(), nfc_token, create_with_card)
+        except NFCCaptureError as exc:
+            return jsonify(success=False, error=str(exc)), 409
 
         # Upload photo if provided (save to database as binary)
         if has_photo:
@@ -442,9 +434,6 @@ def api_register():
                 )
             except Exception as e:
                 logger.error(f"Error saving photo: {str(e)}")
-
-        # Clear RFID after successful registration
-        rfid_reader.clear()
 
         return jsonify(
             {
@@ -673,7 +662,7 @@ if app.config.get("DEBUG"):
 
     @app.route("/debug/kiosk/identify", methods=["GET"])
     def debug_kiosk_identify():
-        """Debug endpoint: start a kiosk session for a student as if the face
+        """Debug endpoint: start a kiosk session for a student as if the card
         and both head turns had passed (development only)"""
         student = None
         raw = request.args.get("student_id", "")
@@ -1094,7 +1083,12 @@ def rfid_status():
 def devices_status():
     """Reader and camera state for the kiosk header (no secrets, no PII)."""
     return jsonify(
-        {"success": True, "reader": rfid_reader.status(), "camera": camera.status()}
+        {
+            "success": True,
+            "reader": rfid_reader.status(),
+            "camera": camera.status(),
+            "nfc": nfc_reader.status(),
+        }
     )
 
 
@@ -1374,12 +1368,10 @@ def internal_error(error):
 
 def cleanup():
     """Cleanup resources on application shutdown"""
-    logger.info("Shutting down application...")
-    # Stop the frame consumer before the camera: a daemon thread still inside
-    # OpenCV at interpreter exit aborts the process ("terminate called ...").
-    if kiosk_loop is not None:
-        kiosk_loop.stop()
+    security_service.stop()
+    nfc_reader.stop()
     rfid_reader.stop()
+    presence_service.stop()
     camera.stop()
 
 

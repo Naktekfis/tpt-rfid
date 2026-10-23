@@ -1,0 +1,18 @@
+{% extends "app_base.html" %}
+{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Keamanan", None)] %}
+{% block title %}Keamanan — Admin Lab Fabrikasi{% endblock %}
+{% block page %}
+<div class="page-head">
+    <div><h1>Keamanan</h1><p>Dokumentasi alarm alat dan kondisi kamera.</p></div>
+    <span id="security-condition" class="status" role="status">Memuat…</span>
+</div>
+<p class="field__hint">Gambar gelap atau datar menunjukkan dugaan kamera tertutup atau cahaya kurang. Foto adalah dokumentasi kejadian, bukan verifikasi identitas. Pengakuan admin tidak menandakan kamera sudah pulih.</p>
+<p id="security-error" class="status status--danger" role="alert" hidden></p>
+<section class="section" aria-labelledby="security-title">
+    <div class="section-head"><h2 id="security-title">Kejadian terbaru</h2><span class="section-head__meta">100 kejadian terakhir · waktu WIB</span></div>
+    <table class="table"><thead><tr>
+        <th scope="col">Kejadian</th><th scope="col">Waktu</th><th scope="col">Dokumentasi</th><th scope="col">Penyelesaian</th><th scope="col">Tindakan</th>
+    </tr></thead><tbody id="security-events"><tr><td colspan="5" class="empty">Memuat…</td></tr></tbody></table>
+</section>
+{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/admin_security.js') }}"></script>{% endblock %}

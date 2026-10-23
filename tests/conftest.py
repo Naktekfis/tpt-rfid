@@ -6,6 +6,7 @@ os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["FLASK_ENV"] = "development"
 os.environ["SECRET_KEY"] = "test"
 os.environ["RFID_READER_ENABLED"] = "false"  # mock reader, whatever .env says
+os.environ["NFC_READER_ENABLED"] = "false"
 os.environ["CAMERA_ENABLED"] = "false"  # mock camera, whatever .env says
 
 import pytest  # noqa: E402
@@ -17,6 +18,7 @@ from utils import db  # noqa: E402
 app_module.app.config["TESTING"] = True
 app_module.app.config["WTF_CSRF_ENABLED"] = False
 app_module.limiter.enabled = False
+app_module.presence_service.stop()  # handle rounds inline so tests see results
 
 TEST_PIN = "424242"
 app_module.ADMIN_PIN_HASH = generate_password_hash(TEST_PIN)
@@ -24,6 +26,8 @@ app_module.ADMIN_PIN_HASH = generate_password_hash(TEST_PIN)
 
 @pytest.fixture()
 def app():
+    app_module.nfc_service.capture = None
+    app_module.kiosk._to_idle()
     flask_app = app_module.app
     with flask_app.app_context():
         db.create_all()

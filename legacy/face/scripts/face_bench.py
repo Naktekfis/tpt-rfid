@@ -28,17 +28,19 @@ import statistics
 import sys
 import time
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
 sys.path.insert(0, ROOT)
 
-from utils.face import (  # noqa: E402
+from legacy.face.utils.face import (  # noqa: E402
     Face,
     FaceModelsMissing,
     create_face_engine,
     quality_issues,
     sharpness,
 )
-from utils.liveness import (  # noqa: E402
+from legacy.face.utils.liveness import (  # noqa: E402
     BlinkChallenge,
     HeadTurnChallenge,
     Landmarks68,

@@ -74,3 +74,31 @@ def test_short_gap_is_not_left():
 def test_duplicate_epcs_in_round():
     m, _ = make()
     assert kinds(m.update(["A", "A"])) == [("new", "A")]
+
+
+def test_diagnostics_report_threshold_gaps_and_observed_departure_delay():
+    monitor, clock = make()
+    monitor.update(["PRIVATE_EPC"])
+    clock.t = 2
+    monitor.update(["PRIVATE_EPC"])
+    clock.t = 8
+    monitor.update([])
+    diagnostics = monitor.diagnostics()
+    assert diagnostics["missing_after_s"] == 5
+    assert diagnostics["tracked_tags"] == 1
+    assert diagnostics["present_tags"] == 0
+    assert diagnostics["missing_tags"] == 1
+    assert diagnostics["sighting_gap"]["max_ms"] == 2000
+    assert diagnostics["departure_delay"]["max_ms"] == 6000
+    assert diagnostics["oldest_sighting_age_s"] == 6
+    assert "PRIVATE_EPC" not in str(diagnostics)
+
+
+def test_diagnostic_gap_samples_are_bounded():
+    monitor, clock = make()
+    for t in range(150):
+        clock.t = t
+        monitor.update(["PRIVATE_EPC"])
+    diagnostics = monitor.diagnostics()
+    assert diagnostics["sighting_gap"]["samples"] == 120
+    assert diagnostics["sighting_gap"]["mean_ms"] == 1000

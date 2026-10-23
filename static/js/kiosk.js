@@ -1,6 +1,6 @@
 /*
  * Kiosk screen (design D): polls /api/kiosk/state every second and shows one
- * screen per kiosk state (idle / unknown_face, identifying, session /
+ * screen per kiosk state (idle / unknown_card, session /
  * summary) plus the alarm. The kiosk logic runs server-side; this page only
  * shows it and sends "Selesai" / "Bukan saya" / admin alarm acknowledge.
  */
@@ -9,26 +9,14 @@
 
     const UI = window.UI;
     const h = UI.h;
-    const CFG = window.KIOSK_CONFIG || {};
 
-    const POLL_MS = 1000;
+    const POLL_MS = 500;
     const DEVICE_POLL_MS = 5000;
-    const CAMERA_RETRY_MS = 10000;
     const REASON_SHOW_MS = 8000;
-    const STATES = ['idle', 'identifying', 'unknown_face', 'session', 'summary'];
+    const STATES = ['idle', 'unknown_card', 'session', 'summary'];
 
     const REASONS = {
-        challenge_timeout: 'Verifikasi belum selesai dalam waktu yang tersedia. Lihat ke kamera untuk mencoba lagi.',
-        different_face: 'Wajah yang terlihat berganti selama verifikasi. Silakan ulangi dari awal.',
-        face_lost: 'Wajah tidak terlihat lagi oleh kamera. Lihat ke kamera untuk mengulang.',
         cancelled: 'Sesi dibatalkan. Tidak ada alat yang tercatat.',
-    };
-
-    // Backend direction is in raw-image terms: "left" means the person turns
-    // to their own right, which is the screen right in the mirrored preview.
-    const TURNS = {
-        left: { text: 'Tengok ke kanan', toLeft: false },
-        right: { text: 'Tengok ke kiri', toLeft: true },
     };
 
     // Unit mark kinds, in legend order.
@@ -49,9 +37,12 @@
     let lastUnverifiedKey = '';
     let lastAlarmKey = '';
     let reasonShownAt = 0;
+    let summaryExitTimer = null;
+    let summaryExpiredAt = null;
     let alarmIds = [];
     let serverDown = false;
     let devices = null;
+    let lastBannersKey = '';
     let toolInfo = {};   // tool_id -> {photo, typeName} from the last board
 
     // ---------- Clock ----------
@@ -71,27 +62,26 @@
 
     function renderBanners() {
         const box = $('banners');
+        const key = JSON.stringify([serverDown, devices && devices.reader && devices.reader.connected, devices && devices.reader && devices.reader.mode, devices && devices.nfc && devices.nfc.connected]);
+        if (key === lastBannersKey) return;
+        lastBannersKey = key;
         box.textContent = '';
         if (serverDown) {
             box.appendChild(h('div', { class: 'bar bar--danger', role: 'alert' },
-                'Koneksi ke server terputus. Data di layar mungkin tidak terbaru.'));
+                'Data belum dapat diperbarui. Tunggu koneksi pulih sebelum mengambil atau mengembalikan alat. Mencoba kembali otomatis…'));
             return;
         }
         if (!devices) return;
         const r = devices.reader || {};
-        const c = devices.camera || {};
-        if (r.mode === 'serial' && !r.connected) {
+        const n = devices.nfc || {};
+        if (r.mode === 'vx6336' && !r.connected) {
             box.appendChild(h('div', { class: 'bar bar--warn', role: 'status' },
                 'Pembaca RFID tidak terhubung. Peminjaman dan pengembalian belum tercatat sampai pembaca tersambung kembali.'));
         }
-        if (c.enabled && !cameraOk(c)) {
+        if (n.connected === false) {
             box.appendChild(h('div', { class: 'bar bar--warn', role: 'status' },
-                'Kamera tidak mengirim gambar. Pengenalan wajah tidak berjalan.'));
+                'Pembaca NFC tidak terhubung. Sesi baru belum dapat dibuka. Hubungi admin.'));
         }
-    }
-
-    function cameraOk(c) {
-        return !!(c.enabled && c.running && c.opened && c.frame_age !== null && c.frame_age < 3);
     }
 
     async function pollDevices() {
@@ -103,40 +93,6 @@
         }
         renderBanners();
         setTimeout(pollDevices, DEVICE_POLL_MS);
-    }
-
-    // ---------- Camera ----------
-
-    function startCamera() {
-        const img = $('camera-img');
-        img.onload = function () {
-            $('camera-placeholder').hidden = true;
-            img.hidden = false;
-        };
-        img.onerror = function () {
-            img.hidden = true;
-            $('camera-placeholder').hidden = false;
-            setTimeout(function () {
-                img.src = CFG.cameraStream + '?t=' + Date.now();
-            }, CAMERA_RETRY_MS);
-        };
-        img.src = CFG.cameraStream;
-    }
-
-    // mode: 'guide' (dashed oval), 'ok' (green oval), 'turn' (arrow + strip)
-    function placeCamera(slot, mode, opts) {
-        const cam = $('camera');
-        if (!slot) {
-            cam.hidden = true;
-            return;
-        }
-        if (cam.parentNode !== slot) slot.appendChild(cam);
-        const o = opts || {};
-        cam.className = 'camera camera--' + (mode === 'turn' ? 'turn' : 'guide') +
-            (mode === 'ok' ? ' camera--ok' : '') +
-            (o.small ? ' camera--small' : '') +
-            (o.toLeft ? ' camera--to-left' : '');
-        cam.hidden = false;
     }
 
     // ---------- Tool photos and unit marks ----------
@@ -212,7 +168,7 @@
     function unitsEl(marks, small) {
         const row = h('div', { class: 'units' + (small ? ' units--sm' : '') });
         marks.forEach(function (m) {
-            row.appendChild(h('span', { class: 'unit-mark unit-mark--' + m.kind, title: m.title }));
+            row.appendChild(h('span', { class: 'unit-mark unit-mark--' + m.kind, title: m.title, role: 'img', 'aria-label': m.title }));
         });
         return row;
     }
@@ -362,19 +318,6 @@
 
     // ---------- Screens ----------
 
-    function photoOf(student) {
-        return (student && student.photo_url) || CFG.placeholderPhoto;
-    }
-
-    function setPhoto(img, student) {
-        const src = photoOf(student);
-        if (img.getAttribute('src') !== src) {
-            img.onerror = function () { img.onerror = null; img.src = CFG.placeholderPhoto; };
-            img.src = src;
-        }
-        img.alt = student ? 'Foto ' + student.name : '';
-    }
-
     function fmtLeft(sec) {
         const s = Math.max(0, Math.ceil(sec || 0));
         return Math.floor(s / 60) + '.' + String(s % 60).padStart(2, '0');
@@ -402,33 +345,9 @@
         const show = s.state === 'idle' && s.reason && REASONS[s.reason] && Date.now() - reasonShownAt < REASON_SHOW_MS;
         box.hidden = !show;
         if (show) box.textContent = REASONS[s.reason];
-        if (s.state === 'unknown_face') {
+        if (s.state === 'unknown_card') {
             $('unknown-ends').textContent = 'Kembali ke layar awal dalam ' + Math.ceil(s.unknown_ends_in || 0) + ' detik';
         }
-    }
-
-    function renderIdentifying(s) {
-        const st = s.student || {};
-        setPhoto($('id-photo'), st);
-        $('id-name').textContent = st.name || '';
-        $('id-nim').textContent = st.nim || '';
-        const steps = s.steps || 2;
-        const step = s.step || 1;
-        const bar = $('id-steps');
-        if (bar.childElementCount !== steps || bar.getAttribute('data-step') !== String(step)) {
-            bar.textContent = '';
-            for (let i = 1; i <= steps; i++) bar.appendChild(h('span', { class: i <= step ? 'is-on' : '' }));
-            bar.setAttribute('data-step', String(step));
-            bar.setAttribute('aria-label', 'Langkah ' + step + ' dari ' + steps);
-        }
-        const turn = TURNS[s.direction] || TURNS.left;
-        const other = turn === TURNS.left ? TURNS.right : TURNS.left;
-        $('id-step-label').textContent = 'Langkah ' + step + ' dari ' + steps + ' · memastikan Anda hadir';
-        $('id-turn-text').textContent = turn.text;
-        // The two steps are the two directions, so the next one is the other.
-        $('id-help').textContent = 'Putar kepala pelan ke arah panah, lalu kembali menghadap kamera.' +
-            (step < steps ? ' Setelah itu ' + other.text.toLowerCase() + '.' : '');
-        return turn;
     }
 
     function renderPerson(s) {
@@ -439,35 +358,39 @@
 
     function render(s) {
         const state = STATES.indexOf(s.state) >= 0 ? s.state : 'idle';
-        const screen = showScreen(state);
-        let mode = 'guide';
-        const opts = {};
-        if (state === 'idle' || state === 'unknown_face') {
+        if (state !== 'summary') summaryExpiredAt = null;
+        clearTimeout(summaryExitTimer);
+        summaryExitTimer = null;
+        showScreen(state);
+        if (state === 'idle' || state === 'unknown_card') {
             renderIdle(s);
-        } else if (state === 'identifying') {
-            mode = 'turn';
-            opts.toLeft = renderIdentifying(s).toLeft;
         } else {
             renderPerson(s);
             renderLists(s, state === 'summary');
-            opts.small = true;
             if (state === 'session') {
-                mode = 'ok';
                 $('ses-left').textContent = fmtLeft(s.expires_in);
                 $('btn-cancel').hidden = !s.can_cancel;
             } else {
                 $('sum-ends').textContent = 'Kembali ke layar awal dalam ' + Math.ceil(s.summary_ends_in || 0) + ' detik';
+                // The API rounds this value to 0.1 s. Leave the summary at
+                // its actual deadline instead of waiting for the next poll.
+                const remaining = Math.max(0, Number(s.summary_ends_in) || 0);
+                summaryExitTimer = setTimeout(function () {
+                    if (lastState !== 'summary') return;
+                    summaryExpiredAt = performance.now();
+                    showScreen('idle');
+                    renderIdle({ state: 'idle', reason: null });
+                    lastState = 'idle';
+                    poll();
+                }, remaining * 1000 + 60);
             }
         }
         lastState = state;
 
         const alarms = s.alarms || [];
-        const compact = state !== 'idle' && state !== 'unknown_face';
+        const compact = state !== 'idle' && state !== 'unknown_card';
         renderAlarm(alarms, compact);
-        // Full alarm: the camera moves into it, so the borrower can still look
-        // at the camera to record the borrow.
-        if (alarms.length && !compact) placeCamera($('alarm').querySelector('[data-camera-slot]'), 'guide', {});
-        else placeCamera(screen && screen.querySelector('[data-camera-slot]'), mode, opts);
+
     }
 
     // ---------- Alarm ----------
@@ -556,6 +479,9 @@
 
     async function act(url, button) {
         button.disabled = true;
+        const label = button.textContent;
+        button.textContent = 'Memproses…';
+        button.setAttribute('aria-busy', 'true');
         try {
             const res = await UI.postJSON(url);
             if (!res.success) UI.toast(res.error || 'Permintaan gagal', 'danger');
@@ -563,6 +489,8 @@
             UI.toast('Tidak dapat menghubungi server.', 'danger');
         } finally {
             button.disabled = false;
+            button.textContent = label;
+            button.removeAttribute('aria-busy');
             poll();
         }
     }
@@ -571,6 +499,27 @@
 
     let pollTimer = null;
     let inFlight = false;
+    // Opt-in, local-only aggregate diagnostics; never retain state payloads.
+    const timingEnabled = new URLSearchParams(window.location.search).get('uhf_timing') === '1';
+    const timingSamples = [];
+    let previousPollEnd = null;
+    if (timingEnabled) {
+        window.kioskTiming = function () {
+            const result = { samples: timingSamples.length, poll_ms: POLL_MS };
+            ['schedule_wait_ms', 'request_ms', 'dom_ms', 'next_frame_ms'].forEach(function (key) {
+                const values = timingSamples.map(function (s) { return s[key]; })
+                    .filter(function (v) { return Number.isFinite(v); }).sort(function (a, b) { return a - b; });
+                result[key] = values.length ? {
+                    samples: values.length,
+                    mean: values.reduce(function (a, b) { return a + b; }, 0) / values.length,
+                    p95: values[Math.ceil(values.length * 0.95) - 1],
+                    max: values[values.length - 1],
+                } : null;
+            });
+            result.failures = timingSamples.filter(function (s) { return s.failed; }).length;
+            return result;
+        };
+    }
 
     function mineOf(s) {
         const mine = {};
@@ -585,9 +534,21 @@
         if (inFlight) return;
         clearTimeout(pollTimer);
         inFlight = true;
+        const requestStarted = performance.now();
+        const started = timingEnabled ? requestStarted : 0;
+        const timing = timingEnabled ? {
+            schedule_wait_ms: previousPollEnd === null ? null : started - previousPollEnd,
+            failed: true,
+        } : null;
         try {
             const s = await UI.fetchJSON('/api/kiosk/state');
+            if (timing) timing.request_ms = performance.now() - started;
+            if (!s.success) throw new Error('State unavailable');
             if (s.success) {
+                // A response requested before the local deadline may arrive
+                // after it; do not bring an expired summary back on screen.
+                if (s.state === 'summary' && summaryExpiredAt !== null && requestStarted <= summaryExpiredAt) return;
+                const domStarted = timingEnabled ? performance.now() : 0;
                 if (serverDown) {
                     serverDown = false;
                     renderBanners();
@@ -595,13 +556,26 @@
                 renderBoard(s.board || [], mineOf(s));
                 renderUnverified(s.unverified_returns || []);
                 render(s);
+                if (timing) {
+                    timing.failed = false;
+                    const domEnd = performance.now();
+                    timing.dom_ms = domEnd - domStarted;
+                    // Animation-frame boundary is a proxy, not proof of screen paint.
+                    requestAnimationFrame(function () { timing.next_frame_ms = performance.now() - domEnd; });
+                }
             }
         } catch (e) {
             if (!serverDown) {
                 serverDown = true;
                 renderBanners();
+                if (!lastBoardKey) $('rack-list').querySelector('.empty').textContent = 'Data alat belum tersedia. Menunggu koneksi pulih…';
             }
         } finally {
+            if (timing) {
+                previousPollEnd = performance.now();
+                timingSamples.push(timing);
+                if (timingSamples.length > 120) timingSamples.shift();
+            }
             inFlight = false;
             pollTimer = setTimeout(poll, POLL_MS);
         }
@@ -612,8 +586,7 @@
     document.addEventListener('DOMContentLoaded', function () {
         tickClock();
         setInterval(tickClock, 1000);
-        startCamera();
-        placeCamera(showScreen('idle').querySelector('[data-camera-slot]'), 'guide', {});
+        showScreen('idle');
         $('btn-end').addEventListener('click', function () { act('/api/kiosk/end', $('btn-end')); });
         $('btn-cancel').addEventListener('click', function () { act('/api/kiosk/cancel', $('btn-cancel')); });
         $('alarm-admin-btn').addEventListener('click', openAdmin);

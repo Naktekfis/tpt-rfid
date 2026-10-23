@@ -62,14 +62,14 @@ fi
 run "$APP_DIR/.venv/bin/pip" install --upgrade "pip<25.1" wheel
 run "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements.txt" -r "$APP_DIR/requirements-cv.txt"
 
-step "Face models (models/face/, SHA256-pinned download)"
-run "$APP_DIR/.venv/bin/python" "$APP_DIR/scripts/fetch_face_models.py"
+step "NFC reader dependencies (PN532 I2C)"
+run "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements-nfc.txt"
 
 step ".env"
 if [ -f "$APP_DIR/.env" ]; then
     echo ".env exists; not touching it. Make sure it has FLASK_ENV=production,"
     echo "RFID_READER_ENABLED=true, RFID_READER_PORT=/dev/rfid-reader,"
-    echo "CAMERA_ENABLED=true and no postgresql DATABASE_URL."
+    echo "NFC_READER_ENABLED=true, CAMERA_ENABLED=true and no postgresql DATABASE_URL."
 elif [ "$DRY_RUN" = 1 ]; then
     echo "+ create .env (FLASK_ENV=production, new SECRET_KEY, reader on /dev/rfid-reader, camera on)"
 else
@@ -80,6 +80,7 @@ FLASK_ENV=production
 SECRET_KEY=$secret
 RFID_READER_ENABLED=true
 RFID_READER_PORT=/dev/rfid-reader
+NFC_READER_ENABLED=true
 CAMERA_ENABLED=true
 CAMERA_INDEX=0
 EOF
@@ -107,6 +108,13 @@ if ! id -nG "$APP_USER" | tr ' ' '\n' | grep -qx video; then
     run sudo usermod -aG video "$APP_USER"
     echo "$APP_USER joins video (USB webcam) at next login."
 fi
+for access_group in i2c gpio; do
+    if getent group "$access_group" >/dev/null; then
+        run sudo usermod -aG "$access_group" "$APP_USER"
+    else
+        echo "Missing $access_group group: install Jetson I2C/GPIO access rules before enabling NFC."
+    fi
+done
 render "$HERE/99-tpt-rfid-reader.rules" /etc/udev/rules.d/99-tpt-rfid-reader.rules
 run sudo udevadm control --reload-rules
 run sudo udevadm trigger --subsystem-match=tty

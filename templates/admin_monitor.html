@@ -1,17 +1,25 @@
 {% extends "app_base.html" %}
-{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Monitor & Kelola", None)] %}
+{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Monitor Alat", None)] %}
 
-{% block title %}Monitor &amp; Kelola — Admin Lab Fabrikasi{% endblock %}
+{% block title %}Monitor Alat — Admin Lab Fabrikasi{% endblock %}
 
 {% block page %}
 <div class="page-head">
     <div>
-        <h1>Monitor &amp; Kelola</h1>
-        <p>Alarm, pengembalian yang belum diverifikasi, peminjaman, dan data wajah mahasiswa.</p>
+        <h1>Monitor Alat</h1>
+        <p>Status rak, pengembalian, peminjaman, dan pengelolaan alat.</p>
     </div>
-    <span class="section-head__meta num" id="updated"></span>
+    <div class="page-head__actions">
+        <span class="section-head__meta num" id="updated"></span>
+        <a class="btn btn--primary" href="{{ url_for('admin_input_tool') }}">Tambah alat / foto</a>
+    </div>
 </div>
 
+
+
+<div class="load-notice" id="state-error" role="status" hidden></div>
+
+<div class="admin-queues">
 <section class="section" aria-labelledby="alarms-title">
     <div class="section-head" id="alarms-head">
         <h2 id="alarms-title">Alarm terbuka</h2>
@@ -36,7 +44,7 @@
         <h2 id="unverified-title">Dikembalikan, belum diverifikasi</h2>
         <span class="section-head__meta" id="unverified-count"></span>
     </div>
-    <p class="field__hint">Alat kembali ke rak tanpa verifikasi wajah. Periksa alatnya, lalu verifikasi.</p>
+    <p class="field__hint">Alat kembali ke rak tanpa sesi NFC. Periksa alatnya, lalu verifikasi.</p>
     <table class="table">
         <thead>
             <tr>
@@ -52,11 +60,14 @@
     </table>
 </section>
 
+</div>
+
 <section class="section" aria-labelledby="loans-title">
     <div class="section-head">
         <h2 id="loans-title">Alat dan peminjaman</h2>
         <span class="section-head__meta" id="loans-count"></span>
     </div>
+    <div class="load-notice" id="tools-error" role="status" hidden></div>
     <div class="toolbar">
         <div class="field field--grow">
             <label class="field__label" for="loan-search">Cari</label>
@@ -65,9 +76,9 @@
         <div class="field">
             <label class="field__label" for="loan-status">Status</label>
             <select class="input input--sm" id="loan-status">
+                <option value="all">Semua alat</option>
                 <option value="borrowed">Dipinjam</option>
                 <option value="overdue">Terlambat</option>
-                <option value="all">Semua alat</option>
             </select>
         </div>
         <div class="field">
@@ -80,6 +91,7 @@
             </select>
         </div>
     </div>
+    <p class="field__hint">Kirim pengingat tersedia pada alat yang dipinjam dengan email mahasiswa. Ubah nama atau kategori lewat Edit alat.</p>
     <table class="table">
         <thead>
             <tr>
@@ -97,35 +109,28 @@
     </table>
 </section>
 
-<section class="section" aria-labelledby="students-title">
-    <div class="section-head">
-        <h2 id="students-title">Mahasiswa</h2>
-        <span class="section-head__meta" id="students-count"></span>
-    </div>
-    <div class="toolbar">
-        <div class="field field--grow">
-            <label class="field__label" for="student-search">Cari</label>
-            <input class="input input--sm" id="student-search" type="search" placeholder="Nama, NIM, atau email">
-        </div>
-    </div>
-    <table class="table">
-        <thead>
-            <tr>
-                <th scope="col">Mahasiswa</th>
-                <th scope="col">Kontak</th>
-                <th scope="col">Data wajah</th>
-                <th scope="col">Pinjaman aktif</th>
-                <th scope="col"><span class="visually-hidden">Tindakan</span></th>
-            </tr>
-        </thead>
-        <tbody id="students-body">
-            <tr><td class="empty" colspan="5">Memuat…</td></tr>
-        </tbody>
-    </table>
-</section>
 {% endblock %}
 
 {% block overlays %}
+<dialog class="dialog" id="edit-tool" aria-labelledby="edit-title">
+    <form id="edit-form">
+        <h2 id="edit-title">Edit alat</h2>
+        <p class="field__hint">Perubahan nama tidak mengubah nama pada riwayat peminjaman.</p>
+        <div class="field">
+            <label class="field__label" for="edit-name">Nama alat</label>
+            <input class="input" id="edit-name" maxlength="200" required>
+        </div>
+        <div class="field" id="edit-category-field">
+            <label class="field__label" for="edit-category">Kategori</label>
+            <input class="input" id="edit-category" maxlength="100" required>
+        </div>
+        <p class="field__hint" id="edit-hint"></p>
+        <div class="dialog__actions">
+            <button type="button" class="btn btn--secondary" id="edit-cancel">Batal</button>
+            <button type="submit" class="btn btn--primary" id="edit-save">Simpan</button>
+        </div>
+    </form>
+</dialog>
 <dialog class="dialog" id="confirm" aria-labelledby="confirm-title">
     <form method="dialog">
         <h2 id="confirm-title"></h2>

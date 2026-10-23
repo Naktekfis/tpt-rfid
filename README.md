@@ -35,6 +35,7 @@ Lihat [deploy/jetson/README.md](deploy/jetson/README.md): `deploy/jetson/install
 | `SECRET_KEY` | dev key | Wajib di production |
 | `RFID_READER_ENABLED` / `RFID_READER_PORT` | `false` / `/dev/ttyUSB0` | `/dev/rfid-reader` di Jetson |
 | `RFID_MISSING_AFTER` | `5` | Detik tag tak terbaca sebelum alat dianggap keluar (8 disarankan dengan banyak tag) |
+| `RFID_ALARM_CONFIRM_SECONDS` | `2` | Detik tambahan alat (tidak dipinjam) harus tetap hilang sebelum alarm; mencegah alarm palsu dari bacaan lemah |
 | `RFID_ALARM_ENABLED` | `true` | Buzzer reader saat alarm |
 | `CAMERA_ENABLED` / `CAMERA_INDEX` | `false` / `0` | Kamera USB |
 | `FACE_ENGINE` / `FACE_MATCH_THRESHOLD` | `yunet_sface` / bawaan engine | |

@@ -1,4 +1,3 @@
-import random
 from datetime import datetime, timedelta
 
 import pytest
@@ -30,23 +29,6 @@ class FakeReader:
         self.beeps += 1
 
 
-class FakeFaces:
-    """Frames are dicts: who (student dict | "unknown" | None), yaw, face (bool)."""
-
-    def identify_frame(self, frame):
-        who = frame.get("who")
-        if who is None:
-            return {"status": "no_face"}
-        if who == "unknown":
-            return {"status": "unknown"}
-        return {"status": "ok", "student": who}
-
-    def landmarks(self, frame):
-        if not frame.get("face", True):
-            return None
-        return [(0, 0), (10, 0), (5 + 10 * frame.get("yaw", 0.0), 5), (0, 9), (10, 9)]
-
-
 def make_student(database, n):
     return database.create_student(
         {
@@ -54,6 +36,8 @@ def make_student(database, n):
             "nim": f"2000000{n}",
             "email": f"s{n}@example.com",
             "phone": "0800000000",
+            "rfid_uid": f"0102030{n}",
+            "nfc_uid": f"0102030{n}",
         }
     )
 
@@ -71,15 +55,20 @@ def clock():
 
 @pytest.fixture()
 def kiosk(app, database, clock):
-    return Kiosk(app, database, FakeFaces(), clock=clock, rng=random.Random(1))
+    return Kiosk(app, database, clock=clock)
 
 
 @pytest.fixture()
 def env(app, database, kiosk, clock):
     reader = FakeReader()
     service = ToolPresenceService(
-        app, database, reader, PresenceMonitor(5.0, clock=clock), True,
-        clock=clock, kiosk=kiosk,
+        app,
+        database,
+        reader,
+        PresenceMonitor(5.0, clock=clock),
+        True,
+        clock=clock,
+        kiosk=kiosk,
     )
     return service, reader
 
@@ -94,25 +83,8 @@ def bob(database):
     return make_student(database, 2)
 
 
-def feed(kiosk, clock, frame, n=1, dt=0.4):
-    for _ in range(n):
-        clock.t += dt
-        kiosk.on_frame(frame)
-
-
-def run_challenges(kiosk, clock, who):
-    """Pass both head turns for `who`."""
-    while kiosk.state_dict()["state"] == "identifying":
-        direction = kiosk.state_dict()["direction"]
-        yaw = -0.5 if direction == "left" else 0.5
-        feed(kiosk, clock, {"who": who, "yaw": 0.0}, 2, dt=0.1)
-        feed(kiosk, clock, {"who": who, "yaw": yaw}, 1, dt=0.1)
-
-
 def start_session(kiosk, clock, who):
-    feed(kiosk, clock, {"who": who})
-    assert kiosk.state_dict()["state"] == "identifying"
-    run_challenges(kiosk, clock, who)
+    assert kiosk.on_card(who["rfid_uid"]) == "session"
     assert kiosk.state_dict()["state"] == "session"
 
 
@@ -133,65 +105,51 @@ def tool_back(service, clock, uid):
     service.on_round([uid])
 
 
-# ---- identification ----
+# ---- NFC identity ----
 
 
-def test_identify_and_both_turns_start_session(kiosk, clock, alice):
+def test_registered_card_starts_session(kiosk, alice):
     assert kiosk.state_dict()["state"] == "idle"
-    feed(kiosk, clock, {"who": alice})
-    st = kiosk.state_dict()
-    assert st["state"] == "identifying" and st["step"] == 1 and st["steps"] == 2
-    first = st["direction"]
-    feed(kiosk, clock, {"who": alice, "yaw": 0.0}, 2, dt=0.1)
-    # wrong direction does not pass
-    feed(kiosk, clock, {"who": alice, "yaw": 0.5 if first == "left" else -0.5}, 1, dt=0.1)
-    assert kiosk.state_dict()["step"] == 1
-    feed(kiosk, clock, {"who": alice, "yaw": -0.5 if first == "left" else 0.5}, 1, dt=0.1)
-    st = kiosk.state_dict()
-    assert st["state"] == "identifying" and st["step"] == 2
-    assert st["direction"] != first  # both directions, once each
-    run_challenges(kiosk, clock, alice)
-    st = kiosk.state_dict()
-    assert st["state"] == "session"
-    assert st["student"]["student_id"] == alice["student_id"]
-    assert 59.0 <= st["expires_in"] <= 60.0
+    assert kiosk.on_card(alice["rfid_uid"]) == "session"
+    state = kiosk.state_dict()
+    assert state["student"]["student_id"] == alice["student_id"]
+    assert state["expires_in"] == 60.0
+    assert state["can_cancel"] is True
 
 
-def test_challenge_timeout_returns_to_idle(kiosk, clock, alice):
-    feed(kiosk, clock, {"who": alice})
-    # keep the face visible and frontal but never turn
-    feed(kiosk, clock, {"who": alice, "yaw": 0.0}, 21, dt=0.4)
-    st = kiosk.state_dict()
-    assert st["state"] == "idle" and st["reason"] == "challenge_timeout"
-    # a short pause before the next attempt, then it starts again
-    feed(kiosk, clock, {"who": alice}, 1, dt=0.4)
-    assert kiosk.state_dict()["state"] == "idle"
-    feed(kiosk, clock, {"who": alice}, 1, dt=2.0)
-    assert kiosk.state_dict()["state"] == "identifying"
-
-
-def test_different_face_mid_challenge_aborts(kiosk, clock, alice, bob):
-    feed(kiosk, clock, {"who": alice})
-    feed(kiosk, clock, {"who": bob, "yaw": 0.0}, 1, dt=1.1)
-    assert kiosk.state_dict()["state"] == "identifying"  # one mismatch only
-    feed(kiosk, clock, {"who": bob, "yaw": 0.0}, 1, dt=1.1)
-    st = kiosk.state_dict()
-    assert st["state"] == "idle" and st["reason"] == "different_face"
-
-
-def test_face_lost_aborts(kiosk, clock, alice):
-    feed(kiosk, clock, {"who": alice})
-    feed(kiosk, clock, {"who": None, "face": False}, 1, dt=3.5)
-    assert kiosk.state_dict()["reason"] == "face_lost"
-
-
-def test_unknown_face_then_idle(kiosk, clock):
-    feed(kiosk, clock, {"who": "unknown"})
-    assert kiosk.state_dict()["state"] == "unknown_face"
+def test_unknown_card_then_idle(kiosk, clock):
+    assert kiosk.on_card("DEADBEEF") == "unknown_card"
+    state = kiosk.state_dict()
+    assert state["state"] == "unknown_card"
+    assert state["student"] is None
+    assert state["unknown_ends_in"] == 5.0
     clock.t += 4
-    assert kiosk.state_dict()["state"] == "unknown_face"
-    clock.t += 1.5
+    assert kiosk.state_dict()["state"] == "unknown_card"
+    clock.t += 1
     assert kiosk.state_dict()["state"] == "idle"
+
+
+def test_known_card_can_follow_unknown_card(kiosk, alice):
+    kiosk.on_card("DEADBEEF")
+    assert kiosk.on_card(alice["rfid_uid"]) == "session"
+
+
+def test_cards_never_replace_or_extend_active_session(kiosk, clock, alice, bob):
+    kiosk.on_card(alice["rfid_uid"])
+    clock.t += 10
+    for uid in (alice["rfid_uid"], bob["rfid_uid"], "DEADBEEF"):
+        assert kiosk.on_card(uid) == "busy"
+        state = kiosk.state_dict()
+        assert state["student"]["student_id"] == alice["student_id"]
+        assert state["expires_in"] == 50.0
+    assert kiosk.start_session(bob) is False
+
+
+def test_card_can_start_session_after_summary(kiosk, alice, bob):
+    kiosk.on_card(alice["rfid_uid"])
+    kiosk.end()
+    assert kiosk.on_card(bob["rfid_uid"]) == "session"
+    assert kiosk.state_dict()["student"]["student_id"] == bob["student_id"]
 
 
 # ---- session: tool events ----
@@ -226,8 +184,12 @@ def test_session_return_own_and_others(env, kiosk, clock, alice, bob, database):
     tool_back(service, clock, "T1")
     tool_back(service, clock, "T2")
     rows = {t.tool_name: t for t in Transaction.query.all()}
-    assert rows["T1"].status == "returned" and rows["T1"].returned_by_id == int(alice["student_id"])
-    assert rows["T2"].status == "returned" and rows["T2"].returned_by_id == int(alice["student_id"])
+    assert rows["T1"].status == "returned" and rows["T1"].returned_by_id == int(
+        alice["student_id"]
+    )
+    assert rows["T2"].status == "returned" and rows["T2"].returned_by_id == int(
+        alice["student_id"]
+    )
     assert rows["T2"].student_id == int(bob["student_id"])
     assert rows["T2"].return_verified is True
     assert Tool.query.filter_by(status="available").count() == 2
@@ -261,9 +223,9 @@ def test_timeout_summary_idle(env, kiosk, clock, alice):
     clock.t += 61
     st = kiosk.state_dict()
     assert st["state"] == "summary" and st["borrowed"] == []
-    clock.t += 7
+    clock.t += 4
     assert kiosk.state_dict()["state"] == "summary"
-    clock.t += 2
+    clock.t += 1
     assert kiosk.state_dict()["state"] == "idle"
 
 
@@ -272,6 +234,10 @@ def test_end_goes_to_summary(kiosk, clock, alice):
     start_session(kiosk, clock, alice)
     assert kiosk.end() is True
     assert kiosk.state_dict()["state"] == "summary"
+    clock.t += 4.9
+    assert kiosk.state_dict()["state"] == "summary"
+    clock.t += 0.1
+    assert kiosk.state_dict()["state"] == "idle"
 
 
 def test_cancel_before_and_after_tool_events(env, kiosk, clock, alice, database):
@@ -316,7 +282,9 @@ def test_no_session_back_of_borrowed_is_unverified_return(env, clock, alice, dat
     assert [u["tool_id"] for u in database.get_unverified_returns()] == [t["tool_id"]]
 
 
-def test_session_start_verifies_own_unverified_returns(env, kiosk, clock, alice, bob, database):
+def test_session_start_verifies_own_unverified_returns(
+    env, kiosk, clock, alice, bob, database
+):
     service, _ = env
     a = make_tool(database, "T1")
     b = make_tool(database, "T2")
@@ -332,7 +300,9 @@ def test_session_start_verifies_own_unverified_returns(env, kiosk, clock, alice,
     left = database.get_unverified_returns()
     assert [u["tool_id"] for u in left] == [b["tool_id"]]
     own = Transaction.query.filter_by(tool_id=int(a["tool_id"])).one()
-    assert own.return_verified is True and own.returned_by_id == int(alice["student_id"])
+    assert own.return_verified is True and own.returned_by_id == int(
+        alice["student_id"]
+    )
 
 
 # ---- alarm grace ----
@@ -407,8 +377,14 @@ def test_state_shape(client, app_kiosk, database):
     assert set(data) >= {"board", "alarms", "unverified_returns", "student", "reason"}
     unit = data["board"][0]["units"][0]
     assert set(unit) >= {
-        "tool_id", "unit_no", "presence", "status",
-        "borrower_name", "borrower_nim", "due_at", "is_overdue",
+        "tool_id",
+        "unit_no",
+        "presence",
+        "status",
+        "borrower_name",
+        "borrower_nim",
+        "due_at",
+        "is_overdue",
     }
     assert data["board"][0]["type_name"]
 
@@ -417,7 +393,12 @@ def test_debug_identify_end_cancel(client, app_kiosk, alice):
     assert client.get("/debug/kiosk/identify?student_id=999").status_code == 404
     res = client.get(f"/debug/kiosk/identify?student_id={alice['student_id']}")
     assert res.get_json()["success"] is True
-    assert client.get(f"/debug/kiosk/identify?student_id={alice['student_id']}").status_code == 409
+    assert (
+        client.get(
+            f"/debug/kiosk/identify?student_id={alice['student_id']}"
+        ).status_code
+        == 409
+    )
     data = client.get("/api/kiosk/state").get_json()
     assert data["state"] == "session" and data["student"]["name"] == "S1"
     assert "photo_data" not in data["student"]

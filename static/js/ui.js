@@ -11,16 +11,46 @@
     }
 
     // fetch() that always resolves to {success, error, ...} (also for 429/500
-    // HTML pages). Rejects only on network failure.
+    // HTML pages). GETs also reject after 5 s so a stalled poll can recover.
     async function fetchJSON(url, options) {
-        const response = await fetch(url, Object.assign({ credentials: 'same-origin' }, options || {}));
-        try {
-            return await response.json();
-        } catch (e) {
-            if (response.status === 429) {
-                return { success: false, error: 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.' };
+        const request = Object.assign({ credentials: 'same-origin' }, options || {});
+        async function readJSON() {
+            const response = await fetch(url, request);
+            try {
+                return await response.json();
+            } catch (e) {
+                if (response.status === 429) {
+                    return { success: false, error: 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.' };
+                }
+                return { success: false, error: 'Terjadi kesalahan server (HTTP ' + response.status + ')' };
             }
-            return { success: false, error: 'Terjadi kesalahan server (HTTP ' + response.status + ')' };
+        }
+        // Mutations may legitimately take longer and must never be retried here.
+        if ((request.method || 'GET').toUpperCase() !== 'GET') return readJSON();
+        const callerSignal = request.signal;
+        const controller = new AbortController();
+        request.signal = controller.signal;
+        let timer;
+        let onAbort;
+        const deadline = new Promise(function (resolve, reject) {
+            function cancel(name, message) {
+                const error = new Error(message);
+                error.name = name;
+                reject(error);
+                controller.abort();
+            }
+            onAbort = function () { cancel('AbortError', 'Request cancelled'); };
+            timer = setTimeout(function () { cancel('TimeoutError', 'Request timed out'); }, 5000);
+            if (callerSignal) {
+                callerSignal.addEventListener('abort', onAbort, { once: true });
+                if (callerSignal.aborted) onAbort();
+            }
+        });
+        try {
+            return await Promise.race([deadline, readJSON()]);
+        } finally {
+            clearTimeout(timer);
+            if (callerSignal) callerSignal.removeEventListener('abort', onAbort);
         }
     }
 
@@ -131,7 +161,43 @@
         });
     }
 
+    // Persistent, deduplicated feedback for data that may be stale.
+    function loadNotice(id, message, retry) {
+        const box = document.getElementById(id);
+        if (!box) return;
+        box.hidden = !message;
+        if (box.dataset.message === message) return;
+        box.dataset.message = message;
+        box.textContent = '';
+        if (!message) return;
+        box.appendChild(h('span', { text: message }));
+        if (retry) {
+            const button = h('button', { type: 'button', class: 'btn btn--secondary btn--sm', text: 'Coba lagi' });
+            button.addEventListener('click', async function () {
+                button.disabled = true;
+                button.textContent = 'Memuat…';
+                try { await retry(); }
+                finally { button.disabled = false; button.textContent = 'Coba lagi'; }
+            });
+            box.appendChild(button);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.page .table').forEach(function (table) {
+            const section = table.closest('.section');
+            const heading = (section && section.querySelector('h2')) || document.querySelector('.page h1');
+            const wrapper = h('div', {
+                class: 'table-scroll', tabindex: '0', role: 'region',
+                'aria-label': (heading ? heading.textContent : 'Tabel data') + '. Geser ke samping untuk melihat seluruh kolom.',
+            });
+            table.before(wrapper);
+            wrapper.appendChild(table);
+        });
+    });
+
     window.UI = {
+        loadNotice: loadNotice,
         getCSRFToken: getCSRFToken,
         postForm: postForm,
         startClock: startClock,

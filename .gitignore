@@ -86,3 +86,4 @@ build/
 
 # Downloaded face models (scripts/fetch_face_models.py)
 models/
+Scanner.zip

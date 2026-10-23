@@ -27,7 +27,7 @@ from flask import (
     Response,
     stream_with_context,
 )
-from utils.cv_handler import (
+from legacy.face.utils.cv_handler import (
     camera,
     get_system_stats,
     generate_live_frames,

@@ -2,7 +2,10 @@ import re
 from pathlib import Path
 
 STATIC = Path(__file__).resolve().parent.parent / "static"
-EXTERNAL = re.compile(r"""(?:src|href)\s*=\s*["']\s*(?:https?:)?//|url\(\s*["']?\s*(?:https?:)?//|@import""", re.I)
+EXTERNAL = re.compile(
+    r"""(?:src|href)\s*=\s*["']\s*(?:https?:)?//|url\(\s*["']?\s*(?:https?:)?//|@import""",
+    re.I,
+)
 
 
 def test_kiosk_page_renders_without_external_assets(client):
@@ -15,7 +18,13 @@ def test_kiosk_page_renders_without_external_assets(client):
 
 
 def test_kiosk_static_assets_are_local():
-    for rel in ("css/tokens.css", "css/ui.css", "css/kiosk.css", "js/ui.js", "js/kiosk.js"):
+    for rel in (
+        "css/tokens.css",
+        "css/ui.css",
+        "css/kiosk.css",
+        "js/ui.js",
+        "js/kiosk.js",
+    ):
         text = (STATIC / rel).read_text(encoding="utf-8")
         assert not EXTERNAL.search(text), rel
         assert "http://" not in text and "https://" not in text, rel
@@ -29,7 +38,12 @@ def test_tool_type_photo_and_board_url(client, database):
 
     tt = database.create_tool_type("Bor Listrik")
     database.create_tool(
-        {"name": "Bor Listrik #1", "rfid_uid": "EPC-1", "type_id": int(tt["type_id"]), "unit_no": 1}
+        {
+            "name": "Bor Listrik #1",
+            "rfid_uid": "EPC-1",
+            "type_id": int(tt["type_id"]),
+            "unit_no": 1,
+        }
     )
     url = f"/api/tool_type/{tt['type_id']}/photo"
     assert client.get(url).status_code == 404
@@ -53,3 +67,19 @@ def test_devices_status(client):
     assert data["success"] is True
     assert data["reader"]["mode"] == "mock"
     assert data["camera"]["enabled"] is False
+
+
+def test_admin_alert_poll_is_authorized_and_omits_full_board(client, admin_client):
+    from tests.conftest import TEST_PIN
+
+    assert client.get("/api/admin/kiosk/alerts").status_code == 401
+    assert (
+        admin_client.post("/api/admin/login", json={"pin": TEST_PIN}).status_code == 200
+    )
+    response = admin_client.get("/api/admin/kiosk/alerts")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["success"] is True
+    assert payload["alarms"] == []
+    assert payload["unverified_returns"] == []
+    assert "board" not in payload

@@ -1,28 +1,24 @@
 {% extends "app_base.html" %}
 {% if enroll_student %}
-{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Monitor", url_for('admin_monitor')), ("Rekam ulang wajah", None)] %}
+{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Monitor", url_for('admin_monitor')), ("Daftarkan kartu", None)] %}
 {% else %}
 {% set crumbs = [("Beranda", url_for('index')), ("Mahasiswa", url_for('mahasiswa_menu')), ("Daftar", None)] %}
 {% endif %}
-
-{% block title %}Daftar — Lab Fabrikasi{% endblock %}
+{% block title %}Daftar kartu — Lab Fabrikasi{% endblock %}
 {% block page_class %}page--fill{% endblock %}
-
 {% block page %}
-<!-- Step 1: personal data -->
-<section class="reg-step" id="step-form" {% if enroll_student %}hidden{% endif %}>
+<section class="reg-step" id="step-form">
     <div class="page-head">
         <div>
-            <h1>Daftar</h1>
-            <p>Langkah 1 dari 2 · Isi data diri Anda. Setelah itu wajah Anda direkam di kamera kiosk.</p>
+            <h1>{% if enroll_student %}Daftarkan kartu{% else %}Daftar mahasiswa{% endif %}</h1>
+            <p>{% if enroll_student %}Hubungkan kartu NFC ke {{ enroll_student.name }} ({{ enroll_student.nim }}).{% else %}Isi data diri, lalu tempelkan kartu NFC untuk menghubungkannya dengan akun Anda.{% endif %}</p>
         </div>
     </div>
-
     <form class="form reg-form" id="reg-form" autocomplete="off" novalidate>
-        <div class="form__row">
+        <div class="form__row" {% if enroll_student %}hidden{% endif %}>
             <div class="field">
                 <label class="field__label" for="name">Nama lengkap</label>
-                <input class="input" id="name" name="name" type="text" maxlength="200" required autofocus>
+                <input class="input" id="name" name="name" type="text" maxlength="200" required {% if not enroll_student %}autofocus{% endif %}>
             </div>
             <div class="field">
                 <label class="field__label" for="nim">NIM</label>
@@ -31,7 +27,7 @@
                 <span class="field__hint" id="nim-hint">Huruf atau angka, 5 sampai 20 karakter</span>
             </div>
         </div>
-        <div class="form__row">
+        <div class="form__row" {% if enroll_student %}hidden{% endif %}>
             <div class="field">
                 <label class="field__label" for="email">Email</label>
                 <input class="input" id="email" name="email" type="email" maxlength="200" required
@@ -43,64 +39,32 @@
                 <input class="input" id="phone" name="phone" type="tel" maxlength="20" required>
             </div>
         </div>
-        <label class="check">
-            <input type="checkbox" id="consent" name="consent" required>
-            <span>Saya setuju foto wajah saya disimpan untuk verifikasi peminjaman alat di Lab Fabrikasi. Data dapat
-                dihapus oleh admin atas permintaan saya.</span>
-        </label>
+        <div class="field">
+            <span class="field__label">Kartu NFC</span>
+            <p id="nfc-status" role="status" aria-live="polite">Tekan tombol di bawah sebelum menempelkan kartu.</p>
+            <div class="form__actions">
+                <button type="button" class="btn btn--secondary" id="nfc-start">Baca kartu NFC</button>
+            </div>
+            <span class="field__hint">Gunakan kartu Anda sendiri. Tidak ada data yang ditulis ke kartu.</span>
+        </div>
         <p class="form-error" id="form-error" role="alert"></p>
         <div class="form__actions">
-            <button type="submit" class="btn btn--primary btn--lg" id="form-submit">Lanjut ke rekam wajah</button>
-            <a href="{{ url_for('mahasiswa_menu') }}">Batal</a>
+            <button type="submit" class="btn btn--primary btn--lg" id="form-submit" disabled>{% if enroll_student %}Simpan kartu{% else %}Daftar{% endif %}</button>
+            <a href="{% if enroll_student %}{{ url_for('admin_monitor') }}{% else %}{{ url_for('mahasiswa_menu') }}{% endif %}">Batal</a>
         </div>
     </form>
 </section>
-
-<!-- Step 2: face capture -->
-<section class="reg-step reg-face" id="step-face" {% if not enroll_student %}hidden{% endif %}>
-    <div class="page-head">
-        <div>
-            <h1>{% if enroll_student %}Rekam ulang wajah{% else %}Rekam wajah{% endif %}</h1>
-            <p>{% if not enroll_student %}Langkah 2 dari 2 · {% endif %}<span id="face-who">{% if enroll_student %}{{ enroll_student.name }} ({{ enroll_student.nim }}){% endif %}</span></p>
-        </div>
-    </div>
-
-    <div class="reg-face__grid">
-        <div class="camera-panel camera-panel--mirror reg-face__camera" id="cam">
-            <img class="camera-panel__img" id="cam-img" alt="Tampilan kamera" hidden>
-            <span class="camera-panel__label" id="cam-label">Menyambungkan kamera…</span>
-            <svg class="camera-panel__guide" viewBox="0 0 300 380" aria-hidden="true">
-                <ellipse cx="150" cy="190" rx="130" ry="170" />
-            </svg>
-        </div>
-
-        <div class="reg-face__side">
-            <div class="stack-sm" id="face-intro">
-                <p class="reg-face__instruction">Lihat lurus ke kamera, lalu gerakkan kepala sedikit ke kiri dan kanan.</p>
-                <p class="lead">Perekaman berlangsung sekitar dua detik. Pastikan wajah berada di dalam bingkai,
-                    hanya Anda yang terlihat, dan cahaya cukup.</p>
-            </div>
-            <div class="form__actions" id="face-actions">
-                <button type="button" class="btn btn--primary btn--lg" id="face-btn">Rekam wajah</button>
-                <span class="muted" id="face-busy" role="status" hidden>Merekam… tetap lihat ke kamera.</span>
-            </div>
-            <p class="reg-face__restart" id="face-restart" hidden>Bukan data Anda?
-                <button type="button" class="linkbtn" id="face-restart-btn">Isi formulir baru</button></p>
-            <div class="result" id="face-result" role="status" aria-live="polite" hidden></div>
-        </div>
-    </div>
+<section class="result result--ok" id="registration-done" role="status" hidden>
+    <h2>Kartu tersimpan.</h2>
+    <p>Angkat kartu dari pembaca. Kembali ke kiosk, lalu tempelkan lagi untuk membuka sesi pinjam atau kembali.</p>
+    <a class="btn btn--primary btn--lg" href="{{ url_for('kiosk_page') }}">Ke kiosk</a>
+    {% if enroll_student %}<a class="btn btn--secondary" href="{{ url_for('admin_monitor') }}">Kembali ke Monitor</a>{% endif %}
 </section>
 {% endblock %}
-
 {% block page_scripts %}
 <script>
     window.REGISTER_CONFIG = {
-        cameraStream: "/camera/stream",
-        kioskUrl: "{{ url_for('kiosk_page') }}",
-        menuUrl: "{{ url_for('mahasiswa_menu') }}",
-        adminMonitorUrl: "{{ url_for('admin_monitor') }}",
-        student: {% if enroll_student %}{{ {"student_id": enroll_student.student_id, "name": enroll_student.name, "nim": enroll_student.nim} | tojson }}{% else %}null{% endif %},
-        adminMode: {{ 'true' if enroll_student else 'false' }},
+        student: {% if enroll_student %}{{ {"student_id": enroll_student.student_id} | tojson }}{% else %}null{% endif %},
     };
 </script>
 <script src="{{ url_for('static', filename='js/register.js') }}"></script>
