@@ -151,4 +151,10 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
 - Dev-server tip: the laptop `.env` enables the real reader; for demos run with
   `RFID_READER_ENABLED=false NFC_READER_ENABLED=false CAMERA_ENABLED=false` and a scratch
   `DATABASE_URL`.
-- Next: step 2 (emails on due and due+2 days); needs a real Gmail app password on the Jetson.
+- Step 2 CODE DONE, deployed `v2026.10.24.4` (`f857f28`), reminders OFF.
+  `utils/loan_reminders.py` + table `loan_reminders` + `scripts/loan_reminders.py`
+  (dry-run counts). Jetson dry run 2026-10-24: due=0 overdue=0. Jetson `.env` has no
+  MAIL_USERNAME/MAIL_PASSWORD/LOAN_REMINDERS_ENABLED yet: the user adds them (Gmail
+  app password), then `kill -HUP $(systemctl show -p MainPID --value tpt-rfid)`; log
+  should say "Loan reminder emails on". Manual admin email unchanged.
+- Next: step 3 (remove `/mahasiswa` and `/` landing).
