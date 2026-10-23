@@ -35,10 +35,11 @@ exec > >(tee "$RUN/update.log") 2>&1
 echo "prev $PREV, new $NEW, run dir $RUN"
 
 say "tests in staging worktree"
-git worktree add -q --detach "$RUN/stage" "$NEW"
+# Jetson git is 2.17: no "worktree add -q", no "worktree remove".
+git worktree add --detach "$RUN/stage" "$NEW" >/dev/null 2>&1
 (cd "$RUN/stage" && "$PY" -m pytest -q -p no:cacheprovider 2>&1 | tail -5; exit "${PIPESTATUS[0]}") \
     || die "tests failed for $TAG; nothing installed"
-git worktree remove --force "$RUN/stage"
+rm -rf "$RUN/stage" && git worktree prune
 
 say "backup (code tree + DB)"
 tar -czf "$RUN/code-before.tgz" --exclude=.git --exclude=.venv --exclude=instance \
