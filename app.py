@@ -285,14 +285,8 @@ def inject_cv_availability():
 
 @app.route("/")
 def index():
-    """Role selection landing page"""
-    return render_template("landing.html")
-
-
-@app.route("/mahasiswa")
-def mahasiswa_menu():
-    """Mahasiswa welcome/menu page"""
-    return render_template("welcome.html")
+    """No landing page: the device is the kiosk; admins go to /admin."""
+    return redirect(url_for("kiosk_page"))
 
 
 @app.route("/register")
@@ -343,7 +337,7 @@ def admin_login():
 def admin_logout():
     """Admin logout"""
     session.pop("admin_logged_in", None)
-    return redirect(url_for("index"))
+    return redirect(url_for("admin_login"))
 
 
 @app.route("/admin/monitor")

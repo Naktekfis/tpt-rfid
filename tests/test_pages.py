@@ -10,8 +10,6 @@ EXTERNAL = re.compile(
 )
 
 PUBLIC = [
-    "/",
-    "/mahasiswa",
     "/register",
     "/daftar",
     "/monitor",
@@ -37,6 +35,19 @@ def test_admin_page_redirects_without_session(client):
     resp = client.get("/admin", headers={"Accept": "text/html"})
     assert resp.status_code == 302
     assert "/admin/login" in resp.headers["Location"]
+
+
+@pytest.mark.parametrize("path", ["/", "/mahasiswa"])
+def test_old_menus_lead_to_kiosk(client, path):
+    resp = client.get(path, follow_redirects=True)
+    assert resp.status_code == 200
+    assert resp.request.path == "/kiosk"
+
+
+def test_logout_returns_to_admin_login(admin_client):
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    resp = admin_client.get("/admin/logout")
+    assert resp.headers["Location"].endswith("/admin/login")
 
 
 def test_scan_redirects_to_kiosk(client):

@@ -1,8 +1,8 @@
 {% extends "app_base.html" %}
 {% if enroll_student %}
-{% set crumbs = [("Beranda", url_for('index')), ("Admin", url_for('admin_menu')), ("Monitor", url_for('admin_monitor')), ("Daftarkan kartu", None)] %}
+{% set crumbs = [("Admin", url_for('admin_menu')), ("Monitor", url_for('admin_monitor')), ("Daftarkan kartu", None)] %}
 {% else %}
-{% set crumbs = [("Beranda", url_for('index')), ("Mahasiswa", url_for('mahasiswa_menu')), ("Daftar", None)] %}
+{% set crumbs = [("Kiosk", url_for('kiosk_page')), ("Daftar", None)] %}
 {% endif %}
 {% block title %}Daftar kartu — Lab Fabrikasi{% endblock %}
 {% block page_class %}page--fill{% endblock %}
@@ -50,7 +50,7 @@
         <p class="form-error" id="form-error" role="alert"></p>
         <div class="form__actions">
             <button type="submit" class="btn btn--primary btn--lg" id="form-submit" disabled>{% if enroll_student %}Simpan kartu{% else %}Daftar{% endif %}</button>
-            <a href="{% if enroll_student %}{{ url_for('admin_monitor') }}{% else %}{{ url_for('mahasiswa_menu') }}{% endif %}">Batal</a>
+            <a href="{% if enroll_student %}{{ url_for('admin_monitor') }}{% else %}{{ url_for('kiosk_page') }}{% endif %}">Batal</a>
         </div>
     </form>
 </section>

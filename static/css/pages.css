@@ -6,7 +6,7 @@
  *   .topbar, .crumbs                thin top bar with breadcrumb and clock
  *   .page, .page--narrow, .page--menu   scrolling page body
  *   .page-head (h1 + p + __actions) page title row
- *   .menu, .menu__link              menu list (landing / mahasiswa / admin)
+ *   .menu, .menu__link              menu list (admin)
  *   .form, .form__row, .check       forms (physical keyboard, Enter submits)
  *   .btn--sm, .linkbtn              small button, text button
  *   .section                        titled block on admin pages

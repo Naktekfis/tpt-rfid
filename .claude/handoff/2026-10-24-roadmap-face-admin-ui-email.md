@@ -158,3 +158,10 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
   app password), then `kill -HUP $(systemctl show -p MainPID --value tpt-rfid)`; log
   should say "Loan reminder emails on". Manual admin email unchanged.
 - Next: step 3 (remove `/mahasiswa` and `/` landing).
+- Step 3 DONE (tag v2026.10.24.5): `/` redirects to `/kiosk`; `/mahasiswa`, `landing.html`
+  and `welcome.html` removed (old links 404 → `/` → `/kiosk`). Crumbs drop "Beranda";
+  public pages start at "Kiosk", admin pages at "Admin"; logout goes to `/admin/login`;
+  brand link goes to `/admin` on admin pages, else `/kiosk`. Mail credentials: none exist
+  anywhere (laptop `.env` and git history only hold placeholders), user still to create
+  a Gmail app password.
+- Next: step 4 (admin UI redesign, ui-review process).

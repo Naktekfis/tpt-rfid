@@ -12,7 +12,7 @@
 
 {% block header %}
 <header class="topbar">
-    <a class="topbar__brand" href="{{ url_for('index') }}">
+    <a class="topbar__brand" href="{{ url_for('admin_menu') if request.path.startswith('/admin') else url_for('kiosk_page') }}">
         <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}"
             alt="Institut Teknologi Bandung">
         <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
