@@ -47,6 +47,7 @@ from routes.nfc_routes import create_nfc_blueprint, capture_owner
 from utils.presence import PresenceMonitor
 from utils.tool_presence import ToolPresenceService
 from utils.security import SecurityService
+from utils.loan_reminders import LoanReminderService
 
 # Configure logging
 logging.basicConfig(
@@ -147,11 +148,36 @@ _reloader_parent = (
 )
 nfc_reader = create_nfc_reader(enabled=app.config.get("NFC_READER_ENABLED", False))
 nfc_service = NFCService(app, nfc_reader, kiosk)
+
+
+def send_reminder_mail(recipient: str, subject: str, body: str) -> None:
+    mail.send(
+        Message(
+            subject=subject,
+            sender=("Lab Fabrikasi Teknik Fisika ITB", app.config["MAIL_USERNAME"]),
+            recipients=[recipient],
+            body=body,
+        )
+    )
+
+
+loan_reminders = LoanReminderService(
+    app,
+    send_reminder_mail,
+    interval=app.config.get("LOAN_REMINDER_INTERVAL_SECONDS", 300),
+    overdue_days=app.config.get("LOAN_OVERDUE_REMINDER_DAYS", 2),
+)
 if not _reloader_parent:
     rfid_reader.start()
     camera.start()
     nfc_reader.start()
     security_service.start()
+    if app.config.get("LOAN_REMINDERS_ENABLED"):
+        if app.config["MAIL_USERNAME"] and app.config["MAIL_PASSWORD"]:
+            loan_reminders.start()
+            logger.info("Loan reminder emails on")
+        else:
+            logger.warning("LOAN_REMINDERS_ENABLED but MAIL_USERNAME/PASSWORD unset")
 
 # Ensure upload folder exists
 os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
@@ -1375,6 +1401,7 @@ def internal_error(error):
 
 def cleanup():
     """Cleanup resources on application shutdown"""
+    loan_reminders.stop()
     security_service.stop()
     nfc_reader.stop()
     rfid_reader.stop()

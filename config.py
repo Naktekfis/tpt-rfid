@@ -79,6 +79,15 @@ class Config:
 
     # Loan period in days (Transaction.due_at = borrow_time + LOAN_DAYS).
     LOAN_DAYS = 2
+    # Automatic reminder emails (utils/loan_reminders.py): one when a borrow is
+    # due, one LOAN_OVERDUE_REMINDER_DAYS later. Off until mail is configured.
+    LOAN_REMINDERS_ENABLED = (
+        os.getenv("LOAN_REMINDERS_ENABLED", "false").lower() == "true"
+    )
+    LOAN_OVERDUE_REMINDER_DAYS = int(os.getenv("LOAN_OVERDUE_REMINDER_DAYS", "2"))
+    LOAN_REMINDER_INTERVAL_SECONDS = int(
+        os.getenv("LOAN_REMINDER_INTERVAL_SECONDS", "300")
+    )
 
     # Kiosk session (NFC tap, then tools leaving/returning are
     # attributed to the student). Extended on every tool event, capped at

@@ -241,6 +241,22 @@ class Transaction(db.Model):
         return f"<Transaction {self.id} - {self.status}>"
 
 
+class LoanReminder(db.Model):
+    """One automatic reminder email per (borrow, kind); see utils/loan_reminders."""
+
+    __tablename__ = "loan_reminders"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    transaction_id = db.Column(
+        db.Integer, db.ForeignKey("transactions.id"), nullable=False, index=True
+    )
+    kind = db.Column(db.String(20), nullable=False)  # due | overdue
+    # Set once the mail went out; a row without it is a claimed, unsent reminder.
+    sent_at = db.Column(db.DateTime, nullable=True)
+
+    __table_args__ = (db.UniqueConstraint("transaction_id", "kind"),)
+
+
 class AlarmEvent(db.Model):
     """A tool left the reader field while it was not borrowed."""
 
