@@ -165,3 +165,7 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
   anywhere (laptop `.env` and git history only hold placeholders), user still to create
   a Gmail app password.
 - Next: step 4 (admin UI redesign, ui-review process).
+- Step 4 DROPPED by the user (2026-10-24): "desain yg sekarang udh bagus", keep design D
+  as is, no admin redesign. Known leftover if ever wanted: at 360 px the admin tables
+  squeeze (monitor table columns wrap per letter); not requested.
+- Next: step 5 (face admin login), starting with anti-spoofing research.
