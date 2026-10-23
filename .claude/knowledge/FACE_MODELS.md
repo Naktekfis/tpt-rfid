@@ -14,3 +14,23 @@ Facts checked on OpenCV 5.0.0 (dev): both MiniFASNet files take 1x3x80x80 float 
 Open: not yet verified that OpenCV 4.x on the Jetson loads `..._2023mar.onnx` (needs 4.5.4+ / 4.8 for the 2023 YuNet ops); fall back to `face_detection_yunet_2022mar.onnx` if not.
 
 Engines (`utils/face.py`): `yunet_sface` (distance 1 - cosine, threshold 0.637) and `dlib` (raw 128-d, L2, threshold 0.5). Stored embeddings carry the engine name; switching `FACE_ENGINE` needs re-enrolment.
+
+## Anti-spoofing for admin face login (research 2026-10-24)
+Jetson facts (checked): `.venv` (Py 3.8) has OpenCV 5.0.0 **without CUDA**; no onnxruntime;
+TensorRT 8.2.1 exists only for the system Python, so inference is CPU `cv2.dnn`. Camera is a
+generic USB RGB webcam ("YLX Streaming Webcams", `/dev/video0`), no IR or depth.
+- RGB-only passive models do not generalise well across camera/lighting; numbers in READMEs
+  are self-reported on public datasets. Calibrate thresholds on this camera with real
+  print and phone-replay attempts.
+- Candidates: current MiniFASNetV2 + V1SE (80x80, cv2.dnn, ms per frame on CPU);
+  `facenox/face-antispoof-onnx` (Apache-2.0, MiniFAS-based, 128x128, 1.8 MB fp32 ONNX,
+  98.2% self-reported on CelebA-Spoof, built for onnxruntime; cv2.dnn loading untested);
+  EasyShield v2.5 (MIT, YOLOv12n, ~75 ms on unknown GPU; too heavy for Nano CPU).
+- rPPG (pulse from video) catches photos/masks but not good screen replays and needs
+  seconds of stable video; not worth it here.
+- Strongest cheap upgrade is hardware: an RGB+NIR USB camera with IR illuminator (phone
+  screens look dark/flat in NIR). Depth cameras cost much more.
+- Plan: layered — YuNet+SFace match, MiniFASNet ensemble over several frames, a random
+  active challenge (head turn, `HeadTurnChallenge` in legacy), failure lockout → PIN,
+  photo log of every attempt. Face login only via the Jetson camera (server-side capture,
+  so a remote browser cannot inject video).
