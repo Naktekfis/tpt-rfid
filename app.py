@@ -210,7 +210,14 @@ app.register_blueprint(
 
 from routes.kiosk_routes import create_kiosk_blueprint  # noqa: E402
 
-app.register_blueprint(create_kiosk_blueprint(database, kiosk, admin_required))
+app.register_blueprint(
+    create_kiosk_blueprint(
+        database,
+        kiosk,
+        admin_required,
+        alarm_overlay_seconds=app.config.get("ALARM_OVERLAY_SECONDS", 30),
+    )
+)
 
 from routes.admin_routes import create_admin_blueprint  # noqa: E402
 

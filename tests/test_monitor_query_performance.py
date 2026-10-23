@@ -170,6 +170,7 @@ def test_open_alarm_poll_loads_all_tool_names_in_one_query_without_images(databa
         actual = database.get_open_alarms()
     finally:
         event.remove(db.engine, "after_cursor_execute", record_columns)
+    assert all(isinstance(a.pop("age_seconds"), float) for a in actual)
     assert actual == expected
     assert len(columns) == 1, "Alarm polling must not load tools one at a time"
     assert not any("photo_data" in column for column in columns[0])

@@ -83,3 +83,29 @@ def test_admin_alert_poll_is_authorized_and_omits_full_board(client, admin_clien
     assert payload["alarms"] == []
     assert payload["unverified_returns"] == []
     assert "board" not in payload
+
+
+def test_kiosk_state_gives_alarm_age_and_overlay_timeout(client, database, tool):
+    from datetime import datetime, timedelta
+
+    from utils.models import AlarmEvent, db
+
+    alarm = database.create_alarm(int(tool["tool_id"]))
+    row = db.session.get(AlarmEvent, int(alarm["alarm_id"]))
+    row.started_at = datetime.utcnow() - timedelta(seconds=45)
+    db.session.commit()
+
+    data = client.get("/api/kiosk/state").get_json()
+    assert data["alarm_overlay_seconds"] == 30
+    [shown] = data["alarms"]
+    assert shown["alarm_id"] == alarm["alarm_id"]
+    assert 44 <= shown["age_seconds"] < 60
+    # The overlay timeout only hides it on the kiosk; the alarm stays open.
+    assert database.open_alarm_for_tool(int(tool["tool_id"])) is not None
+
+
+def test_kiosk_page_has_alarm_close_button_and_logos(client):
+    html = client.get("/kiosk").get_data(as_text=True)
+    assert 'id="alarm-close-btn"' in html
+    assert "assets/Logo_Teknik_Fisika.jpg" in html
+    assert "assets/Logo_Institut_Teknologi_Bandung.png" in html

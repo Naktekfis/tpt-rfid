@@ -104,7 +104,13 @@
                     <span class="section-head__meta" id="grid-count"></span>
                 </div>
                 <ul class="rack-grid" id="rack-grid"></ul>
-                <div class="legend" id="grid-legend"></div>
+                <div class="session-foot">
+                    <div class="legend" id="grid-legend"></div>
+                    <div class="kiosk-logos">
+                        <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika">
+                        <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}" alt="Institut Teknologi Bandung">
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -138,8 +144,9 @@
         </div>
         <ul class="alarm__list" id="alarm-list"></ul>
         <p class="alarm__text">Alat diambil tanpa sesi NFC. Kembalikan alat, atau tempelkan kartu NFC dalam
-            30 detik untuk mencatat peminjaman.</p>
+            30 detik untuk mencatat peminjaman. Alarm tetap tercatat untuk admin.</p>
         <div class="alarm__admin">
+            <button type="button" class="btn btn--primary" id="alarm-close-btn">Tutup</button>
             <button type="button" class="btn btn--secondary" id="alarm-admin-btn">Admin</button>
             <form class="alarm__form" id="alarm-admin-form" hidden autocomplete="off">
                 <div class="field">

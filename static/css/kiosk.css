@@ -337,6 +337,23 @@
   overflow-y: auto;
   align-content: start;
 }
+.session-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--sp-4);
+}
+.kiosk-logos {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex: none;
+}
+.kiosk-logos img {
+  height: 3rem;
+  width: auto;
+}
+
 .rack-tile {
   display: flex;
   flex-direction: column;

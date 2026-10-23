@@ -40,6 +40,7 @@
     let summaryExitTimer = null;
     let summaryExpiredAt = null;
     let alarmIds = [];
+    const closedAlarms = {};   // alarm_id -> true once "Tutup" was pressed
     let serverDown = false;
     let devices = null;
     let lastBannersKey = '';
@@ -387,13 +388,32 @@
         }
         lastState = state;
 
-        const alarms = s.alarms || [];
+        const alarms = overlayAlarms(s.alarms || [], s.alarm_overlay_seconds);
         const compact = state !== 'idle' && state !== 'unknown_card';
         renderAlarm(alarms, compact);
 
     }
 
     // ---------- Alarm ----------
+
+    // The overlay shows an alarm only while it is young and not closed with
+    // "Tutup", so the kiosk is usable again; the alarm stays open for admin.
+    // While the admin PIN form is open nothing times out under the admin.
+    function overlayAlarms(alarms, limitSeconds) {
+        if (!$('alarm-admin-form').hidden) {
+            return alarms.filter(function (a) { return alarmIds.indexOf(a.alarm_id) !== -1; });
+        }
+        const limit = limitSeconds > 0 ? limitSeconds : Infinity;
+        return alarms.filter(function (a) {
+            return !closedAlarms[a.alarm_id] && !(a.age_seconds >= limit);
+        });
+    }
+
+    function closeAlarmOverlay() {
+        alarmIds.forEach(function (id) { closedAlarms[id] = true; });
+        closeAdmin();
+        renderAlarm([], false);
+    }
 
     function renderAlarm(alarms, compact) {
         const box = $('alarm');
@@ -589,6 +609,7 @@
         showScreen('idle');
         $('btn-end').addEventListener('click', function () { act('/api/kiosk/end', $('btn-end')); });
         $('btn-cancel').addEventListener('click', function () { act('/api/kiosk/cancel', $('btn-cancel')); });
+        $('alarm-close-btn').addEventListener('click', closeAlarmOverlay);
         $('alarm-admin-btn').addEventListener('click', openAdmin);
         $('alarm-admin-close').addEventListener('click', closeAdmin);
         $('alarm-admin-form').addEventListener('submit', ackAlarms);

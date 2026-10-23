@@ -613,7 +613,11 @@ class DatabaseHandler:
             .order_by(AlarmEvent.started_at)
             .all()
         )
-        return [a.to_dict() for a in alarms]
+        now = datetime.utcnow()
+        return [
+            {**a.to_dict(), "age_seconds": (now - a.started_at).total_seconds()}
+            for a in alarms
+        ]
 
     def get_alarm_history(self, limit: int = 100) -> List[Dict]:
         alarms = (

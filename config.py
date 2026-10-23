@@ -88,6 +88,9 @@ class Config:
     KIOSK_SESSION_MAX_SECONDS = int(os.getenv("KIOSK_SESSION_MAX_SECONDS", "120"))
     # An open alarm this young becomes a borrow by the student who identifies.
     ALARM_GRACE_SECONDS = int(os.getenv("ALARM_GRACE_SECONDS", "30"))
+    # The kiosk hides an alarm overlay after this long (or on "Tutup") so others
+    # can use the kiosk; the alarm itself stays open for admin.
+    ALARM_OVERLAY_SECONDS = int(os.getenv("ALARM_OVERLAY_SECONDS", "30"))
 
 
 class DevelopmentConfig(Config):

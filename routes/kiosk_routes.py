@@ -12,7 +12,9 @@ from __future__ import annotations
 from flask import Blueprint, Response, jsonify
 
 
-def create_kiosk_blueprint(database, kiosk, admin_required) -> Blueprint:
+def create_kiosk_blueprint(
+    database, kiosk, admin_required, alarm_overlay_seconds: int = 30
+) -> Blueprint:
     bp = Blueprint("kiosk", __name__)
 
     @bp.route("/api/kiosk/state", methods=["GET"])
@@ -23,6 +25,7 @@ def create_kiosk_blueprint(database, kiosk, admin_required) -> Blueprint:
                 **kiosk.state_dict(),
                 "board": database.get_board(),
                 "alarms": database.get_open_alarms(),
+                "alarm_overlay_seconds": alarm_overlay_seconds,
                 "unverified_returns": database.get_unverified_returns(),
             }
         )
