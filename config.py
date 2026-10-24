@@ -60,7 +60,7 @@ class Config:
     RFID_MISSING_AFTER = float(os.getenv("RFID_MISSING_AFTER", "1.5"))
     # An unborrowed tool must stay gone this much longer (s) before the alarm,
     # so weak reads at the edge of the field do not raise false alarms.
-    RFID_ALARM_CONFIRM_SECONDS = float(os.getenv("RFID_ALARM_CONFIRM_SECONDS", "1"))
+    RFID_ALARM_CONFIRM_SECONDS = float(os.getenv("RFID_ALARM_CONFIRM_SECONDS", "0.5"))
     # Beep the reader when an unborrowed tool leaves.
     RFID_ALARM_ENABLED = os.getenv("RFID_ALARM_ENABLED", "true").lower() == "true"
 

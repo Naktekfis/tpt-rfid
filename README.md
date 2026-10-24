@@ -22,7 +22,7 @@ flowchart LR
     S --> T[Ambil alat dari rak] --> P[Tercatat dipinjam<br/>batas 2 hari]
     S --> K[Letakkan alat] --> Q[Tercatat dikembalikan]
     P --> E[Email pengingat saat batas tiba<br/>dan 2 hari setelahnya]
-    X[Alat keluar tanpa sesi] --> Y[Alarm ±2,5 dtk:<br/>buzzer, layar, foto kamera]
+    X[Alat keluar tanpa sesi] --> Y[Alarm ±2 dtk:<br/>buzzer, layar, foto kamera]
     Y -- KTM ditempel dalam 30 dtk --> P
     Z[Alat kembali tanpa sesi] --> V[Dikembalikan,<br/>belum diverifikasi admin]
 ```
@@ -83,7 +83,7 @@ Semua di `.env`; lihat [`.env.example`](.env.example). Yang paling sering disent
 | `ADMIN_PIN_HASH` | – | Diisi oleh `scripts/set_admin_pin.py`. Tanpa ini PIN bawaan `133133` berlaku |
 | `RFID_READER_ENABLED`, `NFC_READER_ENABLED`, `CAMERA_ENABLED` | `false` | `true` di Jetson; `false` memakai tiruan (mock) |
 | `RFID_MISSING_AFTER` | `1.5` | Detik tag tak terbaca sebelum alat dianggap keluar rak |
-| `RFID_ALARM_CONFIRM_SECONDS` | `1` | Jeda tambahan sebelum alarm, menahan alarm palsu |
+| `RFID_ALARM_CONFIRM_SECONDS` | `0.5` | Jeda tambahan sebelum alarm, menahan alarm palsu |
 | `ALARM_GRACE_SECONDS` / `ALARM_OVERLAY_SECONDS` | `30` / `30` | Batas waktu KTM mengubah alarm jadi pinjaman / lama overlay alarm di layar |
 | `KIOSK_SESSION_SECONDS` | `60` | Lama sesi KTM (bertambah saat ada alat diambil/dikembalikan) |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | – | Gmail lab + App Password 16 huruf |

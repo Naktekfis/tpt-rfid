@@ -109,7 +109,7 @@ presence_service = ToolPresenceService(
     rfid_reader,
     PresenceMonitor(missing_after=app.config.get("RFID_MISSING_AFTER", 1.5)),
     alarm_enabled=app.config.get("RFID_ALARM_ENABLED", True),
-    alarm_confirm_seconds=app.config.get("RFID_ALARM_CONFIRM_SECONDS", 1.0),
+    alarm_confirm_seconds=app.config.get("RFID_ALARM_CONFIRM_SECONDS", 0.5),
     background=True,
 )
 # Camera for tool photographs.
