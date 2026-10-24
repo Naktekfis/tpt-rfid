@@ -175,6 +175,10 @@
 .rack__foot a {
   font-weight: 600;
 }
+.rack__foot .rack__admin {
+  font-weight: 400;
+  color: var(--c-text-subtle);
+}
 
 /* ---------- D3: session / summary ---------- */
 

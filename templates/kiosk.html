@@ -67,6 +67,7 @@
             <div class="rack__foot">
                 <span>Belum terdaftar? <a href="/daftar">Daftarkan kartu Anda</a></span>
                 <span>Pinjaman berlaku {{ config.get('LOAN_DAYS', 2) }} hari</span>
+                <a class="rack__admin" href="{{ url_for('admin_login') }}">Admin</a>
             </div>
         </div>
     </section>

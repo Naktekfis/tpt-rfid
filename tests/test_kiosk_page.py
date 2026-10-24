@@ -109,3 +109,8 @@ def test_kiosk_page_has_alarm_close_button_and_logos(client):
     assert 'id="alarm-close-btn"' in html
     assert "assets/Logo_Teknik_Fisika.jpg" in html
     assert "assets/Logo_Institut_Teknologi_Bandung.png" in html
+
+
+def test_kiosk_has_a_plain_admin_link(client):
+    html = client.get("/kiosk").get_data(as_text=True)
+    assert 'class="rack__admin" href="/admin/login">Admin</a>' in html
