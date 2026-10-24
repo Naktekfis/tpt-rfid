@@ -207,6 +207,29 @@ def create_admin_blueprint(
     def api_students():
         return jsonify({"success": True, "students": database.get_students_admin()})
 
+    def _delete_result(result, what):
+        if result == "missing":
+            return _error(f"{what} tidak ditemukan", 404)
+        if result == "active":
+            return _error("Masih ada pinjaman aktif; kembalikan dulu.", 409)
+        return jsonify({"success": True})
+
+    @bp.route("/api/admin/students/<int:student_id>/delete", methods=["POST"])
+    @admin_required
+    def api_delete_student(student_id):
+        result = database.delete_student(student_id)
+        if result == "ok":
+            logger.info("Admin deleted student id=%s", student_id)
+        return _delete_result(result, "Mahasiswa")
+
+    @bp.route("/api/admin/tool_units/<int:tool_id>/delete", methods=["POST"])
+    @admin_required
+    def api_delete_tool_unit(tool_id):
+        result = database.delete_tool_unit(tool_id)
+        if result == "ok":
+            logger.info("Admin deleted tool unit id=%s", tool_id)
+        return _delete_result(result, "Alat")
+
     @bp.route("/api/admin/emails", methods=["GET"])
     @admin_required
     def api_emails():

@@ -1,4 +1,6 @@
-/* Capture one fresh card on the server before creating or binding an account. */
+/* Capture one fresh card on the server before creating or binding an account.
+ * Self-registration also needs a face photo taken on the server from the
+ * kiosk camera (guided 3-2-1 with reader beeps), when the camera is on. */
 (function () {
     'use strict';
     const UI = window.UI;
@@ -11,6 +13,102 @@
     let expiresAt = 0;
     let generation = 0;
     let saving = false;
+    // Face photo: required only when the server says the camera can take it.
+    let photoRequired = false;
+    let photoToken = null;
+    let photoReady = false;
+    let photoGen = 0;
+
+    function updateSubmit() {
+        $('form-submit').disabled = !ready || saving || (photoRequired && !photoReady);
+    }
+
+    function photoStatus(text, hint) {
+        $('photo-status').textContent = text;
+        $('photo-hint').textContent = hint || '';
+    }
+
+    function stopPhotoStream() {
+        $('photo-stream').removeAttribute('src');  // closes the MJPEG connection
+        $('photo-live').hidden = true;
+    }
+
+    async function pollPhoto(current) {
+        while (current === photoGen) {
+            await new Promise(function (r) { setTimeout(r, 200); });
+            if (current !== photoGen) return;
+            let res;
+            try {
+                res = await UI.fetchJSON('/api/register/photo?token=' + encodeURIComponent(photoToken));
+            } catch (e) {
+                continue;
+            }
+            if (current !== photoGen) return;
+            if (!res.success) {
+                stopPhotoStream();
+                photoStatus(res.error || 'Foto gagal. Ulangi.');
+                $('photo-start').disabled = false;
+                return;
+            }
+            $('photo-count').textContent = res.countdown || '';
+            if (res.state === 'running') {
+                photoStatus(res.instruction, res.hint);
+                continue;
+            }
+            stopPhotoStream();
+            $('photo-start').disabled = false;
+            $('photo-start').textContent = 'Ulangi foto';
+            if (res.state === 'ready') {
+                photoReady = true;
+                $('photo-preview').src = '/api/register/photo/preview?token=' + encodeURIComponent(photoToken) + '&t=' + Date.now();
+                $('photo-preview').hidden = false;
+                photoStatus('Foto tersimpan. Ulangi kalau kurang jelas.');
+            } else {
+                photoStatus(res.instruction);
+            }
+            updateSubmit();
+            return;
+        }
+    }
+
+    async function startPhoto() {
+        photoGen += 1;
+        const current = photoGen;
+        photoReady = false;
+        updateSubmit();
+        $('photo-start').disabled = true;
+        $('photo-preview').hidden = true;
+        $('form-error').textContent = '';
+        let res;
+        try {
+            res = await UI.postJSON('/api/register/photo/start', {});
+        } catch (e) {
+            res = { success: false, error: 'Tidak dapat menghubungi server.' };
+        }
+        if (current !== photoGen) return;
+        if (!res.success) {
+            photoStatus(res.error || 'Kamera belum siap. Coba lagi.');
+            $('photo-start').disabled = false;
+            return;
+        }
+        photoToken = res.token;
+        $('photo-live').hidden = false;
+        $('photo-stream').src = '/camera/stream';
+        photoStatus(res.instruction, res.hint);
+        pollPhoto(current);
+    }
+
+    async function initPhoto() {
+        if (CFG.student || !$('photo-field')) return;
+        try {
+            const res = await UI.fetchJSON('/api/register/photo/status');
+            photoRequired = !!(res.success && res.available);
+        } catch (e) {
+            photoRequired = false;
+        }
+        $('photo-field').hidden = !photoRequired;
+        updateSubmit();
+    }
 
     function status(message) { $('nfc-status').textContent = message; }
     function fail(field, message) {
@@ -25,7 +123,7 @@
         token = null;
         generation += 1;
         clearTimeout(timer);
-        $('form-submit').disabled = true;
+        updateSubmit();
         $('nfc-start').disabled = false;
         $('nfc-start').textContent = 'Baca kartu NFC';
         status(message);
@@ -44,13 +142,13 @@
                 return;
             }
             ready = !!res.ready;
-            $('form-submit').disabled = !ready || saving;
+            updateSubmit();
             status(ready ? 'Kartu terbaca. Periksa data Anda, lalu simpan sebelum waktu pembacaan habis.'
                 : res.connected ? 'Tempelkan kartu NFC ke pembaca. Angkat kembali setelah terbaca.'
                     : 'Pembaca NFC belum tersambung. Periksa perangkat; pembacaan akan dilanjutkan.');
         } catch (e) {
             ready = false;
-            $('form-submit').disabled = true;
+            updateSubmit();
             status('Koneksi ke server terputus. Mencoba lagi…');
         }
         if (current === generation) timer = setTimeout(function () { pollCapture(current); }, 750);
@@ -100,6 +198,11 @@
         if (saving) return;
         $('form-error').textContent = '';
         if (!validate()) return;
+        if (photoRequired && !photoReady) {
+            fail(null, 'Ambil foto wajah terlebih dahulu.');
+            $('photo-start').focus();
+            return;
+        }
         if (!ready || !token || Date.now() >= expiresAt) {
             resetCapture('Baca kartu NFC terlebih dahulu.');
             return;
@@ -117,10 +220,16 @@
                 const data = new FormData();
                 FIELDS.forEach(function (f) { data.append(f, $(f).value.trim()); });
                 data.append('nfc_token', token);
+                if (photoRequired) data.append('photo_token', photoToken);
                 res = await UI.postForm('/api/register', data);
             }
             if (!res.success) {
                 fail(null, res.error || 'Pendaftaran gagal. Coba lagi.');
+                if (res.photo_missing) {
+                    photoReady = false;
+                    $('photo-preview').hidden = true;
+                    photoStatus('Foto kedaluwarsa. Ambil foto lagi.');
+                }
                 return;
             }
             generation += 1;
@@ -138,11 +247,14 @@
         }
     }
     $('nfc-start').addEventListener('click', startCapture);
+    if ($('photo-start')) $('photo-start').addEventListener('click', startPhoto);
+    initPhoto();
     $('reg-form').addEventListener('submit', submit);
     FIELDS.forEach(function (f) {
         $(f).addEventListener('input', function () { $(f).removeAttribute('aria-invalid'); });
     });
     window.addEventListener('pagehide', function () {
+        photoGen += 1;
         generation += 1;
         clearTimeout(timer);
         if (!token) return;

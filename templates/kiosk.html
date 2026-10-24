@@ -9,6 +9,16 @@
 {# The kiosk draws its own brand line and clock inside the NFC side. #}
 {% block header %}{% endblock %}
 
+{% macro brand(text) -%}
+<span class="brandbar__brand">
+    <span class="brandbar__logos">
+        <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}" alt="Institut Teknologi Bandung">
+        <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
+    </span>
+    <span>{{ text }}</span>
+</span>
+{%- endmacro %}
+
 {% block content %}
 <div class="kiosk" id="kiosk" data-state="idle">
 
@@ -16,7 +26,7 @@
     <section class="screen screen--idle" data-screen="idle unknown_card">
         <div class="side">
             <div class="brandbar">
-                <span>Lab Fabrikasi · Teknik Fisika ITB</span>
+                {{ brand('Lab Fabrikasi · Teknik Fisika ITB') }}
                 <span class="brandbar__clock num" data-clock>--.--</span>
             </div>
             <div class="side__visual nfc-panel" aria-hidden="true">
@@ -76,7 +86,7 @@
     <section class="screen screen--session" data-screen="session summary" hidden>
         <div class="side side--narrow">
             <div class="brandbar">
-                <span>Lab Fabrikasi · TF ITB</span>
+                {{ brand('Lab Fabrikasi · TF ITB') }}
                 <span class="brandbar__clock num" data-clock>--.--</span>
             </div>
             <p class="side__copy">Sesi kartu NFC</p>
@@ -107,10 +117,6 @@
                 <ul class="rack-grid" id="rack-grid"></ul>
                 <div class="session-foot">
                     <div class="legend" id="grid-legend"></div>
-                    <div class="kiosk-logos">
-                        <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika">
-                        <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}" alt="Institut Teknologi Bandung">
-                    </div>
                 </div>
             </div>
         </div>
@@ -122,7 +128,7 @@
 <div class="alarm overlay" id="alarm" role="alertdialog" aria-labelledby="alarm-title" hidden>
     <div class="alarm__side">
         <div class="brandbar">
-            <span>Lab Fabrikasi · Teknik Fisika ITB</span>
+            {{ brand('Lab Fabrikasi · Teknik Fisika ITB') }}
             <span class="brandbar__clock num" data-clock>--.--</span>
         </div>
         <div class="side__visual nfc-panel" aria-hidden="true">

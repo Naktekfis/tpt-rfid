@@ -24,12 +24,24 @@
         <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
         <span>Lab Fabrikasi · Teknik Fisika ITB</span>
     </a>
+    {% set admin_area = request.path.startswith('/admin') and request.path != '/admin/login' %}
     {% if crumbs %}
     <nav class="crumbs" aria-label="Lokasi halaman">
         <ol>
             {% for label, url in crumbs %}
             <li>
-                {% if url and not loop.last %}<a href="{{ url }}">{{ label }}</a>
+                {% if loop.last and admin_area %}
+                {# The page name doubles as the admin page switcher. #}
+                <details class="switcher">
+                    <summary aria-current="page">{{ label }}<span class="switcher__caret" aria-hidden="true">▾</span><span class="visually-hidden"> (pindah halaman)</span></summary>
+                    <ul class="switcher__menu">
+                        {% for item, path in [('Ringkasan', '/admin'), ('Alat', '/admin/monitor'), ('Mahasiswa', '/admin/students'), ('Keamanan', '/admin/security'), ('Tambah alat', '/admin/input_tool'), ('Riwayat', '/admin/history')] %}
+                        <li><a href="{{ path }}"{% if request.path == path %} aria-current="page"{% endif %}>{{ item }}</a></li>
+                        {% endfor %}
+                        <li class="switcher__sep"><a href="{{ url_for('admin_logout') }}">Keluar</a></li>
+                    </ul>
+                </details>
+                {% elif url and not loop.last %}<a href="{{ url }}">{{ label }}</a>
                 {% else %}<span{% if loop.last %} aria-current="page"{% endif %}>{{ label }}</span>{% endif %}
             </li>
             {% endfor %}
@@ -38,14 +50,6 @@
     {% endif %}
     <span class="topbar__clock num" data-clock>--.--</span>
 </header>
-{% if request.path.startswith('/admin') and request.path != '/admin/login' %}
-<nav class="admin-nav" aria-label="Navigasi admin">
-    {% for label, path in [('Ringkasan', '/admin'), ('Alat', '/admin/monitor'), ('Mahasiswa', '/admin/students'), ('Keamanan', '/admin/security'), ('Tambah alat', '/admin/input_tool'), ('Riwayat', '/admin/history')] %}
-    <a href="{{ path }}"{% if request.path == path %} aria-current="page"{% endif %}>{{ label }}</a>
-    {% endfor %}
-    <a class="admin-nav__exit" href="{{ url_for('admin_logout') }}">Keluar</a>
-</nav>
-{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -57,6 +61,13 @@
 {% block scripts %}
 <script>
 UI.startClock();
+// Page switcher: close on a click outside or Escape.
+document.querySelectorAll('.switcher').forEach(function (d) {
+    document.addEventListener('click', function (e) { if (!d.contains(e.target)) d.open = false; });
+    d.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && d.open) { d.open = false; d.querySelector('summary').focus(); }
+    });
+});
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
 </script>
 {% block page_scripts %}{% endblock %}

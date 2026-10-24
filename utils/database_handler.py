@@ -22,6 +22,7 @@ from .models import (
     ToolType,
     Transaction,
     AlarmEvent,
+    DeletedStudent,
     FaceEmbedding,
 )
 from .helpers import utc_to_wib
@@ -67,6 +68,44 @@ class DatabaseHandler:
 
     # ==================== Student Operations ====================
 
+    @staticmethod
+    def _active_students(query):
+        """Hide soft-deleted students from a query on Student."""
+        return query.filter(
+            ~db.session.query(DeletedStudent.student_id)
+            .filter(DeletedStudent.student_id == Student.id)
+            .exists()
+        )
+
+    @staticmethod
+    def _active_tools(query):
+        """Hide soft-deleted tool units from a query on Tool."""
+        return query.filter(Tool.status != "deleted")
+
+    def delete_student(self, student_id: int) -> str:
+        """Soft delete: 'ok', 'missing' (unknown or already deleted) or 'active'
+        (open borrow). Transactions and the name/NIM stay for history."""
+        try:
+            student = db.session.get(Student, int(student_id))
+            if student is None or db.session.get(DeletedStudent, student.id):
+                return "missing"
+            if Transaction.query.filter_by(
+                student_id=student.id, status="borrowed"
+            ).first():
+                return "active"
+            db.session.add(DeletedStudent(student_id=student.id))
+            StudentNFCCard.query.filter_by(student_id=student.id).delete()
+            FaceEmbedding.query.filter_by(student_id=student.id).delete()
+            student.rfid_uid = None
+            student.photo_data = None
+            student.photo_mimetype = None
+            db.session.commit()
+            logger.info(f"Deleted student {student_id}")
+            return "ok"
+        except Exception:
+            db.session.rollback()
+            raise
+
     def create_student(self, data: Dict) -> Dict:
         """
         Create a new student in the database
@@ -78,14 +117,24 @@ class DatabaseHandler:
             dict: Created student data with ID
         """
         try:
-            student = Student(
-                name=data["name"],
-                nim=data["nim"],
-                email=data["email"],
-                phone=data["phone"],
-                rfid_uid=data.get("rfid_uid"),
-            )
-            db.session.add(student)
+            student = Student.query.filter_by(nim=data["nim"]).first()
+            marker = db.session.get(DeletedStudent, student.id) if student else None
+            if marker is not None:
+                # Re-registration of a deleted student: restore the record.
+                db.session.delete(marker)
+                student.name = data["name"]
+                student.email = data["email"]
+                student.phone = data["phone"]
+                student.rfid_uid = data.get("rfid_uid")
+            else:
+                student = Student(
+                    name=data["name"],
+                    nim=data["nim"],
+                    email=data["email"],
+                    phone=data["phone"],
+                    rfid_uid=data.get("rfid_uid"),
+                )
+                db.session.add(student)
             if data.get("nfc_uid"):
                 db.session.flush()
                 db.session.add(
@@ -106,7 +155,11 @@ class DatabaseHandler:
 
     def get_student_by_nfc(self, uid):
         student = (
-            Student.query.join(StudentNFCCard, Student.id == StudentNFCCard.student_id)
+            self._active_students(
+                Student.query.join(
+                    StudentNFCCard, Student.id == StudentNFCCard.student_id
+                )
+            )
             .filter(StudentNFCCard.uid == uid)
             .first()
         )
@@ -117,7 +170,7 @@ class DatabaseHandler:
         from sqlalchemy.exc import IntegrityError
 
         student = db.session.get(Student, int(student_id))
-        if student is None:
+        if student is None or db.session.get(DeletedStudent, student.id):
             raise ValueError("Mahasiswa tidak ditemukan")
         if StudentNFCCard.query.filter_by(student_id=student.id).first():
             raise ValueError(
@@ -141,7 +194,9 @@ class DatabaseHandler:
             dict or None: Student data if found, None otherwise
         """
         try:
-            student = Student.query.filter_by(rfid_uid=rfid_uid).first()
+            student = self._active_students(
+                Student.query.filter_by(rfid_uid=rfid_uid)
+            ).first()
 
             if student:
                 return student.to_dict()
@@ -152,18 +207,22 @@ class DatabaseHandler:
             logger.error(f"Error getting student by UID: {str(e)}")
             raise
 
-    def get_student_by_nim(self, nim: str) -> Optional[Dict]:
+    def get_student_by_nim(self, nim: str, include_deleted: bool = False):
         """
         Get student by NIM (for validation during registration)
 
         Args:
             nim (str): Student NIM
+            include_deleted (bool): also return soft-deleted students
 
         Returns:
             dict or None: Student data if found, None otherwise
         """
         try:
-            student = Student.query.filter_by(nim=nim).first()
+            query = Student.query.filter_by(nim=nim)
+            if not include_deleted:
+                query = self._active_students(query)
+            student = query.first()
 
             if student:
                 return student.to_dict()
@@ -186,7 +245,7 @@ class DatabaseHandler:
         """
         try:
             student = db.session.get(Student, int(student_id))
-            if student:
+            if student and db.session.get(DeletedStudent, student.id) is None:
                 return student.to_dict()
             return None
         except Exception as e:
@@ -360,7 +419,7 @@ class DatabaseHandler:
             dict or None: Tool data if found, None otherwise
         """
         try:
-            tool = Tool.query.filter(Tool.name.ilike(name)).first()
+            tool = self._active_tools(Tool.query.filter(Tool.name.ilike(name))).first()
 
             if tool:
                 logger.info(f"Found tool by name: {tool.name}")
@@ -424,7 +483,9 @@ class DatabaseHandler:
                 db.func.count(Tool.id),
                 db.func.max(Tool.unit_no),
             )
-            .outerjoin(Tool, Tool.type_id == ToolType.id)
+            .outerjoin(
+                Tool, db.and_(Tool.type_id == ToolType.id, Tool.status != "deleted")
+            )
             .group_by(ToolType.id)
             .order_by(db.func.lower(ToolType.name))
             .all()
@@ -477,7 +538,7 @@ class DatabaseHandler:
         ):
             raise ValueError(f"{tool_type.name} #{unit_no} sudah ada")
         # Category is legacy (exports still show it): reuse the type's.
-        sibling = Tool.query.filter_by(type_id=tool_type.id).first()
+        sibling = self._active_tools(Tool.query.filter_by(type_id=tool_type.id)).first()
         return self.create_tool(
             {
                 "name": f"{tool_type.name} #{unit_no}",
@@ -501,7 +562,7 @@ class DatabaseHandler:
             raise ValueError("Jenis alat dengan nama ini sudah ada")
         try:
             tool_type.name = name
-            for unit in tool_type.tools.all():
+            for unit in tool_type.tools.filter(Tool.status != "deleted"):
                 unit.name = f"{name} #{unit.unit_no}" if unit.unit_no else name
             db.session.commit()
             return True
@@ -536,7 +597,11 @@ class DatabaseHandler:
             .group_by(Transaction.student_id)
             .all()
         )
-        students = Student.query.order_by(Student.created_at.desc()).all()
+        students = (
+            self._active_students(Student.query)
+            .order_by(Student.created_at.desc())
+            .all()
+        )
         return [
             {
                 "student_id": str(s.id),
@@ -557,7 +622,7 @@ class DatabaseHandler:
         """id, status, presence of the tool with this tag, or None if unknown."""
         tool = (
             db.session.query(Tool.id, Tool.status, Tool.presence)
-            .filter(Tool.rfid_uid == rfid_uid)
+            .filter(Tool.rfid_uid == rfid_uid, Tool.status != "deleted")
             .first()
         )
         if tool is None:
@@ -644,7 +709,36 @@ class DatabaseHandler:
             raise
 
     def get_tools_presence(self) -> List[Dict]:
-        return [t.to_dict() for t in Tool.query.order_by(Tool.name).all()]
+        return [
+            t.to_dict()
+            for t in self._active_tools(Tool.query).order_by(Tool.name).all()
+        ]
+
+    def delete_tool_unit(self, tool_id: int) -> str:
+        """Soft delete: 'ok', 'missing' (unknown or already deleted) or 'active'
+        (open borrow). Frees the tag; transactions keep tool_id and tool_name."""
+        try:
+            tool = db.session.get(Tool, int(tool_id))
+            if tool is None or tool.status == "deleted":
+                return "missing"
+            if (
+                tool.status == "borrowed"
+                or Transaction.query.filter_by(
+                    tool_id=tool.id, status="borrowed"
+                ).first()
+            ):
+                return "active"
+            tool.rfid_uid = f"DELETED-{tool.id}-{tool.rfid_uid}"[:100]
+            tool.status = "deleted"
+            tool.unit_no = None
+            tool.presence = "unknown"
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        self.close_alarms_for_tool(tool.id, ended_by="deleted")
+        logger.info(f"Deleted tool unit {tool_id}")
+        return "ok"
 
     @staticmethod
     def _loan_period() -> timedelta:
@@ -773,7 +867,7 @@ class DatabaseHandler:
             list: List of tool dicts
         """
         try:
-            query = Tool.query.order_by(Tool.name)
+            query = self._active_tools(Tool.query).order_by(Tool.name)
 
             if offset > 0:
                 query = query.offset(offset)
@@ -838,9 +932,9 @@ class DatabaseHandler:
                 db.select(Tool).filter_by(id=int(tool_id)).with_for_update()
             ).scalar_one_or_none()
 
-            if not student:
+            if not student or db.session.get(DeletedStudent, student.id):
                 raise ValueError("Data mahasiswa tidak ditemukan")
-            if not tool:
+            if not tool or tool.status == "deleted":
                 raise ValueError("Data tool tidak ditemukan")
 
             if tool.status != "available":
@@ -1100,6 +1194,7 @@ class DatabaseHandler:
                 ),
             )
             .outerjoin(Student, Student.id == Transaction.student_id)
+            .filter(Tool.status != "deleted")
             .all()
         )
         groups: Dict[object, Dict] = {}
@@ -1171,6 +1266,7 @@ class DatabaseHandler:
                     ),
                 )
                 .outerjoin(Student, Student.id == Transaction.student_id)
+                .filter(Tool.status != "deleted")
                 .order_by(Tool.name)
             )
 

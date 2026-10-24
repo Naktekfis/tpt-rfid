@@ -196,7 +196,82 @@
         });
     });
 
+    // ---------- Row menu ("Kelola ▾") ----------
+    // One button per table row; it opens a small menu of labelled actions
+    // ({label, desc, danger, onSelect}). The menu lives in <body>, so table
+    // scrolling or a row re-render does not clip or close it.
+    let openMenu = null;
+
+    function closeMenu(refocus) {
+        if (!openMenu) return;
+        const m = openMenu;
+        openMenu = null;
+        m.el.remove();
+        m.button.setAttribute('aria-expanded', 'false');
+        if (refocus && m.button.isConnected) m.button.focus();
+    }
+
+    // Below the button (above when there is no room), right edges aligned.
+    function placeMenu() {
+        if (!openMenu) return;
+        const el = openMenu.el;
+        if (!openMenu.button.isConnected) { closeMenu(false); return; }
+        const r = openMenu.button.getBoundingClientRect();
+        const left = Math.max(8, Math.min(r.right - el.offsetWidth, window.innerWidth - el.offsetWidth - 8));
+        const below = r.bottom + 4 + el.offsetHeight <= window.innerHeight;
+        el.style.left = (left + window.scrollX) + 'px';
+        el.style.top = ((below ? r.bottom + 4 : r.top - 4 - el.offsetHeight) + window.scrollY) + 'px';
+    }
+
+    function rowMenu(label, items) {
+        const button = h('button', { type: 'button', class: 'btn btn--secondary btn--sm rowmenu__button',
+            'aria-haspopup': 'menu', 'aria-expanded': 'false' }, label + ' ',
+            h('span', { class: 'rowmenu__caret', 'aria-hidden': 'true', text: '▾' }));
+        button.addEventListener('click', function (event) {
+            event.stopPropagation();
+            const wasOpen = openMenu && openMenu.button === button;
+            closeMenu(false);
+            if (wasOpen) return;
+            const el = h('ul', { class: 'rowmenu', role: 'menu' });
+            items.filter(Boolean).forEach(function (item) {
+                const choice = h('button', { type: 'button', role: 'menuitem',
+                    class: 'rowmenu__item' + (item.danger ? ' rowmenu__item--danger' : '') },
+                    h('span', { class: 'rowmenu__label', text: item.label }),
+                    item.desc ? h('span', { class: 'rowmenu__desc', text: item.desc }) : null);
+                choice.addEventListener('click', function () {
+                    closeMenu(false);
+                    item.onSelect();
+                });
+                el.appendChild(h('li', { role: 'none', class: item.separate ? 'rowmenu__sep' : null }, choice));
+            });
+            document.body.appendChild(el);
+            button.setAttribute('aria-expanded', 'true');
+            openMenu = { el: el, button: button };
+            placeMenu();
+            el.querySelector('button').focus({ preventScroll: true });
+        });
+        return button;
+    }
+
+    document.addEventListener('click', function (event) {
+        if (openMenu && !openMenu.el.contains(event.target)) closeMenu(false);
+    });
+    document.addEventListener('keydown', function (event) {
+        if (!openMenu) return;
+        if (event.key === 'Escape') closeMenu(true);
+        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+            const items = Array.prototype.slice.call(openMenu.el.querySelectorAll('button'));
+            const i = items.indexOf(document.activeElement);
+            const next = event.key === 'ArrowDown' ? i + 1 : i - 1;
+            items[(next + items.length) % items.length].focus();
+            event.preventDefault();
+        }
+    });
+    window.addEventListener('resize', placeMenu);
+    window.addEventListener('scroll', placeMenu, true);
+
     window.UI = {
+        rowMenu: rowMenu,
         loadNotice: loadNotice,
         getCSRFToken: getCSRFToken,
         postForm: postForm,

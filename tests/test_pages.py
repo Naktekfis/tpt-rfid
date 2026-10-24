@@ -46,7 +46,8 @@ def test_old_menus_lead_to_kiosk(client, path):
 
 def test_logout_returns_to_the_kiosk_on_the_kiosk_screen(admin_client):
     admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
-    assert 'class="admin-nav__exit"' in admin_client.get("/admin").get_data(as_text=True)
+    page = admin_client.get("/admin/monitor").get_data(as_text=True)
+    assert 'class="switcher"' in page and "/admin/logout" in page
     resp = admin_client.get("/admin/logout")
     assert resp.headers["Location"].endswith("/kiosk")
 

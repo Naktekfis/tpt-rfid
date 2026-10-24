@@ -42,6 +42,26 @@
   font-size: 1.25rem;
   font-weight: 700;
 }
+.brandbar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+/* Logos sit on a small white plate so they read on the dark side. */
+.brandbar__logos {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: none;
+  padding: var(--sp-1) var(--sp-2);
+  background: #fff;
+  border-radius: 6px;
+}
+.brandbar__logos img {
+  height: 2rem;
+  width: auto;
+}
 
 /* ---------- D1: idle / unknown card ---------- */
 

@@ -39,6 +39,25 @@
                 <input class="input" id="phone" name="phone" type="tel" maxlength="20" required>
             </div>
         </div>
+        {% if not enroll_student %}
+        <div class="field reg-photo" id="photo-field" hidden>
+            <span class="field__label">Foto wajah</span>
+            <div class="reg-photo__row">
+                <div class="camera-panel camera-panel--mirror reg-photo__frame" id="photo-live" hidden>
+                    <img class="camera-panel__img" id="photo-stream" alt="">
+                    <span class="reg-photo__count" id="photo-count" aria-hidden="true"></span>
+                </div>
+                <img class="reg-photo__frame reg-photo__preview" id="photo-preview" alt="Foto wajah Anda" hidden>
+                <div class="reg-photo__side">
+                    <p class="reg-photo__instruction" id="photo-status" role="status" aria-live="polite">Tekan Ambil foto, lalu lihat ke kamera. Ada hitungan mundur 3-2-1 dengan bunyi, lalu foto diambil.</p>
+                    <p class="field__hint" id="photo-hint"></p>
+                    <div class="form__actions">
+                        <button type="button" class="btn btn--secondary" id="photo-start">Ambil foto</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         <div class="field">
             <span class="field__label">Kartu NFC</span>
             <p id="nfc-status" role="status" aria-live="polite">Tekan tombol di bawah sebelum menempelkan kartu.</p>

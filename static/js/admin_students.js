@@ -1,4 +1,5 @@
-/* Student monitoring: NFC binding, loan details and confirmed reminder emails. */
+/* Student monitoring: loan details and a "Kelola" menu per student (bind an
+ * NFC card, confirmed reminder emails, delete with history kept). */
 (function () {
     'use strict';
     const UI = window.UI;
@@ -26,9 +27,12 @@
             h('strong', { text: student.name }), h('span', { class: 'sub num', text: student.nim })));
     }
 
-    function confirmation(text) {
+    function confirmation(text, title, okLabel, danger) {
         const dialog = $('reminder');
+        $('reminder-title').textContent = title || 'Kirim pengingat?';
         $('reminder-text').textContent = text;
+        $('reminder-ok').textContent = okLabel || 'Kirim email';
+        $('reminder-ok').className = 'btn ' + (danger ? 'btn--danger' : 'btn--primary');
         return new Promise(function (resolve) {
             dialog.addEventListener('close', function close() {
                 dialog.removeEventListener('close', close);
@@ -49,6 +53,28 @@
                 tool_name: loan.name, borrow_date: loan.borrow_time_wib || '',
             });
             UI.toast(result.success ? 'Email pengingat terkirim.' : result.error || 'Pengiriman gagal.', result.success ? 'ok' : 'danger');
+        } catch (error) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async function removeStudent(student, loans, button) {
+        if (loans.length) {
+            UI.toast(student.name + ' masih meminjam ' + loans.map(function (l) { return l.name; }).join(', ') +
+                '; kembalikan dulu sebelum dihapus.', 'warn');
+            return;
+        }
+        const ok = await confirmation(student.name + ' (' + student.nim + ') hilang dari daftar, kartu NFC dan fotonya dilepas. ' +
+            'Riwayat peminjamannya tetap tersimpan. Kalau mendaftar lagi dengan NIM yang sama, datanya dipulihkan.',
+            'Hapus mahasiswa?', 'Hapus mahasiswa', true);
+        if (!ok) return;
+        button.disabled = true;
+        try {
+            const result = await UI.postJSON('/api/admin/students/' + encodeURIComponent(student.student_id) + '/delete', {});
+            UI.toast(result.success ? student.name + ' dihapus.' : result.error || 'Penghapusan gagal.', result.success ? 'ok' : 'danger');
+            if (result.success) load();
         } catch (error) {
             UI.toast('Tidak dapat menghubungi server.', 'danger');
         } finally {
@@ -84,15 +110,20 @@
                     h('span', { class: 'sub' + (loan.is_overdue ? ' status--warn' : ''),
                         text: (loan.is_overdue ? 'Terlambat · ' : 'Batas: ') + UI.formatWibDate(loan.due_at, true) })));
             });
-            const actions = h('td', { class: 'actions' });
-            if (!student.has_nfc) actions.appendChild(h('a', {
-                href: CFG.registerUrl + '?student_id=' + encodeURIComponent(student.student_id), text: 'Daftarkan kartu',
-            }));
+            const items = [];
+            if (!student.has_nfc) items.push({ label: 'Daftarkan kartu NFC', desc: 'Ikat kartu baru ke ' + student.name,
+                onSelect: function () {
+                    window.location.href = CFG.registerUrl + '?student_id=' + encodeURIComponent(student.student_id);
+                } });
             if (student.email) loans.forEach(function (loan) {
-                const button = h('button', { type: 'button', class: 'linkbtn', text: 'Kirim pengingat: ' + loan.name });
-                button.addEventListener('click', function () { remind(student, loan, button); });
-                actions.appendChild(button);
+                items.push({ label: 'Kirim pengingat', desc: loan.name + ' · ke ' + student.email,
+                    onSelect: function () { remind(student, loan, menu); } });
             });
+            items.push({ label: 'Hapus mahasiswa', danger: true, separate: true,
+                desc: loans.length ? 'Kembalikan semua pinjaman dulu' : 'Riwayat peminjaman tetap tersimpan',
+                onSelect: function () { removeStudent(student, loans, menu); } });
+            const menu = UI.rowMenu('Kelola', items);
+            const actions = h('td', { class: 'actions' }, menu);
             body.appendChild(h('tr', null, h('td', null, person(student)),
                 h('td', null, h('span', { text: student.email }), h('span', { class: 'sub num', text: student.phone })),
                 h('td', null, h('span', { class: 'status' + (student.has_nfc ? '' : ' status--muted'), text: student.has_nfc ? 'Ada' : 'Belum ada' })),

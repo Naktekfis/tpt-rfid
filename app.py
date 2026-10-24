@@ -34,7 +34,6 @@ from config import get_config
 from utils import (
     DatabaseHandler,
     db,
-    allowed_file,
     validate_nim,
     sanitize_input,
     validate_record_id,
@@ -239,6 +238,12 @@ from routes.admin_face_routes import create_admin_face_blueprint  # noqa: E402
 from utils.admin_face import build_face_auth, log_pin_login  # noqa: E402
 
 face_auth = build_face_auth(app, camera, beep=rfid_reader.beep)
+
+from utils.photo_capture import build_photo_capture  # noqa: E402
+from routes.register_photo_routes import create_register_photo_blueprint  # noqa: E402
+
+photo_capture = build_photo_capture(app, camera, beep=rfid_reader.beep)
+app.register_blueprint(create_register_photo_blueprint(photo_capture, limiter))
 app.register_blueprint(
     create_admin_face_blueprint(
         face_auth,
@@ -454,21 +459,20 @@ def api_register():
 
         student_data = {"name": name, "nim": nim, "email": email, "phone": phone}
 
-        # Handle photo upload
-        photo = request.files.get("photo")
-        has_photo = (
-            photo
-            and photo.filename
-            and allowed_file(photo.filename, app.config["ALLOWED_EXTENSIONS"])
-        )
-
-        if photo and photo.filename and not has_photo:
-            return jsonify(
-                {
-                    "success": False,
-                    "error": "Format foto tidak valid. Gunakan PNG, JPG, atau JPEG",
-                }
-            ), 400
+        # Face photo taken on the server by the guided capture (never an
+        # upload); required whenever the kiosk camera can take it.
+        photo_jpeg = None
+        photo_token = request.form.get("photo_token", "")
+        if photo_capture.available:
+            # Peek now, consume only after the account exists, so a failed
+            # card read does not cost the student a new photo.
+            photo_jpeg = photo_capture.preview(capture_owner(), photo_token)
+            if photo_jpeg is None:
+                return jsonify(
+                    success=False,
+                    error="Foto wajah belum diambil atau sudah kedaluwarsa.",
+                    photo_missing=True,
+                ), 400
 
         # Create student
         def create_with_card(uid):
@@ -481,16 +485,11 @@ def api_register():
         except NFCCaptureError as exc:
             return jsonify(success=False, error=str(exc)), 409
 
-        # Upload photo if provided (save to database as binary)
-        if has_photo:
-            try:
-                photo_data = photo.read()
-                mimetype = photo.content_type or "image/jpeg"
-                database.update_student_photo(
-                    student["student_id"], photo_data, mimetype
-                )
-            except Exception as e:
-                logger.error(f"Error saving photo: {str(e)}")
+        if photo_jpeg:
+            photo_capture.take(capture_owner(), photo_token)
+            database.update_student_photo(
+                student["student_id"], photo_jpeg, "image/jpeg"
+            )
 
         return jsonify(
             {

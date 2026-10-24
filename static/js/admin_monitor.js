@@ -1,6 +1,7 @@
 /*
  * /admin/monitor: open alarms (acknowledge), unverified returns (verify),
- * tools and loans (search, filters, editing, warning email). Alarms and returns
+ * tools and loans (search, filters, and a "Kelola" menu per row: warning
+ * email, edit unit, edit type, delete unit). Alarms and returns
  * poll alerts every 500 ms, tools every second and types every minute/after edits.
  */
 (function () {
@@ -221,27 +222,43 @@
         }
         rows.forEach(function (t) {
             const borrowed = t.status === 'borrowed';
-            let action = null;
-            if (borrowed && t.borrower_email) {
-                action = h('button', { type: 'button', class: 'linkbtn', text: 'Kirim pengingat' });
-                action.addEventListener('click', function () { sendWarning(t, action); });
-            }
-            const edit = h('button', { type: 'button', class: 'linkbtn', text: 'Edit alat' });
-            edit.addEventListener('click', function () { editTool(t, null); });
             const type = types.find(function (entry) { return String(entry.type_id) === String(t.type_id); });
-            let rename = null;
-            if (type) {
-                rename = h('button', { type: 'button', class: 'linkbtn', text: 'Edit jenis' });
-                rename.addEventListener('click', function () { editTool(t, type); });
-            }
+            const menu = UI.rowMenu('Kelola', [
+                borrowed && t.borrower_email ? {
+                    label: 'Kirim pengingat', desc: 'Email ke ' + t.borrower_name,
+                    onSelect: function () { sendWarning(t, menu); },
+                } : null,
+                { label: 'Ubah unit ini', desc: 'Nama dan kategori ' + t.name,
+                    onSelect: function () { editTool(t, null); } },
+                type ? { label: 'Ubah jenis alat', desc: 'Nama jenis, berlaku untuk semua unit ' + type.name,
+                    onSelect: function () { editTool(t, type); } } : null,
+                { label: 'Hapus unit', desc: borrowed ? 'Kembalikan dulu sebelum dihapus' : 'Riwayat peminjaman tetap tersimpan',
+                    danger: true, separate: true, onSelect: function () { deleteTool(t, menu); } },
+            ]);
             body.appendChild(h('tr', null,
                 h('td', null, h('strong', { text: t.name }), h('span', { class: 'sub num', text: t.rfid_uid || '' })),
                 h('td', null, borrowed ? personCell(t.borrower_name, t.borrower_nim, t.borrower_photo_url) : h('span', { class: 'muted', text: '-' })),
                 h('td', { class: 'num', text: borrowed ? UI.formatWibDate(t.borrow_time_wib, true) : '' }),
                 h('td', { class: 'num' + (t.is_overdue ? ' status status--warn' : ''), text: borrowed ? UI.formatWibDate(t.due_at, true) : '' }),
                 h('td', null, toolStatus(t)),
-                h('td', { class: 'actions' }, edit, rename, action)));
+                h('td', { class: 'actions' }, menu)));
         });
+    }
+
+    async function deleteTool(t, button) {
+        if (t.status === 'borrowed') {
+            UI.toast(t.name + ' masih dipinjam ' + t.borrower_name + '; kembalikan dulu sebelum dihapus.', 'warn');
+            return;
+        }
+        const ok = await confirmDialog('Hapus ' + t.name + '?',
+            'Unit ini hilang dari kiosk dan daftar alat, dan tag RFID-nya bisa dipakai untuk unit baru. ' +
+            'Riwayat peminjamannya tetap tersimpan.', 'Hapus unit', true);
+        if (!ok) return;
+        if (await act(button, '/api/admin/tool_units/' + t.tool_id + '/delete', {}, t.name + ' dihapus.')) {
+            loadLists();
+            loadTypes();
+            refreshState();
+        }
     }
 
     async function sendWarning(t, button) {
@@ -264,7 +281,7 @@
 
     function editTool(tool, type) {
         editing = { tool: tool, type: type };
-        $('edit-title').textContent = type ? 'Edit jenis alat' : 'Edit alat';
+        $('edit-title').textContent = type ? 'Ubah jenis alat' : 'Ubah unit';
         $('edit-name').value = type ? type.name : tool.name;
         $('edit-category').value = tool.category || '';
         $('edit-category-field').hidden = !!type;

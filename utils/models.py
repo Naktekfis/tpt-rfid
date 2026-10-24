@@ -85,6 +85,14 @@ class StudentNFCCard(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class DeletedStudent(db.Model):
+    """Soft-delete marker: the student row stays so history keeps its name/NIM."""
+
+    __tablename__ = "deleted_students"
+    student_id = db.Column(db.Integer, db.ForeignKey("students.id"), primary_key=True)
+    deleted_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class FaceEmbedding(db.Model):
     """One face embedding of a student (float32 bytes), per face engine."""
 

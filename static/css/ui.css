@@ -23,6 +23,7 @@
  *   .tool-photo --sm --md --lg       tool photo tile; without a photo it holds
  *                                    .tool-photo__initials (type initials)
  *   .toasts / .toast --ok --warn --danger
+ *   .rowmenu (UI.rowMenu)            "Kelola ▾" menu of labelled row actions
  *   .num .muted .empty .visually-hidden
  */
 
@@ -380,7 +381,7 @@ a:hover {
   border-color: var(--c-ink);
 }
 .unit-mark--mine {
-  border: 2px solid var(--c-brand);
+  border: 2px dashed var(--c-brand);
 }
 .unit-mark--borrowed {
   border: 1px dashed var(--c-ink);
@@ -496,4 +497,54 @@ a:hover {
 .btn[aria-busy="true"] { cursor: progress; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
+
+/* ---------- Row menu (UI.rowMenu) ---------- */
+
+.rowmenu__caret {
+  color: var(--c-brand);
+  font-size: 0.8em;
+}
+.rowmenu {
+  position: absolute;
+  z-index: 50;
+  min-width: 15rem;
+  max-width: calc(100vw - 16px);
+  margin: 0;
+  padding: var(--sp-1) 0;
+  list-style: none;
+  background: var(--c-surface);
+  border: 1px solid var(--c-ink);
+  border-radius: var(--radius);
+}
+.rowmenu__item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-4);
+  font: inherit;
+  text-align: left;
+  color: var(--c-ink);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.rowmenu__item:hover,
+.rowmenu__item:focus-visible {
+  background: #f3f6f9;
+  outline: none;
+}
+.rowmenu__label { font-weight: 600; }
+.rowmenu__desc {
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+.rowmenu__item--danger .rowmenu__label { color: var(--c-danger); }
+.rowmenu__sep {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-1);
+  border-top: var(--hairline);
 }

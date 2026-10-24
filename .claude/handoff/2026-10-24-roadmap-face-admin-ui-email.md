@@ -208,3 +208,11 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
 - Recognizer ArcFace MBF (see FACE_MODELS.md), majority match 5/6, distance in the log.
 - Guided enrolment (user idea): 1 s "Lihat ke kamera", 3-2-1 with short reader beeps, long beep "cekrek", then capture; big countdown number on the page.
 - Existing enrolment "Ujang" was SFace: hidden now, must enrol again.
+
+## Update v2026.10.24.15
+- Soft delete students / tool units (history kept, blocked while borrowed; NIM re-registration restores).
+- Admin: second nav bar removed; current page name in the crumbs is a switcher (▾) incl. Keluar.
+  Row actions are one "Kelola ▾" menu (UI.rowMenu) with labelled items incl. Hapus.
+- Registration needs a face photo when the kiosk camera is on (utils/photo_capture.py: YuNet, one face,
+  facing, sharp; 1 s + 3-2-1 beeps + cekrek). Without a camera it is optional.
+- "Anda pinjam" mark is dashed blue; kiosk logos moved to the top-left brand line (idle, session, alarm).
