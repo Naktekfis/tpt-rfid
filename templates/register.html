@@ -1,6 +1,6 @@
 {% extends "app_base.html" %}
 {% if enroll_student %}
-{% set crumbs = [("Admin", url_for('admin_menu')), ("Monitor", url_for('admin_monitor')), ("Daftarkan KTM", None)] %}
+{% set crumbs = [("Admin", url_for('admin_menu')), ("Mahasiswa", url_for('admin_api.students_page')), ("Daftarkan KTM", None)] %}
 {% else %}
 {% set crumbs = [("Home", url_for('kiosk_page')), ("Daftar", None)] %}
 {% endif %}
@@ -25,9 +25,9 @@
                 <div class="form__row">
                     <div class="field">
                         <label class="field__label" for="nim">NIM</label>
-                        <input class="input" id="nim" name="nim" type="text" inputmode="numeric" maxlength="20" required
+                        <input class="input" id="nim" name="nim" type="text" inputmode="numeric" maxlength="8" pattern="[0-9]{8}" required
                             aria-describedby="nim-hint">
-                        <span class="field__hint" id="nim-hint">5 sampai 20 huruf atau angka</span>
+                        <span class="field__hint" id="nim-hint">8 digit angka</span>
                     </div>
                     <div class="field">
                         <label class="field__label" for="phone">No. HP</label>
@@ -78,7 +78,7 @@
             <p class="form-error" id="form-error" role="alert"></p>
             <div class="form__actions">
                 <button type="submit" class="btn btn--primary btn--lg" id="form-submit" disabled>{% if enroll_student %}Simpan KTM{% else %}Daftar{% endif %}</button>
-                <a href="{% if enroll_student %}{{ url_for('admin_monitor') }}{% else %}{{ url_for('kiosk_page') }}{% endif %}">Batal</a>
+                <a href="{% if enroll_student %}{{ url_for('admin_api.students_page') }}{% else %}{{ url_for('kiosk_page') }}{% endif %}">Batal</a>
             </div>
         </div>
     </form>
@@ -86,8 +86,8 @@
 <section class="result result--ok" id="registration-done" role="status" hidden>
     <h2>KTM tersimpan.</h2>
     <p>Angkat KTM dari pembaca. Kembali ke Home, lalu tempelkan KTM lagi untuk membuka sesi pinjam atau kembali.</p>
-    <a class="btn btn--primary btn--lg" href="{{ url_for('kiosk_page') }}">Ke Home</a>
-    {% if enroll_student %}<a class="btn btn--secondary" href="{{ url_for('admin_monitor') }}">Kembali ke Monitor</a>{% endif %}
+    {% if enroll_student %}<a class="btn btn--primary btn--lg" href="{{ url_for('admin_api.students_page') }}">Kembali ke Mahasiswa</a>
+    {% else %}<a class="btn btn--primary btn--lg" href="{{ url_for('kiosk_page') }}">Kembali ke Home</a>{% endif %}
 </section>
 {% endblock %}
 {% block page_scripts %}

@@ -65,7 +65,7 @@
                 ? h('span', { class: 'status status--brand', text: 'Berhasil' })
                 : h('span', { class: 'status status--danger', text: 'Gagal' + (e.reason ? ' · ' + (REASONS[e.reason] || e.reason) : '') });
             const photo = e.has_photo
-                ? h('a', { href: '/api/admin/login_events/' + e.event_id + '/photo', target: '_blank', rel: 'noopener', text: 'Lihat foto' })
+                ? h('a', { href: '/api/admin/login_events/' + e.event_id + '/photo', 'data-lightbox': 'Login ' + (METHODS[e.method] || e.method) + ' · ' + UI.formatWibDate(e.at), text: 'Lihat foto' })
                 : h('span', { class: 'muted', text: '—' });
             body.appendChild(h('tr', null,
                 h('td', { class: 'num', text: UI.formatWibDate(e.at) }),

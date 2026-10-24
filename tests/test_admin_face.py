@@ -147,7 +147,7 @@ def test_remote_browser_cannot_start_face_login(client, face):
 
 def test_repeated_failures_lock_face_login_but_not_the_pin(client, face):
     enrol("Ahmad", "A")
-    for _ in range(3):
+    for _ in range(face.settings.lockout_failures):
         login(client, face, good("B"))
     resp, _ = login(client, face, good())
     assert resp.status_code == 429
@@ -227,12 +227,12 @@ def test_face_session_ends_at_its_deadline(client, face):
     assert not is_admin(client)
 
 
-def test_one_doubtful_frame_is_tolerated_two_are_not(client, face):
+def test_two_doubtful_frames_are_tolerated_three_are_not(client, face):
     enrol("Ahmad", "A")
-    _, result = login(client, face, [front("A", 0.2)] + [front()] * 5)
+    _, result = login(client, face, [front("A", 0.2)] * 2 + [front()] * 4)
     assert result["state"] == "passed"
     client.get("/admin/logout")
-    _, result = login(client, face, [front("A", 0.2)] * 2 + [front()] * 4)
+    _, result = login(client, face, [front("A", 0.2)] * 3 + [front()] * 3)
     assert result["reason"] == "spoof"
 
 

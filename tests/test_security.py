@@ -257,3 +257,32 @@ def test_stale_recovery_save_preserves_ack_under_store_lock(service):
     saved = service.store.get(event['event_id'])
     assert saved['acknowledged_at']
     assert saved['recovered_at']
+
+
+def test_cover_that_lets_light_through_is_seen_by_lost_edges():
+    np = pytest.importorskip("numpy")
+    pytest.importorskip("cv2")
+    from utils.security import ObstructionDetector
+
+    rng = np.random.default_rng(0)
+    scene = (rng.integers(0, 2, (12, 16)) * 200).astype("uint8")
+    scene = np.kron(scene, np.ones((40, 40), dtype="uint8"))  # 480x640 checker scene
+    detector = ObstructionDetector()
+    for _ in range(3):
+        assert detector.condition(scene) == "healthy"
+    # A bright, slightly uneven cover (paper/hand with light behind it).
+    cover = np.clip(120 + rng.normal(0, 12, scene.shape), 0, 255).astype("uint8")
+    cover = __import__("cv2").GaussianBlur(cover, (31, 31), 0)
+    assert detector.condition(cover) == "suspected_obstruction"
+    # A person in front hides part of the scene but adds edges: still healthy.
+    person = scene.copy()
+    person[120:360, 200:440] = 90
+    person[200:210, 220:420] = 250
+    assert detector.condition(person) == "healthy"
+
+
+def test_covered_camera_beeps_seven_times(service):
+    np = pytest.importorskip("numpy")
+    service.camera.read.return_value = np.zeros((64, 64, 3), dtype="uint8")
+    settle(service, 0)
+    service.reader.beep.assert_called_once_with(active=2, silent=2, times=7)

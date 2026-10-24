@@ -123,8 +123,7 @@ def format_timestamp(timestamp):
 
 def validate_nim(nim):
     """
-    Validate NIM (Student ID Number) format
-    Basic validation - can be customized based on institution rules
+    Validate NIM (Student ID Number) format: exactly 8 digits (ITB)
 
     Args:
         nim (str): Student ID number to validate
@@ -138,8 +137,8 @@ def validate_nim(nim):
     # Remove whitespace
     nim = nim.strip()
 
-    # Basic validation: must be alphanumeric and between 5-20 characters
-    return nim.isalnum() and 5 <= len(nim) <= 20
+    # ITB NIM: exactly 8 digits
+    return len(nim) == 8 and nim.isdigit() and nim.isascii()
 
 
 def validate_record_id(record_id):

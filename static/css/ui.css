@@ -24,6 +24,7 @@
  *                                    .tool-photo__initials (type initials)
  *   .toasts / .toast --ok --warn --danger
  *   .rowmenu (UI.rowMenu)            "Kelola ▾" menu of labelled row actions
+ *   .lightbox (UI.lightbox)          photo pop-up for a[data-lightbox] links
  *   .num .muted .empty .visually-hidden
  */
 
@@ -381,7 +382,7 @@ a:hover {
   border-color: var(--c-ink);
 }
 .unit-mark--mine {
-  border: 2px dashed var(--c-brand);
+  border: 2px solid var(--c-brand);
 }
 .unit-mark--borrowed {
   border: 1px dashed var(--c-ink);
@@ -548,3 +549,54 @@ a:hover {
   padding-top: var(--sp-1);
   border-top: var(--hairline);
 }
+
+/* ---------- Photo pop-up (UI.lightbox) ---------- */
+
+.lightbox {
+  width: min(90vw, calc(90vh * 4 / 3));
+  max-width: 90vw;
+  height: 90vh;
+  max-height: 90vh;
+  padding: 0;
+  border: 1px solid var(--c-ink);
+  border-radius: var(--radius);
+  background: var(--c-dark);
+}
+.lightbox[open] { display: flex; flex-direction: column; }
+.lightbox::backdrop { background: rgba(16, 24, 32, 0.7); }
+.lightbox__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: var(--sp-2) var(--sp-4);
+  color: var(--c-on-dark);
+  font-weight: 600;
+}
+.lightbox__body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--sp-4) var(--sp-4);
+}
+.lightbox__img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+/* ---------- Table pages (data-page-size) ---------- */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding-top: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+}
+.pager[hidden] { display: none; }
+.pager__buttons { display: flex; gap: var(--sp-2); }

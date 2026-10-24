@@ -364,7 +364,7 @@
         box.hidden = !show;
         if (show) box.textContent = REASONS[s.reason];
         if (s.state === 'unknown_card') {
-            $('unknown-ends').textContent = 'Kembali ke layar awal dalam ' + Math.ceil(s.unknown_ends_in || 0) + ' detik';
+            $('unknown-ends').textContent = 'Kembali ke Home dalam ' + Math.ceil(s.unknown_ends_in || 0) + ' detik';
         }
     }
 
@@ -389,7 +389,7 @@
                 $('ses-left').textContent = fmtLeft(s.expires_in);
                 $('btn-cancel').hidden = !s.can_cancel;
             } else {
-                $('sum-ends').textContent = 'Kembali ke layar awal dalam ' + Math.ceil(s.summary_ends_in || 0) + ' detik';
+                $('sum-ends').textContent = 'Kembali ke Home dalam ' + Math.ceil(s.summary_ends_in || 0) + ' detik';
                 // The API rounds this value to 0.1 s. Leave the summary at
                 // its actual deadline instead of waiting for the next poll.
                 const remaining = Math.max(0, Number(s.summary_ends_in) || 0);

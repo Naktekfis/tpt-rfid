@@ -89,7 +89,7 @@ Semua di `.env`; lihat [`.env.example`](.env.example). Yang paling sering disent
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | – | Gmail lab + App Password 16 huruf |
 | `LOAN_REMINDERS_ENABLED` | `false` | Email otomatis saat batas pinjam tiba dan 2 hari setelahnya |
 | `FACE_LOGIN_ENABLED` | `false` | Login wajah admin (hanya di layar rak peminjaman) |
-| `FACE_RECOGNIZER` / `FACE_LIVENESS_MODELS` | `arcface_mbf` / `mn3:0.5` | Model pengenal wajah dan cek keaslian |
+| `FACE_RECOGNIZER` / `FACE_LIVENESS_MODELS` | `arcface_mbf` / `mn3:0.3` | Model pengenal wajah dan cek keaslian |
 
 ## Arsitektur
 

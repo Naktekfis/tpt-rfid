@@ -191,8 +191,8 @@
                 return false;
             }
         }
-        if (!/^[A-Za-z0-9]{5,20}$/.test($('nim').value.trim())) {
-            fail('nim', 'NIM berisi 5 sampai 20 huruf atau angka, tanpa spasi.');
+        if (!/^[0-9]{8}$/.test($('nim').value.trim())) {
+            fail('nim', 'NIM harus 8 digit angka.');
             return false;
         }
         if (!/^[0-9+\-\s]{8,20}$/.test($('phone').value.trim())) {

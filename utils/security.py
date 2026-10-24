@@ -42,6 +42,60 @@ def frame_condition(frame):
     return "healthy"
 
 
+class ObstructionDetector:
+    """Camera cover check that learns what the healthy scene looks like.
+
+    Brightness alone misses a cover that lets light through and flags a dim
+    room (Bosch VCA tamper note; LeDat98/CameraTamperingDetection compares
+    edge histograms to a baseline for the same reason). So, on a 160x120
+    grayscale copy: dark or flat is a cover as before; otherwise the frame is
+    split into 12x16 blocks and a block counts as "textured" when Canny finds
+    edges in it. While healthy, the textured blocks are averaged into a slow
+    reference. A frame that keeps under `lost_fraction` of the reference's
+    textured blocks has lost the scene: a hand, paper or sticker over the lens
+    rather than a person walking by, who adds edges of their own. The
+    SecurityService debounce then requires that for several seconds.
+    """
+
+    GRID = (12, 16)  # blocks of 10x10 px on the 160x120 copy
+
+    def __init__(self, lost_fraction: float = 0.2, learn_rate: float = 0.05,
+                 min_reference_blocks: int = 20):
+        self.lost_fraction = lost_fraction
+        self.learn_rate = learn_rate
+        self.min_reference_blocks = min_reference_blocks
+        self.reference = None  # per-block edge density, healthy frames only
+
+    def condition(self, frame):
+        base = frame_condition(frame)
+        if base != "healthy":
+            return base
+        try:
+            import cv2
+        except ImportError:
+            return base
+        import numpy as np
+
+        small = cv2.resize(np.asarray(frame), (160, 120), interpolation=cv2.INTER_AREA)
+        gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY) if small.ndim == 3 else small
+        edges = cv2.Canny(gray, 50, 150) > 0
+        rows, cols = self.GRID
+        density = edges.reshape(rows, 120 // rows, cols, 160 // cols).mean(axis=(1, 3))
+        textured = density > 0.02
+        if self.reference is not None:
+            ref_textured = self.reference > 0.02
+            known = int(ref_textured.sum())
+            if known >= self.min_reference_blocks:
+                kept = int((ref_textured & textured).sum()) / known
+                if kept < self.lost_fraction:
+                    return "suspected_obstruction"
+        if self.reference is None:
+            self.reference = density
+        else:
+            self.reference = (1 - self.learn_rate) * self.reference + self.learn_rate * density
+        return "healthy"
+
+
 class EvidenceStore:
     def __init__(self, directory, max_storage_bytes=200 * 1024 * 1024):
         self.directory = Path(directory)
@@ -151,6 +205,7 @@ class SecurityService:
         self._storage_retry = False
         self.storage_error = None
         self.condition = "disabled" if not enabled else "warming_up"
+        self.detector = ObstructionDetector()
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -218,7 +273,7 @@ class SecurityService:
             frame, condition = None, "unavailable"
         else:
             frame = self.camera.read()
-            condition = frame_condition(frame)
+            condition = self.detector.condition(frame)
         if condition != self._candidate:
             self._candidate, self._candidate_since = condition, now
         threshold = self.recovery_seconds if condition == "healthy" else self.debounce_seconds
@@ -252,7 +307,11 @@ class SecurityService:
                 self._active = self._event("camera_" + condition)
                 new_incident = True
                 if self.alarm_enabled:
-                    self.reader.beep()
+                    if condition == "suspected_obstruction":
+                        # Covered lens: a long run of beeps, unlike a tool alarm.
+                        self.reader.beep(active=2, silent=2, times=7)
+                    else:
+                        self.reader.beep()
         try:
             for previous in self._pending_recoveries:
                 self.store.save(previous)

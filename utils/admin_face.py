@@ -66,7 +66,7 @@ class FaceLocked(RuntimeError):
 @dataclass
 class FaceSettings:
     frames_needed: int = 6  # frames looked at per attempt (~2 s on the Jetson)
-    min_live: int = 5  # of those, how many must pass liveness
+    min_live: int = 4  # of those, how many must pass liveness
     min_match: int = 5  # login: how many must match the admin (none another)
     enrol_prepare: float = 1.0  # enrolment: time to read the instruction
     enrol_countdown: int = 3  # then 3-2-1, one second each
@@ -74,11 +74,11 @@ class FaceSettings:
     ambiguous_margin: float = 0.05
     min_face_px: int = 100
     facing_yaw: float = 0.35  # roughly facing the camera
-    timeout: float = 12.0  # from the start of the capture
-    face_lost_seconds: float = 1.5
-    lockout_failures: int = 3
+    timeout: float = 20.0  # from the start of the capture
+    face_lost_seconds: float = 3.0
+    lockout_failures: int = 10  # generous: a cool-down, not a punishment
     lockout_window: float = 600.0
-    lockout_seconds: float = 300.0
+    lockout_seconds: float = 60.0
 
 
 @dataclass
@@ -495,13 +495,13 @@ def build_face_auth(app, camera, beep=None) -> FaceAuth:
         return FaceAuth(
             app, camera, settings=settings, unavailable="Kamera tidak aktif."
         )
-    from utils.face import FaceModelsMissing, create_engine, face_jpeg
+    from utils.face import FaceModelsMissing, create_engine, portrait_jpeg
     from utils.liveness import Liveness, LivenessUnavailable
 
     model_dir = cfg.get("FACE_MODEL_DIR", "models/face")
     try:
         engine = create_engine(model_dir, cfg.get("FACE_RECOGNIZER", "arcface_mbf"))
-        liveness = Liveness(model_dir, cfg.get("FACE_LIVENESS_MODELS", "mn3:0.5"))
+        liveness = Liveness(model_dir, cfg.get("FACE_LIVENESS_MODELS", "mn3:0.3"))
     except (FaceModelsMissing, LivenessUnavailable, ValueError) as exc:
         logger.warning("Face login unavailable: %s", exc)
         return FaceAuth(
@@ -510,8 +510,8 @@ def build_face_auth(app, camera, beep=None) -> FaceAuth:
     logger.info(
         "Face login on (%s, liveness %s)",
         engine.name,
-        cfg.get("FACE_LIVENESS_MODELS", "mn3:0.5"),
+        cfg.get("FACE_LIVENESS_MODELS", "mn3:0.3"),
     )
     return FaceAuth(
-        app, camera, engine, liveness, settings, photo=face_jpeg, beep=beep
+        app, camera, engine, liveness, settings, photo=portrait_jpeg, beep=beep
     )

@@ -183,6 +183,38 @@
         }
     }
 
+    // ---------- Table pages ----------
+    // A <table data-page-size="10"> shows that many rows at a time with
+    // previous/next below it. It works on whatever the page script renders
+    // into the tbody (a MutationObserver re-applies it), and keeps the page
+    // across the regular re-renders of polling pages.
+    function pageTable(table) {
+        const size = parseInt(table.getAttribute('data-page-size'), 10) || 10;
+        const body = table.tBodies[0];
+        const info = h('span', { class: 'pager__info num' });
+        const prev = h('button', { type: 'button', class: 'btn btn--secondary btn--sm', text: '‹ Sebelumnya' });
+        const next = h('button', { type: 'button', class: 'btn btn--secondary btn--sm', text: 'Berikutnya ›' });
+        const bar = h('div', { class: 'pager', hidden: true }, info, h('span', { class: 'pager__buttons' }, prev, next));
+        let page = 0;
+
+        function apply() {
+            const rows = Array.prototype.filter.call(body.rows, function (r) { return !r.querySelector('.empty'); });
+            const pages = Math.max(1, Math.ceil(rows.length / size));
+            page = Math.min(page, pages - 1);
+            rows.forEach(function (r, i) { r.hidden = Math.floor(i / size) !== page; });
+            bar.hidden = rows.length <= size;
+            const first = page * size;
+            info.textContent = (first + 1) + '–' + Math.min(rows.length, first + size) + ' dari ' + rows.length;
+            prev.disabled = page === 0;
+            next.disabled = page >= pages - 1;
+        }
+        prev.addEventListener('click', function () { page -= 1; apply(); });
+        next.addEventListener('click', function () { page += 1; apply(); });
+        (table.closest('.table-scroll') || table).after(bar);
+        new MutationObserver(apply).observe(body, { childList: true });
+        apply();
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.page .table').forEach(function (table) {
             const section = table.closest('.section');
@@ -194,6 +226,7 @@
             table.before(wrapper);
             wrapper.appendChild(table);
         });
+        document.querySelectorAll('.page .table[data-page-size]').forEach(pageTable);
     });
 
     // ---------- Row menu ("Kelola ▾") ----------
@@ -270,7 +303,43 @@
     window.addEventListener('resize', placeMenu);
     window.addEventListener('scroll', placeMenu, true);
 
+    // ---------- Photo pop-up ----------
+    // Links with data-lightbox open their image in a dialog (about 90% of the
+    // screen, aspect kept) instead of a new tab; the attribute is the caption.
+    let lightboxEl = null;
+
+    function lightbox(src, caption) {
+        if (!lightboxEl) {
+            lightboxEl = h('dialog', { class: 'lightbox', 'aria-label': 'Foto' },
+                h('div', { class: 'lightbox__bar' },
+                    h('span', { class: 'lightbox__caption' }),
+                    h('button', { type: 'button', class: 'btn btn--on-dark-secondary btn--sm', text: 'Tutup',
+                        onclick: function () { lightboxEl.close(); } })),
+                h('div', { class: 'lightbox__body' }, h('img', { class: 'lightbox__img', alt: '' })));
+            lightboxEl.addEventListener('click', function (event) {
+                if (event.target === lightboxEl) lightboxEl.close();  // click on the backdrop
+            });
+            lightboxEl.addEventListener('close', function () {
+                lightboxEl.querySelector('img').removeAttribute('src');
+            });
+            document.body.appendChild(lightboxEl);
+        }
+        lightboxEl.querySelector('.lightbox__caption').textContent = caption || '';
+        const img = lightboxEl.querySelector('img');
+        img.alt = caption || 'Foto';
+        img.src = src;
+        lightboxEl.showModal();
+    }
+
+    document.addEventListener('click', function (event) {
+        const link = event.target.closest && event.target.closest('a[data-lightbox]');
+        if (!link) return;
+        event.preventDefault();
+        lightbox(link.href, link.getAttribute('data-lightbox'));
+    });
+
     window.UI = {
+        lightbox: lightbox,
         rowMenu: rowMenu,
         loadNotice: loadNotice,
         getCSRFToken: getCSRFToken,

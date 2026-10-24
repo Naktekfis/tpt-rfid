@@ -229,3 +229,13 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
   .page--fill now scrolls instead of hiding overflow (it hid the Daftar button).
 - Registration photo is a 4:5 head-and-shoulders close-up (utils.face.portrait_box), user asked for space above the hair and a bit of shoulder.
 - Admin: Keluar is a visible button in the top bar (removed from the switcher menu).
+
+## Update v2026.10.24.22
+- "Anda pinjam" back to solid blue outline. NIM must be exactly 8 digits (server + client).
+- Back links unified: "Kembali ke <page>" (Home, Ringkasan, Mahasiswa).
+- Photos open in a pop-up (UI.lightbox, a[data-lightbox]) instead of a new tab.
+- Multi-table pages (Monitor Alat, Keamanan, Riwayat) page their tables (table[data-page-size], UI pager).
+- Camera cover: ObstructionDetector (dark/flat + lost reference edges per block), 7 beeps.
+- Face login looser after the log showed real faces failing liveness (mn3 0.4-0.7) and a 3-failure lockout:
+  mn3:0.3, 4/6 live, timeout 20 s, face lost 3 s, cool-down 60 s after 10 failures/10 min; login photo is the
+  portrait crop. User wants to drop the PIN eventually: NOT done (auth change, needs a decision on fallback).

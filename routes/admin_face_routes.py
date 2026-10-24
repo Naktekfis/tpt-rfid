@@ -49,7 +49,8 @@ def create_admin_face_blueprint(face_auth, admin_required, limiter, session_seco
             return _error(str(exc), 503)
         except FaceLocked:
             return _error(
-                "Terlalu banyak percobaan gagal. Gunakan PIN.",
+                "Terlalu banyak percobaan gagal. Coba lagi dalam "
+                f"{max(1, int(face_auth.locked_for()))} detik.",
                 429,
                 locked_seconds=int(face_auth.locked_for()),
             )

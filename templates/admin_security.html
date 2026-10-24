@@ -10,7 +10,7 @@
 <p id="security-error" class="status status--danger" role="alert" hidden></p>
 <section class="section" aria-labelledby="security-title">
     <div class="section-head"><h2 id="security-title">Kejadian terbaru</h2><span class="section-head__meta">100 kejadian terakhir · waktu WIB</span></div>
-    <table class="table"><thead><tr>
+    <table data-page-size="10" class="table"><thead><tr>
         <th scope="col">Kejadian</th><th scope="col">Waktu</th><th scope="col">Dokumentasi</th><th scope="col">Penyelesaian</th><th scope="col">Tindakan</th>
     </tr></thead><tbody id="security-events"><tr><td colspan="5" class="empty">Memuat…</td></tr></tbody></table>
 </section>
@@ -18,7 +18,7 @@
 <section class="section" aria-labelledby="faces-title">
     <div class="section-head"><h2 id="faces-title">Wajah admin</h2><span class="section-head__meta" id="faces-count"></span></div>
     <p class="field__hint">Login wajah hanya di layar rak peminjaman; PIN tetap bisa dipakai. Saat mendaftar, lihat ke kamera: ada hitungan mundur 3-2-1 dengan bunyi buzzer, lalu tahan sebentar sampai selesai.</p>
-    <table class="table"><thead><tr>
+    <table data-page-size="5" class="table"><thead><tr>
         <th scope="col">Admin</th><th scope="col">Sampel</th><th scope="col">Didaftarkan</th><th scope="col"><span class="visually-hidden">Tindakan</span></th>
     </tr></thead><tbody id="faces-body"><tr><td colspan="4" class="empty">Memuat…</td></tr></tbody></table>
     <form class="form face-enrol" id="enrol-form" autocomplete="off" hidden>
@@ -42,7 +42,7 @@
 </section>
 <section class="section" aria-labelledby="logins-title">
     <div class="section-head"><h2 id="logins-title">Riwayat login admin</h2><span class="section-head__meta">50 percobaan terakhir · waktu WIB</span></div>
-    <table class="table"><thead><tr>
+    <table data-page-size="10" class="table"><thead><tr>
         <th scope="col">Waktu</th><th scope="col">Cara</th><th scope="col">Hasil</th><th scope="col">Admin</th><th scope="col">Foto</th>
     </tr></thead><tbody id="logins-body"><tr><td colspan="5" class="empty">Memuat…</td></tr></tbody></table>
 </section>

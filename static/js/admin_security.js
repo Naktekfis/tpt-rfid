@@ -39,7 +39,7 @@
                 const title = event.kind === 'tool_alarm' ? 'Alarm alat · ' + (event.tool_name || 'Alat #' + event.tool_id) : labels[event.kind];
                 let photo = h('span', { text: photos[event.photo_status] || 'Foto tidak tersedia' });
                 if (event.photo_status === 'captured') {
-                    photo = h('a', { href: '/api/admin/security/events/' + event.event_id + '/photo', target: '_blank', rel: 'noopener', text: 'Lihat foto' });
+                    photo = h('a', { href: '/api/admin/security/events/' + event.event_id + '/photo', 'data-lightbox': title + ' · ' + date(event.started_at), text: 'Lihat foto' });
                 }
                 const resolved = alarm ? (alarm.ended_at ? 'Selesai · ' + (alarm.ended_by || '') + ' · ' + alarmDate(alarm.ended_at) : 'Alarm alat terbuka')
                     : (event.recovered_at ? (event.recovery_reason === 'healthy' ? 'Kamera pulih · ' : 'Kondisi berubah · ') + date(event.recovered_at) : 'Gangguan masih aktif');

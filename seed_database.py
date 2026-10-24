@@ -24,19 +24,19 @@ from utils.models import Student, Tool, ToolType  # noqa: E402
 STUDENTS = [
     {
         "name": "Ahmad Fauzi",
-        "nim": "1234567890",
+        "nim": "13320001",
         "email": "ahmad.fauzi@university.ac.id",
         "phone": "081234567890",
     },
     {
         "name": "Siti Nurhaliza",
-        "nim": "0987654321",
+        "nim": "13320002",
         "email": "siti.nurhaliza@university.ac.id",
         "phone": "081234567891",
     },
     {
         "name": "Budi Santoso",
-        "nim": "1122334455",
+        "nim": "13320003",
         "email": "budi.santoso@university.ac.id",
         "phone": "081234567892",
     },
