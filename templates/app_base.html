@@ -38,7 +38,6 @@
                         {% for item, path in [('Ringkasan', '/admin'), ('Alat', '/admin/monitor'), ('Mahasiswa', '/admin/students'), ('Keamanan', '/admin/security'), ('Tambah alat', '/admin/input_tool'), ('Riwayat', '/admin/history')] %}
                         <li><a href="{{ path }}"{% if request.path == path %} aria-current="page"{% endif %}>{{ item }}</a></li>
                         {% endfor %}
-                        <li class="switcher__sep"><a href="{{ url_for('admin_logout') }}">Keluar</a></li>
                     </ul>
                 </details>
                 {% elif url and not loop.last %}<a href="{{ url }}">{{ label }}</a>
@@ -49,6 +48,7 @@
     </nav>
     {% endif %}
     <span class="topbar__clock num" data-clock>--.--</span>
+    {% if admin_area %}<a class="btn btn--secondary btn--sm topbar__exit" href="{{ url_for('admin_logout') }}">Keluar</a>{% endif %}
 </header>
 {% endblock %}
 

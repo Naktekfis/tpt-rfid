@@ -11,8 +11,8 @@ const OFFLINE = '<!doctype html><html lang="id"><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
     '<title>Admin Lab tidak terhubung</title>' +
     '<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 16px;color:#1d2731">' +
-    '<h1 style="font-size:1.4rem">Tidak terhubung ke kiosk</h1>' +
-    '<p>Pastikan perangkat ini ada di jaringan lab dan kiosk menyala, lalu muat ulang.</p>' +
+    '<h1 style="font-size:1.4rem">Tidak terhubung ke rak peminjaman</h1>' +
+    '<p>Pastikan perangkat ini ada di jaringan lab dan rak peminjaman menyala, lalu muat ulang.</p>' +
     '<button onclick="location.reload()" style="font:inherit;padding:.5rem 1rem">Muat ulang</button></body></html>';
 
 self.addEventListener('install', function () { self.skipWaiting(); });

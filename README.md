@@ -2,11 +2,11 @@
 
 # Lab Fabrikasi TF ITB
 
-Kiosk peminjaman alat workshop Lab Fabrikasi Teknik Fisika ITB. Mahasiswa membuka sesi dengan **KTM (Kartu Tanda Mahasiswa)**. Setiap alat diberi tag UHF RFID yang terus dipantau reader: alat yang diambil saat sesi tercatat sebagai pinjaman, sedangkan alat yang keluar tanpa sesi memicu alarm. Admin mengelola semuanya di layar yang sama, dengan login wajah atau PIN.
+Rak peminjaman alat pintar untuk workshop Lab Fabrikasi Teknik Fisika ITB. Mahasiswa membuka sesi dengan **KTM (Kartu Tanda Mahasiswa)**. Setiap alat diberi tag UHF RFID yang terus dipantau reader: alat yang diambil saat sesi tercatat sebagai pinjaman, sedangkan alat yang keluar tanpa sesi memicu alarm. Admin mengelola semuanya di layar yang sama, dengan login wajah atau PIN.
 
-| Kiosk menunggu KTM | Sesi peminjaman |
+| Home (menunggu KTM) | Sesi peminjaman |
 |---|---|
-| ![Layar kiosk saat menunggu KTM](docs/images/kiosk-idle.jpg) | ![Layar sesi peminjaman](docs/images/kiosk-session.jpg) |
+| ![Home saat menunggu KTM](docs/images/kiosk-idle.jpg) | ![Layar sesi peminjaman](docs/images/kiosk-session.jpg) |
 | **Admin: Monitor Alat** | **Daftar mahasiswa** |
 | ![Halaman admin Monitor Alat](docs/images/admin-monitor.jpg) | ![Halaman daftar mahasiswa](docs/images/register.jpg) |
 
@@ -27,9 +27,9 @@ flowchart LR
     Z[Alat kembali tanpa sesi] --> V[Dikembalikan,<br/>belum diverifikasi admin]
 ```
 
-- **Kiosk** (`/kiosk`): papan "Di rak sekarang" menampilkan tiap alat, siapa peminjamnya, dan yang terlambat atau hilang.
+- **Home** (`/kiosk`, layar rak peminjaman): papan "Di rak sekarang" menampilkan tiap alat, siapa peminjamnya, dan yang terlambat atau hilang.
 - **Daftar** (`/daftar`): isi data, ambil foto wajah (hitungan mundur 3-2-1 dengan bunyi buzzer), lalu tempelkan KTM.
-- **Admin** (`/admin`, tautan "Admin" di kanan bawah kiosk): ringkasan, alat (alarm, verifikasi pengembalian, kelola unit), mahasiswa, keamanan (foto alarm, kamera tertutup, wajah admin, riwayat login), tambah alat, riwayat dan ekspor (CSV/Excel/email) serta riwayat email pengingat. Pindah halaman lewat nama halaman ▾ di bar atas; aksi per baris lewat tombol **Kelola ▾**.
+- **Admin** (`/admin`, tautan "Admin" di kanan bawah Home): ringkasan, alat (alarm, verifikasi pengembalian, kelola unit), mahasiswa, keamanan (foto alarm, kamera tertutup, wajah admin, riwayat login), tambah alat, riwayat dan ekspor (CSV/Excel/email) serta riwayat email pengingat. Pindah halaman lewat nama halaman ▾ di bar atas; aksi per baris lewat tombol **Kelola ▾**.
 
 ## Perangkat
 
@@ -55,7 +55,7 @@ Butuh Python 3.8+.
 .venv/bin/python app.py                        # http://localhost:5000/kiosk
 ```
 
-Tanpa reader dan kamera (bawaan `.env.example`), jalankan dengan `FLASK_ENV=development` lalu `scripts/kiosk_demo.sh` untuk memutar semua keadaan kiosk: tag di rak, sesi, pinjam, selesai, alarm.
+Tanpa reader dan kamera (bawaan `.env.example`), jalankan dengan `FLASK_ENV=development` lalu `scripts/kiosk_demo.sh` untuk memutar semua keadaan Home dan sesi: tag di rak, sesi, pinjam, selesai, alarm.
 
 **Tes:** `scripts/check.sh` (ruff + pytest). Kode harus tetap jalan di Python 3.8; `PY38=<python3.8> scripts/check.sh` juga menjalankan tes di 3.8.
 
@@ -88,7 +88,7 @@ Semua di `.env`; lihat [`.env.example`](.env.example). Yang paling sering disent
 | `KIOSK_SESSION_SECONDS` | `60` | Lama sesi KTM (bertambah saat ada alat diambil/dikembalikan) |
 | `MAIL_USERNAME` / `MAIL_PASSWORD` | – | Gmail lab + App Password 16 huruf |
 | `LOAN_REMINDERS_ENABLED` | `false` | Email otomatis saat batas pinjam tiba dan 2 hari setelahnya |
-| `FACE_LOGIN_ENABLED` | `false` | Login wajah admin (hanya di layar kiosk) |
+| `FACE_LOGIN_ENABLED` | `false` | Login wajah admin (hanya di layar rak peminjaman) |
 | `FACE_RECOGNIZER` / `FACE_LIVENESS_MODELS` | `arcface_mbf` / `mn3:0.5` | Model pengenal wajah dan cek keaslian |
 
 ## Arsitektur
@@ -122,7 +122,7 @@ cd ~/tpt-rfid && .venv/bin/python scripts/set_admin_pin.py
 kill -HUP $(systemctl show -p MainPID --value tpt-rfid)
 ```
 
-**Daftarkan wajah admin.** Di layar kiosk: Admin → login PIN → Keamanan → Wajah admin → isi nama → Daftarkan wajah → lihat kamera saat hitungan 3-2-1. Lalu Keluar dan coba "Masuk dengan wajah".
+**Daftarkan wajah admin.** Di layar rak peminjaman: Admin → login PIN → Keamanan → Wajah admin → isi nama → Daftarkan wajah → lihat kamera saat hitungan 3-2-1. Lalu Keluar dan coba "Masuk dengan wajah".
 
 **Alarm berbunyi.** Kembalikan alat ke rak, atau peminjam menempelkan KTM dalam 30 detik. Kalau alarm palsu, admin menekan **Matikan alarm** di Monitor Alat. Foto saat alarm ada di Keamanan.
 
@@ -130,14 +130,14 @@ kill -HUP $(systemctl show -p MainPID --value tpt-rfid)
 
 **Kirim email uji.** Di Jetson: `MAIL_LIVE_TO=alamat@contoh.com .venv/bin/python -m pytest -q tests/test_mail_live.py`.
 
-**Kiosk tertutup.** Klik dua kali ikon **Lab Fabrikasi** di desktop Jetson.
+**Layar rak peminjaman tertutup.** Klik dua kali ikon **Lab Fabrikasi** di desktop Jetson.
 
 **Kalibrasi cek keaslian wajah.** Di Jetson jalankan `scripts/face_spoof_bench.py real`, `print`, `screen`, lalu `--report`, kemudian atur `FACE_LIVENESS_MODELS`.
 
 ## Troubleshooting
 
-**Tampilan kiosk tidak berubah setelah deploy**
-Penyebab: cache browser. Perbaikan: Ctrl+Shift+R di kiosk.
+**Tampilan rak peminjaman tidak berubah setelah deploy**
+Penyebab: cache browser. Perbaikan: Ctrl+Shift+R di layar rak peminjaman.
 
 **"Pembaca KTM tidak terhubung" atau alat tidak terbaca**
 Cek `curl -s 127.0.0.1:5000/api/devices/status` di Jetson; cabut-pasang USB reader. Log: `journalctl -u tpt-rfid -n 100`.

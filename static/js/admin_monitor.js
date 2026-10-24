@@ -251,7 +251,7 @@
             return;
         }
         const ok = await confirmDialog('Hapus ' + t.name + '?',
-            'Unit ini hilang dari kiosk dan daftar alat, dan tag RFID-nya bisa dipakai untuk unit baru. ' +
+            'Unit ini hilang dari Home dan daftar alat, dan tag RFID-nya bisa dipakai untuk unit baru. ' +
             'Riwayat peminjamannya tetap tersimpan.', 'Hapus unit', true);
         if (!ok) return;
         if (await act(button, '/api/admin/tool_units/' + t.tool_id + '/delete', {}, t.name + ' dihapus.')) {

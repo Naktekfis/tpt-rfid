@@ -42,7 +42,7 @@ def create_admin_face_blueprint(face_auth, admin_required, limiter, session_seco
 
     def start(mode, name=None):
         if not _is_local():
-            return _error("Login wajah hanya bisa di layar kiosk.", 403)
+            return _error("Login wajah hanya bisa di layar rak peminjaman.", 403)
         try:
             attempt = face_auth.start(mode, name)
         except FaceUnavailable as exc:

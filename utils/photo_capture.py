@@ -6,8 +6,8 @@ a moment to read "Lihat ke kamera", a 3-2-1 countdown with a short beep from
 the reader's buzzer on each count, a longer beep ("cekrek"), then up to
 `capture_seconds` of frames. A frame counts only if YuNet finds exactly one
 face that is big enough, roughly facing the camera and sharp; after
-`frames_needed` such frames the sharpest one is kept as a JPEG of the face
-with some margin. No recognition or liveness: this is a record photo.
+`frames_needed` such frames the sharpest one is kept as a 4:5 portrait from
+the forehead to the chin (utils.face.portrait_box). No recognition or liveness: this is a record photo.
 
 Like the NFC capture, the photo stays on the server: the browser gets a
 token bound to its session (capture_owner), and /api/register takes the
@@ -288,7 +288,7 @@ def build_photo_capture(app, camera, beep=None) -> PhotoCapture:
     cfg = app.config
     if not cfg.get("CAMERA_ENABLED", False):
         return PhotoCapture(camera, unavailable="Kamera tidak aktif.")
-    from utils.face import FaceModelsMissing, YuNetSFaceEngine, face_jpeg, sharpness
+    from utils.face import FaceModelsMissing, YuNetSFaceEngine, portrait_jpeg, sharpness
 
     try:
         engine = YuNetSFaceEngine(cfg.get("FACE_MODEL_DIR", "models/face"))
@@ -300,5 +300,5 @@ def build_photo_capture(app, camera, beep=None) -> PhotoCapture:
         engine,
         beep=beep,
         sharpness=sharpness,
-        encode=lambda frame, face: face_jpeg(frame, face, margin=0.6),
+        encode=portrait_jpeg,
     )

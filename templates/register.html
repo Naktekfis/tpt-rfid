@@ -2,7 +2,7 @@
 {% if enroll_student %}
 {% set crumbs = [("Admin", url_for('admin_menu')), ("Monitor", url_for('admin_monitor')), ("Daftarkan KTM", None)] %}
 {% else %}
-{% set crumbs = [("Kiosk", url_for('kiosk_page')), ("Daftar", None)] %}
+{% set crumbs = [("Home", url_for('kiosk_page')), ("Daftar", None)] %}
 {% endif %}
 {% block title %}Daftar KTM — Lab Fabrikasi{% endblock %}
 {% block page_class %}page--fill{% endblock %}
@@ -11,72 +11,82 @@
     <div class="page-head">
         <div>
             <h1>{% if enroll_student %}Daftarkan KTM{% else %}Daftar mahasiswa{% endif %}</h1>
-            <p>{% if enroll_student %}Hubungkan KTM ke {{ enroll_student.name }} ({{ enroll_student.nim }}).{% else %}Isi data diri, ambil foto wajah, lalu tempelkan KTM (Kartu Tanda Mahasiswa) untuk menghubungkannya dengan akun Anda.{% endif %}</p>
+            <p>{% if enroll_student %}Hubungkan KTM ke {{ enroll_student.name }} ({{ enroll_student.nim }}).{% else %}Tiga langkah: isi data diri, ambil foto wajah, lalu tempelkan KTM.{% endif %}</p>
         </div>
     </div>
     <form class="form reg-form" id="reg-form" autocomplete="off" novalidate>
-        <div class="form__row" {% if enroll_student %}hidden{% endif %}>
-            <div class="field">
-                <label class="field__label" for="name">Nama lengkap</label>
-                <input class="input" id="name" name="name" type="text" maxlength="200" required {% if not enroll_student %}autofocus{% endif %}>
-            </div>
-            <div class="field">
-                <label class="field__label" for="nim">NIM</label>
-                <input class="input" id="nim" name="nim" type="text" inputmode="numeric" maxlength="20" required
-                    aria-describedby="nim-hint">
-                <span class="field__hint" id="nim-hint">Huruf atau angka, 5 sampai 20 karakter</span>
-            </div>
-        </div>
-        <div class="form__row" {% if enroll_student %}hidden{% endif %}>
-            <div class="field">
-                <label class="field__label" for="email">Email</label>
-                <input class="input" id="email" name="email" type="email" maxlength="200" required
-                    aria-describedby="email-hint">
-                <span class="field__hint" id="email-hint">Pengingat pengembalian dikirim ke alamat ini</span>
-            </div>
-            <div class="field">
-                <label class="field__label" for="phone">No. HP</label>
-                <input class="input" id="phone" name="phone" type="tel" maxlength="20" required>
-            </div>
-        </div>
-        {% if not enroll_student %}
-        <div class="field reg-photo" id="photo-field" hidden>
-            <span class="field__label">Foto wajah</span>
-            <div class="reg-photo__row">
-                <div class="camera-panel camera-panel--mirror reg-photo__frame" id="photo-live" hidden>
-                    <img class="camera-panel__img" id="photo-stream" alt="">
-                    <span class="reg-photo__count" id="photo-count" aria-hidden="true"></span>
+        <div class="reg-grid{% if enroll_student %} reg-grid--card-only{% endif %}">
+            <div class="reg-col" {% if enroll_student %}hidden{% endif %}>
+                <h2 class="reg-step__title"><span class="reg-step__no">1</span> Data diri</h2>
+                <div class="field">
+                    <label class="field__label" for="name">Nama lengkap</label>
+                    <input class="input" id="name" name="name" type="text" maxlength="200" required {% if not enroll_student %}autofocus{% endif %}>
                 </div>
-                <img class="reg-photo__frame reg-photo__preview" id="photo-preview" alt="Foto wajah Anda" hidden>
-                <div class="reg-photo__side">
-                    <p class="reg-photo__instruction" id="photo-status" role="status" aria-live="polite">Tekan Ambil foto, lalu lihat ke kamera. Ada hitungan mundur 3-2-1 dengan bunyi, lalu foto diambil.</p>
-                    <p class="field__hint" id="photo-hint"></p>
-                    <div class="form__actions">
-                        <button type="button" class="btn btn--secondary" id="photo-start">Ambil foto</button>
+                <div class="form__row">
+                    <div class="field">
+                        <label class="field__label" for="nim">NIM</label>
+                        <input class="input" id="nim" name="nim" type="text" inputmode="numeric" maxlength="20" required
+                            aria-describedby="nim-hint">
+                        <span class="field__hint" id="nim-hint">5 sampai 20 huruf atau angka</span>
+                    </div>
+                    <div class="field">
+                        <label class="field__label" for="phone">No. HP</label>
+                        <input class="input" id="phone" name="phone" type="tel" maxlength="20" required>
                     </div>
                 </div>
+                <div class="field">
+                    <label class="field__label" for="email">Email</label>
+                    <input class="input" id="email" name="email" type="email" maxlength="200" required
+                        aria-describedby="email-hint">
+                    <span class="field__hint" id="email-hint">Pengingat pengembalian dikirim ke alamat ini</span>
+                </div>
+            </div>
+            <div class="reg-col">
+                {% if not enroll_student %}
+                <div class="reg-photo" id="photo-field" hidden>
+                    <h2 class="reg-step__title"><span class="reg-step__no">2</span> Foto wajah</h2>
+                    <div class="reg-photo__row">
+                        <div class="reg-photo__frame">
+                            <div class="camera-panel camera-panel--mirror reg-photo__live" id="photo-live" hidden>
+                                <img class="camera-panel__img" id="photo-stream" alt="">
+                                <span class="reg-photo__count" id="photo-count" aria-hidden="true"></span>
+                            </div>
+                            <img class="reg-photo__preview" id="photo-preview" alt="Foto wajah Anda" hidden>
+                            <span class="reg-photo__empty" id="photo-empty" aria-hidden="true">Belum ada foto</span>
+                        </div>
+                        <div class="reg-photo__side">
+                            <p class="reg-photo__instruction" id="photo-status" role="status" aria-live="polite">Tekan Ambil foto, lalu lihat ke kamera. Hitungan 3-2-1 berbunyi, lalu foto diambil.</p>
+                            <p class="field__hint" id="photo-hint"></p>
+                            <div class="form__actions">
+                                <button type="button" class="btn btn--secondary" id="photo-start">Ambil foto</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="reg-card">
+                    <h2 class="reg-step__title"><span class="reg-step__no">{% if enroll_student %}1{% else %}<span class="reg-step__photo-no">3</span>{% endif %}</span> KTM (Kartu Tanda Mahasiswa)</h2>
+                    <p id="nfc-status" role="status" aria-live="polite">Tekan Baca KTM, lalu tempelkan KTM ke pembaca.</p>
+                    <div class="form__actions">
+                        <button type="button" class="btn btn--secondary" id="nfc-start">Baca KTM</button>
+                    </div>
+                    <span class="field__hint">Wajib memakai KTM Anda sendiri, sesuai arahan admin lab. Tidak ada data yang ditulis ke KTM.</span>
+                </div>
             </div>
         </div>
-        {% endif %}
-        <div class="field">
-            <span class="field__label">KTM (Kartu Tanda Mahasiswa)</span>
-            <p id="nfc-status" role="status" aria-live="polite">Tekan tombol di bawah sebelum menempelkan KTM.</p>
+        <div class="reg-submit">
+            <p class="form-error" id="form-error" role="alert"></p>
             <div class="form__actions">
-                <button type="button" class="btn btn--secondary" id="nfc-start">Baca KTM</button>
+                <button type="submit" class="btn btn--primary btn--lg" id="form-submit" disabled>{% if enroll_student %}Simpan KTM{% else %}Daftar{% endif %}</button>
+                <a href="{% if enroll_student %}{{ url_for('admin_monitor') }}{% else %}{{ url_for('kiosk_page') }}{% endif %}">Batal</a>
             </div>
-            <span class="field__hint">Wajib memakai KTM Anda sendiri, sesuai arahan admin lab. Tidak ada data yang ditulis ke KTM.</span>
-        </div>
-        <p class="form-error" id="form-error" role="alert"></p>
-        <div class="form__actions">
-            <button type="submit" class="btn btn--primary btn--lg" id="form-submit" disabled>{% if enroll_student %}Simpan KTM{% else %}Daftar{% endif %}</button>
-            <a href="{% if enroll_student %}{{ url_for('admin_monitor') }}{% else %}{{ url_for('kiosk_page') }}{% endif %}">Batal</a>
         </div>
     </form>
 </section>
 <section class="result result--ok" id="registration-done" role="status" hidden>
     <h2>KTM tersimpan.</h2>
-    <p>Angkat KTM dari pembaca. Kembali ke kiosk, lalu tempelkan KTM lagi untuk membuka sesi pinjam atau kembali.</p>
-    <a class="btn btn--primary btn--lg" href="{{ url_for('kiosk_page') }}">Ke kiosk</a>
+    <p>Angkat KTM dari pembaca. Kembali ke Home, lalu tempelkan KTM lagi untuk membuka sesi pinjam atau kembali.</p>
+    <a class="btn btn--primary btn--lg" href="{{ url_for('kiosk_page') }}">Ke Home</a>
     {% if enroll_student %}<a class="btn btn--secondary" href="{{ url_for('admin_monitor') }}">Kembali ke Monitor</a>{% endif %}
 </section>
 {% endblock %}

@@ -46,6 +46,7 @@
             if (current !== photoGen) return;
             if (!res.success) {
                 stopPhotoStream();
+                $('photo-empty').hidden = false;
                 photoStatus(res.error || 'Foto gagal. Ulangi.');
                 $('photo-start').disabled = false;
                 return;
@@ -65,6 +66,7 @@
                 photoStatus('Foto tersimpan. Ulangi kalau kurang jelas.');
             } else {
                 photoStatus(res.instruction);
+                $('photo-empty').hidden = false;
             }
             updateSubmit();
             return;
@@ -78,6 +80,7 @@
         updateSubmit();
         $('photo-start').disabled = true;
         $('photo-preview').hidden = true;
+        $('photo-empty').hidden = true;
         $('form-error').textContent = '';
         let res;
         try {
@@ -88,6 +91,7 @@
         if (current !== photoGen) return;
         if (!res.success) {
             photoStatus(res.error || 'Kamera belum siap. Coba lagi.');
+            $('photo-empty').hidden = false;
             $('photo-start').disabled = false;
             return;
         }
@@ -107,6 +111,10 @@
             photoRequired = false;
         }
         $('photo-field').hidden = !photoRequired;
+        // Without the photo step the KTM is step 2.
+        document.querySelectorAll('.reg-step__photo-no').forEach(function (el) {
+            el.textContent = photoRequired ? '3' : '2';
+        });
         updateSubmit();
     }
 
@@ -228,6 +236,7 @@
                 if (res.photo_missing) {
                     photoReady = false;
                     $('photo-preview').hidden = true;
+                    $('photo-empty').hidden = false;
                     photoStatus('Foto kedaluwarsa. Ambil foto lagi.');
                 }
                 return;

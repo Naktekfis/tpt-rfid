@@ -222,3 +222,10 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
 - Kiosk idle hero: campus photo `static/assets/hero_itb.jpg` replaces the NFC card drawing (alarm overlay keeps it).
 - README rewritten for the lab team (skill crafting-effective-readmes, internal template): banner, screenshots
   from synthetic data in docs/images/, mermaid flow, runbook, troubleshooting. `.env.example` refreshed.
+
+## Update v2026.10.24.20
+- Terms (user): the device is "rak peminjaman", the idle page is "Home"; "kiosk" stays only in code/URLs.
+- Register page: two columns with numbered steps (data | photo + KTM), Daftar always visible at 1360x768;
+  .page--fill now scrolls instead of hiding overflow (it hid the Daftar button).
+- Registration photo is a 4:5 portrait from forehead to chin (utils.face.portrait_box).
+- Admin: Keluar is a visible button in the top bar (removed from the switcher menu).

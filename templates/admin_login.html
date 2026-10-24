@@ -16,7 +16,7 @@
     <div class="face-login__live" id="face-live" hidden>
         <div class="camera-panel camera-panel--mirror face-login__camera">
             <img class="camera-panel__img" id="face-stream" alt="">
-            <span class="camera-panel__label">Kamera kiosk</span>
+            <span class="camera-panel__label">Kamera rak peminjaman</span>
         </div>
         <p class="face-login__instruction" id="face-instruction" role="status" aria-live="polite"></p>
         <p class="field__hint" id="face-hint"></p>
@@ -37,7 +37,7 @@
     <p class="form-error" id="pin-error" role="alert"></p>
     <div class="form__actions">
         <button type="submit" class="btn btn--primary" id="login-btn">Masuk</button>
-        <a href="{{ url_for('kiosk_page') }}">Kembali ke kiosk</a>
+        <a href="{{ url_for('kiosk_page') }}">Kembali ke Home</a>
     </div>
 </form>
 {% endblock %}
