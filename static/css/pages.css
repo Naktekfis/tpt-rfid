@@ -816,6 +816,7 @@ input[type="date"].input {
   font-weight: 600;
 }
 .admin-nav [aria-current="page"] { color: #fff; background: var(--c-brand); }
+.admin-nav .admin-nav__exit { margin-left: auto; color: var(--c-text-muted); }
 .page > nav.toolbar { padding-bottom: var(--sp-5); margin-bottom: var(--sp-6); border-bottom: var(--hairline); }
 .toolbar > a, .menu-foot a, .crumbs a { display: inline-flex; align-items: center; min-height: 44px; }
 .section { min-width: 0; }

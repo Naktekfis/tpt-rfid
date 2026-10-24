@@ -44,9 +44,17 @@ def test_old_menus_lead_to_kiosk(client, path):
     assert resp.request.path == "/kiosk"
 
 
-def test_logout_returns_to_admin_login(admin_client):
+def test_logout_returns_to_the_kiosk_on_the_kiosk_screen(admin_client):
     admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    assert 'class="admin-nav__exit"' in admin_client.get("/admin").get_data(as_text=True)
     resp = admin_client.get("/admin/logout")
+    assert resp.headers["Location"].endswith("/kiosk")
+
+
+def test_logout_elsewhere_returns_to_admin_login(admin_client):
+    remote = {"REMOTE_ADDR": "10.42.0.1"}
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN}, environ_base=remote)
+    resp = admin_client.get("/admin/logout", environ_base=remote)
     assert resp.headers["Location"].endswith("/admin/login")
 
 

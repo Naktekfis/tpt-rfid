@@ -43,6 +43,7 @@
     {% for label, path in [('Ringkasan', '/admin'), ('Alat', '/admin/monitor'), ('Mahasiswa', '/admin/students'), ('Keamanan', '/admin/security'), ('Tambah alat', '/admin/input_tool'), ('Riwayat', '/admin/history')] %}
     <a href="{{ path }}"{% if request.path == path %} aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
+    <a class="admin-nav__exit" href="{{ url_for('admin_logout') }}">Keluar</a>
 </nav>
 {% endif %}
 {% endblock %}

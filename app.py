@@ -361,10 +361,12 @@ def admin_login():
 
 @app.route("/admin/logout")
 def admin_logout():
-    """Admin logout"""
+    """Admin logout: back to the kiosk on the kiosk screen, else to the login."""
     session.pop("admin_logged_in", None)
     session.pop("admin_name", None)
     session.pop("admin_until", None)
+    if request.remote_addr in ("127.0.0.1", "::1"):
+        return redirect(url_for("kiosk_page"))
     return redirect(url_for("admin_login"))
 
 
