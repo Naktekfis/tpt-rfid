@@ -8,6 +8,7 @@ os.environ["SECRET_KEY"] = "test"
 os.environ["RFID_READER_ENABLED"] = "false"  # mock reader, whatever .env says
 os.environ["NFC_READER_ENABLED"] = "false"
 os.environ["CAMERA_ENABLED"] = "false"  # mock camera, whatever .env says
+os.environ["LOAN_REMINDERS_ENABLED"] = "false"  # never mail real people from tests
 
 import pytest  # noqa: E402
 from werkzeug.security import generate_password_hash  # noqa: E402
