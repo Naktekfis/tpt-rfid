@@ -160,20 +160,21 @@ def sharpness(frame, face: Face) -> float:
 
 
 def portrait_box(frame_shape, face: Face) -> Tuple[int, int, int, int]:
-    """(x, y, w, h) of a 4:5 portrait from the forehead to just below the chin.
+    """(x, y, w, h) of a 4:5 head-and-shoulders close-up.
 
     Measured from the landmarks: D = eye line to chin (the box bottom). The
-    hairline sits about 0.6 D above the eyes, so the top is 0.75 D above them
-    and the bottom 0.12 D below the chin. Shifted (not padded) to stay inside
-    the frame; clipped only if the frame is smaller than the portrait."""
+    top of the hair is about 1.1 D above the eyes, so the top is 1.5 D above
+    them (a little space over the hair) and the bottom 0.9 D below the chin
+    (the top of the shoulders). Shifted (not padded) to stay inside the frame;
+    clipped only if the frame is smaller than the portrait."""
     fh, fw = frame_shape[:2]
     x, y, w, h = face.box
     lm = face.landmarks
     eye_y = (float(lm[0][1]) + float(lm[1][1])) / 2.0
     chin = float(y + h)
     d = max(1.0, chin - eye_y)
-    top = eye_y - 0.75 * d
-    ph = min(float(fh), (chin + 0.12 * d) - top)
+    top = eye_y - 1.5 * d
+    ph = min(float(fh), (chin + 0.9 * d) - top)
     pw = min(float(fw), ph * 4.0 / 5.0)
     cx = (float(lm[0][0]) + float(lm[1][0]) + float(lm[2][0])) / 3.0
     left = min(max(0.0, cx - pw / 2.0), fw - pw)

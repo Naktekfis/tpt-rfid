@@ -125,13 +125,13 @@ def test_without_a_camera_the_photo_is_optional(client):
     assert register(client).status_code == 200
 
 
-def test_portrait_box_runs_from_forehead_to_chin():
+def test_portrait_box_is_a_head_and_shoulders_close_up():
     from utils.face import portrait_box
 
     # 640x480 frame; eyes at y=200, chin (box bottom) at y=300 -> D = 100.
     face = Face((270, 160, 100, 140), [(290, 200), (350, 200), (320, 240)], 0.9)
     x, y, w, h = portrait_box((480, 640, 3), face)
-    assert (y, y + h) == (125, 312)  # 0.75 D above the eyes, 0.12 D below the chin
+    assert (y, y + h) == (50, 390)  # 1.5 D above the eyes, 0.9 D below the chin
     assert abs(w / h - 0.8) < 0.01 and abs((x + w / 2) - 320) <= 1
 
 

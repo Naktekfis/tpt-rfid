@@ -227,5 +227,5 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
 - Terms (user): the device is "rak peminjaman", the idle page is "Home"; "kiosk" stays only in code/URLs.
 - Register page: two columns with numbered steps (data | photo + KTM), Daftar always visible at 1360x768;
   .page--fill now scrolls instead of hiding overflow (it hid the Daftar button).
-- Registration photo is a 4:5 portrait from forehead to chin (utils.face.portrait_box).
+- Registration photo is a 4:5 head-and-shoulders close-up (utils.face.portrait_box), user asked for space above the hair and a bit of shoulder.
 - Admin: Keluar is a visible button in the top bar (removed from the switcher menu).
