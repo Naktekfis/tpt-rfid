@@ -182,3 +182,10 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
   (`scripts/set_admin_pin.py`), set `FACE_LOGIN_ENABLED=true` in `.env`, HUP, PIN-login
   at the kiosk, enrol each admin on /admin/security, then try a printed photo and a
   phone replay and tune FACE_LIVENESS_THRESHOLD / FACE_MATCH_THRESHOLD from the log.
+- Face login enabled on the Jetson (`FACE_LOGIN_ENABLED=true` appended to `.env`), plain
+  "Admin" link bottom right on the kiosk (v2026.10.24.7).
+- User: no head turn ("susah"), find a passive model that really tells face from photo
+  and runs on the Nano. Head-turn removed (v2026.10.24.8); liveness is now pluggable:
+  `minifas`, `minifas_se` (facenox), `mn3` (OpenVINO), AND-combined via
+  `FACE_LIVENESS_MODELS` (default `minifas:0.7`). Next: run `scripts/face_spoof_bench.py`
+  real/print/screen on the Jetson with the user, then set FACE_LIVENESS_MODELS.

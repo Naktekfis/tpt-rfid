@@ -32,8 +32,8 @@ class FakeEngine:
 
 
 class FakeLiveness:
-    def score(self, frame, face):
-        return frame["live"]
+    def check(self, frame, face):
+        return frame["live"] >= 0.7, {"fake": frame["live"]}
 
 
 class FakeCamera:
@@ -44,23 +44,12 @@ class FakeCamera:
         return self.frames.popleft() if self.frames else None
 
 
-class FirstChoice:
-    def choice(self, seq):
-        return seq[0]  # "left": nose toward image left
-
-
 def front(who="A", live=0.95):
     return {"faces": [(who, 0.0)], "live": live}
 
 
-def turned(who="A", live=0.95):
-    return {"faces": [(who, -0.4)], "live": live}
-
-
 def good(who="A", after=None, live=0.95):
-    return (
-        [front(who, live)] * 3 + [turned(who, live)] + [front(after or who, live)] * 2
-    )
+    return [front(who, live)] * 3 + [front(after or who, live)] * 3
 
 
 @pytest.fixture()
@@ -73,7 +62,6 @@ def face(app, monkeypatch):
         "camera": FakeCamera(),
         "settings": FaceSettings(),
         "_threaded": False,
-        "_rng": FirstChoice(),
         "_photo": lambda frame, f: b"jpeg",
         "_attempts": {},
         "_running": None,
@@ -129,8 +117,8 @@ def test_login_passes_and_gives_only_this_browser_a_session(app, client, face):
     [
         (good(live=0.3), "spoof"),
         (good("B"), "unknown_face"),
-        (good("A", after="B"), "unknown_face"),  # swapped after the turn
-        ([front()] * 6, "camera"),  # never turned the head
+        (good("A", after="B"), "unknown_face"),  # swapped partway
+        ([front()] * 3, "camera"),  # walked away: no more frames
     ],
 )
 def test_failed_login_gives_no_session(client, face, frames, reason):
@@ -173,7 +161,7 @@ def test_enrol_stores_faces_and_refuses_a_face_of_another_admin(admin_client, fa
     admin_client.post("/api/admin/faces/enroll/start", json={"name": " Ahmad "})
     assert admin_client.get("/api/admin/face/attempt").get_json()["state"] == "passed"
     faces = admin_client.get("/api/admin/faces").get_json()["faces"]
-    assert [(f["name"], f["samples"]) for f in faces] == [("Ahmad", 5)]
+    assert [(f["name"], f["samples"]) for f in faces] == [("Ahmad", 6)]
 
     face.camera.frames.extend(good())
     admin_client.post("/api/admin/faces/enroll/start", json={"name": "Budi"})
@@ -212,28 +200,6 @@ def test_pin_logins_are_logged(admin_client):
     assert [e["success"] for e in events] == [True, False]
 
 
-def test_turn_prompt_is_in_the_persons_own_terms():
-    a = Attempt(id="x", mode="login", direction="left", started=0.0, phase="turn")
-    assert a.instruction == "Tolehkan kepala ke kanan Anda"
-    a.direction = "right"
-    assert a.instruction == "Tolehkan kepala ke kiri Anda"
-
-
-def test_photo_on_frontal_frames_with_a_live_face_in_between_fails(client, face):
-    # Review finding: photo for the key frames, own live face for many turn frames.
-    enrol("Ahmad", "A")
-    frames = [front("A", 0.1)] * 3 + [turned("B")] * 20 + [front("A", 0.1)] * 2
-    _, result = login(client, face, frames)
-    assert result["reason"] == "spoof"
-    assert not is_admin(client)
-
-
-def test_other_face_during_the_turn_fails_even_when_live(client, face):
-    enrol("Ahmad", "A")
-    frames = [front("A")] * 3 + [turned("B")] + [front("A")] * 2
-    _, result = login(client, face, frames)
-    assert result["reason"] == "face_changed"
-
 
 def test_second_face_during_the_attempt_fails(client, face):
     enrol("Ahmad", "A")
@@ -259,3 +225,41 @@ def test_face_session_ends_at_its_deadline(client, face):
         assert s["admin_until"] > 0 and not s.permanent
         s["admin_until"] = 1.0
     assert not is_admin(client)
+
+
+def test_one_doubtful_frame_is_tolerated_two_are_not(client, face):
+    enrol("Ahmad", "A")
+    _, result = login(client, face, [front("A", 0.2)] + [front()] * 5)
+    assert result["state"] == "passed"
+    client.get("/admin/logout")
+    _, result = login(client, face, [front("A", 0.2)] * 2 + [front()] * 4)
+    assert result["reason"] == "spoof"
+
+
+def test_face_turned_away_is_not_counted(client, face):
+    enrol("Ahmad", "A")
+    away = {"faces": [("B", 0.8)], "live": 0.95}  # someone else, looking aside
+    _, result = login(client, face, [away] * 3 + good())
+    assert result["state"] == "passed"
+
+
+def test_enrol_refuses_two_people(admin_client, face):
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    face.camera.frames.extend(good("A", after="B"))
+    admin_client.post("/api/admin/faces/enroll/start", json={"name": "Ahmad"})
+    assert admin_client.get("/api/admin/face/attempt").get_json()["reason"] == "face_changed"
+
+
+def test_attempt_asks_only_to_look_at_the_camera():
+    a = Attempt(id="x", mode="login", started=0.0)
+    assert a.instruction == "Lihat ke kamera"
+    assert a.to_dict()["progress"] == 0.0
+
+
+def test_liveness_spec_parsing():
+    from utils.liveness import parse_spec
+
+    assert parse_spec("mn3:0.8, minifas_se:0.6") == [("mn3", 0.8), ("minifas_se", 0.6)]
+    assert parse_spec("minifas") == [("minifas", 0.5)]
+    with pytest.raises(ValueError):
+        parse_spec("nope:0.5")

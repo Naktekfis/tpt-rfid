@@ -96,7 +96,9 @@ class Config:
         "FACE_MODEL_DIR",
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "face"),
     )
-    FACE_LIVENESS_THRESHOLD = float(os.getenv("FACE_LIVENESS_THRESHOLD", "0.7"))
+    # Passive liveness models and their real-face thresholds; a frame must pass
+    # all of them (utils/liveness.py). Calibrate with scripts/face_spoof_bench.py.
+    FACE_LIVENESS_MODELS = os.getenv("FACE_LIVENESS_MODELS", "minifas:0.7")
     # A face login on the shared kiosk ends after this many minutes.
     FACE_SESSION_MINUTES = int(os.getenv("FACE_SESSION_MINUTES", "15"))
     # Empty = SFace default (cosine distance 0.637); lower is stricter.

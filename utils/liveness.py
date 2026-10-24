@@ -1,28 +1,58 @@
 """
-Liveness for admin face login (from legacy/face/utils/liveness.py, trimmed).
+Passive liveness (face anti-spoofing) for admin face login: is the face in
+front of the kiosk camera a real face, or a photo / a screen?
 
-PassiveLiveness: two MiniFASNet anti-spoofing models (Silent-Face weights as
-ONNX, loaded with cv2.dnn). Fail closed: missing models or cv2 raise
-LivenessUnavailable and face login stays off.
+Three small ONNX models, all run with cv2.dnn on the CPU (the Jetson's OpenCV
+has no CUDA). Each gives a real-face probability 0..1; `Liveness` combines
+the configured ones and a frame passes only if every model passes its own
+threshold (FACE_LIVENESS_MODELS, e.g. "mn3:0.8,minifas_se:0.6").
 
-HeadTurnChallenge: pure logic on 5-point landmarks for the active check.
+  minifas     MiniFASNetV2 + V1SE (Silent-Face, Apache-2.0), mean of both
+  minifas_se  MiniFASNetV2-SE 128x128 (facenox/face-antispoof-onnx, Apache-2.0)
+  mn3         anti-spoof-mn3 MobileNetV3 (OpenVINO model zoo, MIT; CelebA-Spoof)
+
+Files and hashes: scripts/fetch_face_models.py and .claude/knowledge/FACE_MODELS.md.
+Fail closed: a missing model or cv2 raises LivenessUnavailable and face login
+stays off. No model is reliable on its own across cameras and lighting:
+calibrate the thresholds on site with scripts/face_spoof_bench.py.
 """
 
 from __future__ import annotations
 
 import os
-from typing import Any, List, Tuple
-
-MODEL_V2 = ("MiniFASNetV2.onnx", 2.7)
-MODEL_V1SE = ("MiniFASNetV1SE.onnx", 4.0)
-INPUT_SIZE = 80  # both ONNX files take 1x3x80x80 and give 3 logits (1 = real)
+from typing import Any, Dict, List, Tuple
 
 
 class LivenessUnavailable(RuntimeError):
     """Liveness cannot be evaluated (models/cv2 missing)."""
 
 
-def crop_scaled(frame, box, scale: float, out_size: int = INPUT_SIZE):
+def _cv():
+    try:
+        import cv2
+        import numpy as np
+    except ImportError as exc:
+        raise LivenessUnavailable(f"OpenCV/numpy not installed: {exc}") from exc
+    return cv2, np
+
+
+def _load(cv2, model_dir: str, filename: str):
+    path = os.path.join(model_dir, filename)
+    if not os.path.isfile(path):
+        raise LivenessUnavailable(f"Liveness model missing: {path}")
+    try:
+        return cv2.dnn.readNetFromONNX(path)
+    except cv2.error as exc:
+        raise LivenessUnavailable(f"Cannot load {path}: {exc}") from exc
+
+
+def _softmax(np, logits):
+    logits = np.asarray(logits, np.float64).reshape(-1)
+    e = np.exp(logits - logits.max())
+    return e / e.sum()
+
+
+def crop_scaled(frame, box, scale: float, out_size: int):
     """Silent-Face crop: box centre, box size * scale kept inside the frame."""
     import cv2
 
@@ -52,83 +82,127 @@ def crop_scaled(frame, box, scale: float, out_size: int = INPUT_SIZE):
     return cv2.resize(crop, (out_size, out_size))
 
 
-class PassiveLiveness:
-    def __init__(self, model_dir: str):
-        try:
-            import cv2
-            import numpy as np
-        except ImportError as exc:
-            raise LivenessUnavailable(f"OpenCV/numpy not installed: {exc}") from exc
-        self._np = np
-        self._nets: List[Tuple[Any, float]] = []
-        for filename, scale in (MODEL_V2, MODEL_V1SE):
-            path = os.path.join(model_dir, filename)
-            if not os.path.isfile(path):
-                raise LivenessUnavailable(f"Liveness model missing: {path}")
-            try:
-                self._nets.append((cv2.dnn.readNetFromONNX(path), scale))
-            except cv2.error as exc:
-                raise LivenessUnavailable(f"Cannot load {path}: {exc}") from exc
-        for net, _ in self._nets:  # fail early on a model without 3 classes
-            out = self._forward(net, np.zeros((INPUT_SIZE, INPUT_SIZE, 3), np.uint8))
-            if out.size != 3:
-                raise LivenessUnavailable(f"Unexpected liveness output size {out.size}")
+def crop_square(frame, box, expansion: float):
+    """Square crop of max(w, h) * expansion around the box centre; edges reflected."""
+    import cv2
 
-    def _forward(self, net, crop):
-        np = self._np
-        blob = crop.astype(np.float32).transpose(2, 0, 1)[None]  # BGR, 0-255, NCHW
-        net.setInput(blob)
-        logits = net.forward().reshape(-1).astype(np.float64)
-        e = np.exp(logits - logits.max())
-        return e / e.sum()
+    fh, fw = frame.shape[:2]
+    x, y, w, h = box
+    size = max(1, int(max(w, h) * expansion))
+    x0 = int(x + w / 2.0 - size / 2.0)
+    y0 = int(y + h / 2.0 - size / 2.0)
+    crop = frame[max(0, y0) : min(fh, y0 + size), max(0, x0) : min(fw, x0 + size)]
+    return cv2.copyMakeBorder(
+        crop,
+        max(0, -y0),
+        max(0, y0 + size - fh),
+        max(0, -x0),
+        max(0, x0 + size - fw),
+        cv2.BORDER_REFLECT_101,
+    )
+
+
+class MiniFAS:
+    """MiniFASNetV2 + V1SE: 80x80 BGR 0-255, 3 classes, index 1 = real."""
+
+    name = "minifas"
+    MODELS = (("MiniFASNetV2.onnx", 2.7), ("MiniFASNetV1SE.onnx", 4.0))
+
+    def __init__(self, model_dir: str):
+        self._cv2, self._np = _cv()
+        self._nets = [(_load(self._cv2, model_dir, f), s) for f, s in self.MODELS]
 
     def score(self, frame, face) -> float:
-        """Mean real-face probability over both models (0..1)."""
-        scores = [
-            float(self._forward(net, crop_scaled(frame, face.box, scale))[1])
-            for net, scale in self._nets
+        np = self._np
+        out = []
+        for net, scale in self._nets:
+            crop = crop_scaled(frame, face.box, scale, 80)
+            net.setInput(crop.astype(np.float32).transpose(2, 0, 1)[None])
+            out.append(float(_softmax(np, net.forward())[1]))
+        return sum(out) / len(out)
+
+
+class MiniFASSE:
+    """facenox MiniFASNetV2-SE: square crop 1.5x, RGB, 128x128, /255, logits, index 0 = real."""
+
+    name = "minifas_se"
+    FILE = "MiniFASNetV2SE_facenox.onnx"
+
+    def __init__(self, model_dir: str):
+        self._cv2, self._np = _cv()
+        self._net = _load(self._cv2, model_dir, self.FILE)
+
+    def score(self, frame, face) -> float:
+        cv2, np = self._cv2, self._np
+        crop = cv2.resize(
+            crop_square(frame, face.box, 1.5), (128, 128), interpolation=cv2.INTER_AREA
+        )
+        rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        self._net.setInput(rgb.transpose(2, 0, 1)[None])
+        return float(_softmax(np, self._net.forward())[0])
+
+
+class AntiSpoofMN3:
+    """OpenVINO anti-spoof-mn3: face box crop, RGB, 128x128, (x - mean) / scale,
+    softmax output, index 0 = real."""
+
+    name = "mn3"
+    FILE = "anti-spoof-mn3.onnx"
+    MEAN = (151.2405, 119.5950, 107.8395)
+    SCALE = (63.0105, 56.4570, 55.0035)
+
+    def __init__(self, model_dir: str):
+        self._cv2, self._np = _cv()
+        self._net = _load(self._cv2, model_dir, self.FILE)
+
+    def score(self, frame, face) -> float:
+        cv2, np = self._cv2, self._np
+        crop = cv2.resize(
+            crop_square(frame, face.box, 1.0), (128, 128), interpolation=cv2.INTER_AREA
+        )
+        rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB).astype(np.float32)
+        x = (rgb - np.array(self.MEAN, np.float32)) / np.array(self.SCALE, np.float32)
+        self._net.setInput(x.transpose(2, 0, 1)[None])
+        out = np.asarray(self._net.forward(), np.float64).reshape(-1)
+        return float(out[0])  # the model ends in a softmax
+
+
+MODELS = {cls.name: cls for cls in (MiniFAS, MiniFASSE, AntiSpoofMN3)}
+
+
+def parse_spec(spec: str) -> List[Tuple[str, float]]:
+    """ "mn3:0.8,minifas_se:0.6" -> [("mn3", 0.8), ("minifas_se", 0.6)]."""
+    out = []
+    for part in (p.strip() for p in spec.split(",")):
+        if not part:
+            continue
+        name, _, thr = part.partition(":")
+        name = name.strip()
+        if name not in MODELS:
+            raise ValueError(f"Unknown liveness model {name!r} (use {sorted(MODELS)})")
+        out.append((name, float(thr) if thr else 0.5))
+    if not out:
+        raise ValueError("No liveness model configured")
+    return out
+
+
+class Liveness:
+    """The configured models; a frame is live only if every model passes."""
+
+    def __init__(self, model_dir: str, spec: str):
+        self.models: List[Tuple[Any, float]] = [
+            (MODELS[name](model_dir), thr) for name, thr in parse_spec(spec)
         ]
-        return sum(scores) / len(scores)
+
+    def check(self, frame, face) -> Tuple[bool, Dict[str, float]]:
+        scores = {m.name: m.score(frame, face) for m, _ in self.models}
+        return all(scores[m.name] >= thr for m, thr in self.models), scores
 
 
 def yaw(landmarks) -> float:
-    """(nose_x - eyes_mid_x) / eye distance; 0 = frontal, sign = image direction."""
+    """(nose_x - eyes_mid_x) / eye distance; 0 = facing the camera."""
     re, le, nose = landmarks[0], landmarks[1], landmarks[2]
     eye_dist = abs(float(le[0]) - float(re[0]))
     if eye_dist < 1e-6:
         return 0.0
     return (float(nose[0]) - (float(re[0]) + float(le[0])) / 2.0) / eye_dist
-
-
-class HeadTurnChallenge:
-    """Pass when the head turns past `yaw_threshold` in the asked direction
-    after at least one near-frontal frame (so a photo held turned fails).
-
-    Direction is in the raw (unmirrored) image: "left" = nose toward smaller x,
-    i.e. the person turns toward THEIR OWN RIGHT. A mirrored preview must word
-    its prompt in the person's terms (see FaceLogin.instruction).
-    """
-
-    def __init__(
-        self,
-        direction: str,
-        yaw_threshold: float = 0.25,
-        frontal_threshold: float = 0.1,
-    ):
-        if direction not in ("left", "right"):
-            raise ValueError("direction must be 'left' or 'right'")
-        self.direction = direction
-        self._sign = -1.0 if direction == "left" else 1.0
-        self.yaw_threshold = yaw_threshold
-        self.frontal_threshold = frontal_threshold
-        self._seen_frontal = False
-        self.passed = False
-
-    def update(self, landmarks) -> bool:
-        if not self.passed and landmarks is not None:
-            y = yaw(landmarks)
-            if abs(y) < self.frontal_threshold:
-                self._seen_frontal = True
-            elif self._seen_frontal and y * self._sign > self.yaw_threshold:
-                self.passed = True
-        return self.passed

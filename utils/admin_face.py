@@ -1,28 +1,24 @@
 """
 Admin face login and enrolment.
 
-One attempt at a time reads the kiosk camera in a background thread:
-  look  - a few frontal frames: embeddings + liveness
-  turn  - random head-turn challenge (HeadTurnChallenge)
-  back  - a few frontal frames again, which must be the same admin
-Every frame used must hold exactly one face, big enough; a second face or the
-face leaving the camera for long ends the attempt. Every used frame is
-embedded and liveness-scored (MiniFASNet): the frontal key frames must each
-pass liveness and most of all frames must. Login matches every key frame to
-one enrolled admin and every other frame (the turn) must stay close to that
-admin, so a photo cannot be swapped in for the frontal frames only.
-Enrolment checks the same continuity and stores the key frames.
+One attempt at a time reads the kiosk camera in a background thread: the admin
+just looks at the camera for a moment, no head movement. Every frame used
+must hold exactly one face, big enough and roughly facing the camera; a second
+face or the face leaving the camera for long ends the attempt. Each used frame
+is embedded and checked by the passive liveness models (utils/liveness.py).
+After FRAMES_NEEDED frames, most must be live and every one must match the
+same enrolled admin (login) or the same person (enrolment), so a photo cannot
+be swapped in for part of the attempt.
 
 Failures are logged with a face photo (AdminLoginEvent); repeated login
 failures lock face login for a while, so the PIN is the way in. The engine,
-liveness model, camera, photo encoder and clock are injected, so tests use
-fakes and run without cv2.
+liveness, camera, photo encoder and clock are injected, so tests use fakes and
+run without cv2.
 """
 
 from __future__ import annotations
 
 import logging
-import random
 import threading
 import time
 import uuid
@@ -31,7 +27,7 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from utils.liveness import HeadTurnChallenge, yaw
+from utils.liveness import yaw
 from utils.models import AdminFace, AdminLoginEvent, db
 
 logger = logging.getLogger(__name__)
@@ -64,18 +60,13 @@ class FaceLocked(RuntimeError):
 
 @dataclass
 class FaceSettings:
-    live_threshold: float = 0.7  # mean MiniFASNet real probability per frame
-    min_live_ratio: float = 0.8  # share of used frames that must pass
+    frames_needed: int = 6  # frames looked at per attempt (~2 s on the Jetson)
+    min_live: int = 5  # of those, how many must pass liveness
     match_threshold: Optional[float] = None  # None = engine default
     ambiguous_margin: float = 0.05
-    # Frames during the turn embed less well; they only have to stay this much
-    # beyond the match threshold to count as the same person.
-    continuity_margin: float = 0.15
-    frames_before: int = 3
-    frames_after: int = 2
     min_face_px: int = 100
-    frontal_yaw: float = 0.15
-    timeout: float = 15.0
+    facing_yaw: float = 0.35  # roughly facing the camera
+    timeout: float = 12.0
     face_lost_seconds: float = 1.5
     lockout_failures: int = 3
     lockout_window: float = 600.0
@@ -86,20 +77,17 @@ class FaceSettings:
 class Attempt:
     id: str
     mode: str
-    direction: str
     started: float
     name: Optional[str] = None  # enrol: the new admin; login: who matched
-    phase: str = "look"  # look | turn | back
     state: str = "running"  # running | passed | failed
     reason: Optional[str] = None
     hint: Optional[str] = None
     consumed: bool = False  # login passed and turned into a session
-    frames: List[Tuple[Any, float]] = field(default_factory=list)  # (embedding, liveness)
-    before: List[int] = field(default_factory=list)  # frontal frames before the turn
-    after: List[int] = field(default_factory=list)  # frontal frames after it
+    frames: List[Tuple[Any, bool]] = field(default_factory=list)  # (embedding, live)
+    scores: Dict[str, List[float]] = field(default_factory=dict)  # per liveness model
     last_face_at: Optional[float] = None
     photo: Optional[bytes] = None
-    challenge: Optional[HeadTurnChallenge] = None
+    needed: int = 6
 
     @property
     def instruction(self) -> str:
@@ -107,12 +95,6 @@ class Attempt:
             return "Berhasil."
         if self.state == "failed":
             return REASONS.get(self.reason or "", "Gagal.")
-        if self.phase == "turn":
-            # "left" is image-left = the person's own right (see HeadTurnChallenge).
-            side = "kanan" if self.direction == "left" else "kiri"
-            return f"Tolehkan kepala ke {side} Anda"
-        if self.phase == "back":
-            return "Lihat ke kamera lagi"
         return "Lihat ke kamera"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -120,9 +102,9 @@ class Attempt:
             "attempt_id": self.id,
             "mode": self.mode,
             "state": self.state,
-            "phase": self.phase,
             "instruction": self.instruction,
             "hint": self.hint,
+            "progress": min(1.0, len(self.frames) / max(1, self.needed)),
             "reason": self.reason,
             "name": self.name if self.state == "passed" else None,
         }
@@ -149,7 +131,6 @@ class FaceAuth:
         unavailable: Optional[str] = None,
         photo: Optional[Callable[[Any, Any], Optional[bytes]]] = None,
         clock: Callable[[], float] = time.monotonic,
-        rng: Optional[random.Random] = None,
         threaded: bool = True,
     ):
         self.app = app
@@ -162,7 +143,6 @@ class FaceAuth:
         )
         self._photo = photo
         self._clock = clock
-        self._rng = rng or random.SystemRandom()
         self._threaded = threaded
         self._lock = threading.Lock()
         self._attempts: Dict[str, Attempt] = {}
@@ -193,11 +173,10 @@ class FaceAuth:
         attempt = Attempt(
             id=uuid.uuid4().hex,
             mode=mode,
-            direction=self._rng.choice(("left", "right")),
             started=self._clock(),
             name=name if mode == ENROLL else None,
+            needed=self.settings.frames_needed,
         )
-        attempt.challenge = HeadTurnChallenge(attempt.direction)
         with self._lock:
             if self._running is not None:  # one camera: the newest attempt wins
                 self._fail(self._running, "cancelled")
@@ -275,70 +254,46 @@ class FaceAuth:
             return
         face = faces[0]
         attempt.last_face_at = now
+        if abs(yaw(face.landmarks)) > s.facing_yaw:
+            attempt.hint = "Hadapkan wajah ke kamera"
+            return
         attempt.hint = None
         if attempt.photo is None and self._photo is not None:
             attempt.photo = self._photo(frame, face)
-        # Every used frame is embedded and scored, so the same live person has
-        # to stay in front of the camera through the whole attempt.
-        attempt.frames.append(
-            (self.engine.embed(frame, face), float(self.liveness.score(frame, face)))
-        )
-        index = len(attempt.frames) - 1
-        frontal = abs(yaw(face.landmarks)) < s.frontal_yaw
-        if attempt.phase == "look":
-            if frontal:
-                attempt.before.append(index)
-                if len(attempt.before) >= s.frames_before:
-                    attempt.phase = "turn"
-                    attempt.challenge.update(face.landmarks)  # frontal start
-        elif attempt.phase == "turn":
-            if attempt.challenge.update(face.landmarks):
-                attempt.phase = "back"
-        elif frontal:
-            attempt.after.append(index)
-            if len(attempt.after) >= s.frames_after:
-                self._decide(attempt)
+        live, scores = self.liveness.check(frame, face)
+        for model, value in scores.items():
+            attempt.scores.setdefault(model, []).append(float(value))
+        attempt.frames.append((self.engine.embed(frame, face), bool(live)))
+        if len(attempt.frames) >= s.frames_needed:
+            self._decide(attempt)
 
     def _decide(self, attempt: Attempt) -> None:
         s = self.settings
-        frames = attempt.frames
-        key = [frames[i][0] for i in attempt.before + attempt.after]
-        key_live = all(frames[i][1] >= s.live_threshold for i in attempt.before + attempt.after)
-        live_ok = sum(1 for _, live in frames if live >= s.live_threshold)
-        if not key_live or live_ok / len(frames) < s.min_live_ratio:
+        if sum(1 for _, live in attempt.frames if live) < s.min_live:
             self._finish(attempt, False, "spoof")
             return
+        vecs = [v for v, _ in attempt.frames]
         gallery = self._gallery()
-        loose = self.threshold + s.continuity_margin
         if attempt.mode == LOGIN:
-            name = self._match(key, gallery)
+            name = self._match(vecs, gallery)
             if name is None:
                 self._finish(attempt, False, "unknown_face")
-                return
-            reference = [v for n, v in gallery if n == name]
-            if not self._close_to(reference, [v for v, _ in frames], loose):
-                self._finish(attempt, False, "face_changed")
                 return
             attempt.name = name
             self._finish(attempt, True, None)
             return
-        before = [frames[i][0] for i in attempt.before]
-        after = [frames[i][0] for i in attempt.after]
-        if not (
-            self._close_to(before, after, self.threshold)
-            and self._close_to(before, [v for v, _ in frames], loose)
-        ):
+        if not self._close_to(vecs[:1], vecs, self.threshold):
             self._finish(attempt, False, "face_changed")
             return
         own = [(n, v) for n, v in gallery if n == attempt.name]
-        if own and self._match(key, own) != attempt.name:
+        if own and self._match(vecs, own) != attempt.name:
             self._finish(attempt, False, "name_taken")
             return
         others = [(n, v) for n, v in gallery if n != attempt.name]
-        if others and self._match(key, others, require_all=False):
+        if others and self._match(vecs, others, require_all=False):
             self._finish(attempt, False, "other_admin")
             return
-        self._finish(attempt, True, None, store=key)
+        self._finish(attempt, True, None, store=vecs)
 
     def _close_to(self, reference, vecs, limit: float) -> bool:
         """Every vector is within `limit` of its nearest reference vector."""
@@ -390,6 +345,14 @@ class FaceAuth:
                     self._running = None
             else:
                 self._fail(attempt, reason or "error")
+            # Per-model liveness means, for calibrating the thresholds from the log.
+            logger.info(
+                "Face %s %s%s, liveness %s",
+                attempt.mode,
+                "passed" if ok else "failed",
+                f" ({reason})" if reason else "",
+                {m: round(sum(v) / len(v), 3) for m, v in attempt.scores.items()},
+            )
             # A passer-by in the picture is bad luck, not an attack attempt.
             if attempt.mode == LOGIN and not ok and reason not in ("cancelled", "multiple_faces"):
                 self._note_failure()
@@ -466,10 +429,7 @@ def log_pin_login(success: bool) -> None:
 def build_face_auth(app, camera) -> FaceAuth:
     """FaceAuth from config; unavailable (with a reason) when off or models fail."""
     cfg = app.config
-    settings = FaceSettings(
-        live_threshold=cfg.get("FACE_LIVENESS_THRESHOLD", 0.7),
-        match_threshold=cfg.get("FACE_MATCH_THRESHOLD"),
-    )
+    settings = FaceSettings(match_threshold=cfg.get("FACE_MATCH_THRESHOLD"))
     if not cfg.get("FACE_LOGIN_ENABLED", False):
         return FaceAuth(
             app, camera, settings=settings, unavailable="Login wajah dimatikan."
@@ -479,16 +439,18 @@ def build_face_auth(app, camera) -> FaceAuth:
             app, camera, settings=settings, unavailable="Kamera tidak aktif."
         )
     from utils.face import FaceModelsMissing, YuNetSFaceEngine, face_jpeg
-    from utils.liveness import LivenessUnavailable, PassiveLiveness
+    from utils.liveness import Liveness, LivenessUnavailable
 
     model_dir = cfg.get("FACE_MODEL_DIR", "models/face")
     try:
         engine = YuNetSFaceEngine(model_dir)
-        liveness = PassiveLiveness(model_dir)
-    except (FaceModelsMissing, LivenessUnavailable) as exc:
+        liveness = Liveness(model_dir, cfg.get("FACE_LIVENESS_MODELS", "minifas:0.7"))
+    except (FaceModelsMissing, LivenessUnavailable, ValueError) as exc:
         logger.warning("Face login unavailable: %s", exc)
         return FaceAuth(
             app, camera, settings=settings, unavailable="Model wajah tidak tersedia."
         )
-    logger.info("Face login on (models in %s)", model_dir)
+    logger.info(
+        "Face login on (liveness %s)", cfg.get("FACE_LIVENESS_MODELS", "minifas:0.7")
+    )
     return FaceAuth(app, camera, engine, liveness, settings, photo=face_jpeg)
