@@ -189,3 +189,7 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
   `minifas`, `minifas_se` (facenox), `mn3` (OpenVINO), AND-combined via
   `FACE_LIVENESS_MODELS` (default `minifas:0.7`). Next: run `scripts/face_spoof_bench.py`
   real/print/screen on the Jetson with the user, then set FACE_LIVENESS_MODELS.
+
+## Update v2026.10.24.9
+- On-site bench (labels doubtful, real n=7): minifas rejected the real face (median 0.37 on a live probe); minifas_se and mn3 pass real faces ~1.0 but also scored print/screen ~0.99.
+- User decision: pick what lets real faces in now, anti-spoofing later. Default is now `mn3:0.5` (Jetson `.env` also sets it). Re-run the bench with correct labels before relying on liveness against photos.

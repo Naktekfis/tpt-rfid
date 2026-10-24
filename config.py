@@ -98,7 +98,7 @@ class Config:
     )
     # Passive liveness models and their real-face thresholds; a frame must pass
     # all of them (utils/liveness.py). Calibrate with scripts/face_spoof_bench.py.
-    FACE_LIVENESS_MODELS = os.getenv("FACE_LIVENESS_MODELS", "minifas:0.7")
+    FACE_LIVENESS_MODELS = os.getenv("FACE_LIVENESS_MODELS", "mn3:0.5")
     # A face login on the shared kiosk ends after this many minutes.
     FACE_SESSION_MINUTES = int(os.getenv("FACE_SESSION_MINUTES", "15"))
     # Empty = SFace default (cosine distance 0.637); lower is stricter.

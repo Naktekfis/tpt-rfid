@@ -444,13 +444,13 @@ def build_face_auth(app, camera) -> FaceAuth:
     model_dir = cfg.get("FACE_MODEL_DIR", "models/face")
     try:
         engine = YuNetSFaceEngine(model_dir)
-        liveness = Liveness(model_dir, cfg.get("FACE_LIVENESS_MODELS", "minifas:0.7"))
+        liveness = Liveness(model_dir, cfg.get("FACE_LIVENESS_MODELS", "mn3:0.5"))
     except (FaceModelsMissing, LivenessUnavailable, ValueError) as exc:
         logger.warning("Face login unavailable: %s", exc)
         return FaceAuth(
             app, camera, settings=settings, unavailable="Model wajah tidak tersedia."
         )
     logger.info(
-        "Face login on (liveness %s)", cfg.get("FACE_LIVENESS_MODELS", "minifas:0.7")
+        "Face login on (liveness %s)", cfg.get("FACE_LIVENESS_MODELS", "mn3:0.5")
     )
     return FaceAuth(app, camera, engine, liveness, settings, photo=face_jpeg)
