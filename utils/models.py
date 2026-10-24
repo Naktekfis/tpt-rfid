@@ -294,6 +294,33 @@ class AdminLoginEvent(db.Model):
         }
 
 
+class EmailLog(db.Model):
+    """Every reminder email to a student, automatic (due | overdue) or manual."""
+
+    __tablename__ = "email_log"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    kind = db.Column(db.String(10), nullable=False)  # due | overdue | manual
+    recipient = db.Column(db.String(200), nullable=False)
+    student_name = db.Column(db.String(200), nullable=True)
+    tool_name = db.Column(db.String(200), nullable=True)
+    success = db.Column(db.Boolean, nullable=False)
+    error = db.Column(db.String(200), nullable=True)
+
+    def to_dict(self):
+        return {
+            "email_id": self.id,
+            "at": _get_utc_to_wib()(self.at),
+            "kind": self.kind,
+            "recipient": self.recipient,
+            "student_name": self.student_name,
+            "tool_name": self.tool_name,
+            "success": self.success,
+            "error": self.error,
+        }
+
+
 class AlarmEvent(db.Model):
     """A tool left the reader field while it was not borrowed."""
 

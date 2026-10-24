@@ -113,3 +113,17 @@ def test_static_css_js_are_local():
         assert not EXTERNAL.search(text), f.name
         assert "http://" not in text and "https://" not in text, f.name
         assert "tailwind" not in text.lower(), f.name
+
+
+def test_admin_app_is_installable(client):
+    manifest = client.get("/manifest.webmanifest")
+    assert manifest.mimetype == "application/manifest+json"
+    data = manifest.get_json(force=True)
+    assert data["start_url"] == "/admin" and data["display"] == "standalone"
+    for icon in data["icons"]:
+        assert client.get(icon["src"]).status_code == 200
+    worker = client.get("/sw.js")
+    assert worker.status_code == 200 and worker.mimetype == "text/javascript"
+    page = client.get("/admin/login").get_data(as_text=True)
+    assert 'rel="manifest"' in page and "serviceWorker" in page
+    assert client.get("/favicon.ico").status_code == 200

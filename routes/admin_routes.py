@@ -16,6 +16,7 @@ import re
 from flask import Blueprint, jsonify, render_template, request
 
 from utils.helpers import allowed_file, sanitize_input
+from utils.loan_reminders import email_history
 
 logger = logging.getLogger(__name__)
 
@@ -205,5 +206,11 @@ def create_admin_blueprint(
     @admin_required
     def api_students():
         return jsonify({"success": True, "students": database.get_students_admin()})
+
+    @bp.route("/api/admin/emails", methods=["GET"])
+    @admin_required
+    def api_emails():
+        """The last 100 reminder emails to students (automatic and manual)."""
+        return jsonify({"success": True, "emails": email_history(100)})
 
     return bp

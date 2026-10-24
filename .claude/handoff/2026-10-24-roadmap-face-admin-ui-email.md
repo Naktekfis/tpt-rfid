@@ -193,3 +193,13 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
 ## Update v2026.10.24.9
 - On-site bench (labels doubtful, real n=7): minifas rejected the real face (median 0.37 on a live probe); minifas_se and mn3 pass real faces ~1.0 but also scored print/screen ~0.99.
 - User decision: pick what lets real faces in now, anti-spoofing later. Default is now `mn3:0.5` (Jetson `.env` also sets it). Re-run the bench with correct labels before relying on liveness against photos.
+
+## Update v2026.10.24.11
+- Gmail reminders ON at the Jetson (labfabrikasi.itb@gmail.com, app password in `.env`), live test mail received.
+- User picks for "finish everything": PWA admin (step 6), email history, alarm photos, camera tamper.
+  Alarm photos + obstruction detection already existed (`utils/security.py`, Keamanan page; Jetson had 188 alarm photos) — docs fixed.
+- New: `email_log` table (auto due/overdue + manual warning, failures deduped), `/api/admin/emails`, section on Riwayat page.
+- New: PWA (manifest, root `/sw.js` that caches nothing, icons from the user's wrench/screwdriver image in `static/icons/`).
+  Installable only on https or localhost; over http://10.42.0.14 browsers offer at most a shortcut.
+- `RFID_ALARM_CONFIRM_SECONDS` 2 -> 1 (user request), also in the Jetson `.env`.
+- Still with the user: change default PIN 133133, enrol admin faces, anti-spoofing later.

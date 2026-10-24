@@ -7,6 +7,12 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
+{# Installable admin app: manifest + icons; the worker registers below. #}
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+<meta name="theme-color" content="#005aab">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Admin Lab">
 {% block page_head %}{% endblock %}
 {% endblock %}
 
@@ -48,6 +54,9 @@
 {% endblock %}
 
 {% block scripts %}
-<script>UI.startClock();</script>
+<script>
+UI.startClock();
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(function () {});
+</script>
 {% block page_scripts %}{% endblock %}
 {% endblock %}

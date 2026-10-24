@@ -48,7 +48,7 @@ from routes.nfc_routes import create_nfc_blueprint, capture_owner
 from utils.presence import PresenceMonitor
 from utils.tool_presence import ToolPresenceService
 from utils.security import SecurityService
-from utils.loan_reminders import LoanReminderService
+from utils.loan_reminders import LoanReminderService, log_email
 
 # Configure logging
 logging.basicConfig(
@@ -110,7 +110,7 @@ presence_service = ToolPresenceService(
     rfid_reader,
     PresenceMonitor(missing_after=app.config.get("RFID_MISSING_AFTER", 1.5)),
     alarm_enabled=app.config.get("RFID_ALARM_ENABLED", True),
-    alarm_confirm_seconds=app.config.get("RFID_ALARM_CONFIRM_SECONDS", 2.0),
+    alarm_confirm_seconds=app.config.get("RFID_ALARM_CONFIRM_SECONDS", 1.0),
     background=True,
 )
 # Camera for tool photographs.
@@ -269,6 +269,9 @@ app.register_blueprint(
 )
 
 from routes.admin_routes import create_admin_blueprint  # noqa: E402
+from routes.pwa_routes import create_pwa_blueprint  # noqa: E402
+
+app.register_blueprint(create_pwa_blueprint())
 
 app.register_blueprint(
     create_admin_blueprint(
@@ -854,7 +857,12 @@ Email ini dikirim secara otomatis oleh sistem monitoring Lab Fabrikasi.
             body=body,
         )
 
-        mail.send(msg)
+        try:
+            mail.send(msg)
+        except Exception as exc:  # SMTP/network errors vary
+            log_email("manual", student_email, student_name, tool_name, exc)
+            raise
+        log_email("manual", student_email, student_name, tool_name)
 
         logger.info(f"Warning email sent to ***@*** for tool {tool_name}")
 

@@ -91,3 +91,42 @@ def test_row_without_due_at_uses_loan_days(borrow):
     mail = FakeMail()
     assert send_due_reminders(mail, now=T0 + timedelta(days=1)) == 0
     assert send_due_reminders(mail, now=T0 + timedelta(days=2, minutes=1)) == 1
+
+
+def test_sent_and_failed_reminders_are_logged_once(borrow, admin_client):
+    from tests.conftest import TEST_PIN
+
+    for hours in (1, 2):  # an outage retried every check leaves one failure row
+        send_due_reminders(FakeMail(fail=True), now=DUE_AT + timedelta(hours=hours))
+    send_due_reminders(FakeMail(), now=DUE_AT + timedelta(hours=3))
+
+    assert admin_client.get("/api/admin/emails").status_code == 401
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    emails = admin_client.get("/api/admin/emails").get_json()["emails"]
+    assert [(m["kind"], m["success"]) for m in emails] == [(DUE, True), (DUE, False)]
+    assert emails[0]["recipient"] == "budi@example.com"
+    assert emails[0]["tool_name"] == "Obeng"
+    assert emails[1]["error"] == "OSError: smtp down"
+
+
+def test_manual_warning_email_is_logged(admin_client, monkeypatch):
+    import app as app_module
+    from tests.conftest import TEST_PIN
+
+    sent = []
+    monkeypatch.setattr(app_module.mail, "send", sent.append)
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    resp = admin_client.post(
+        "/api/admin/send_warning_email",
+        json={
+            "student_name": "Budi",
+            "student_email": "budi@example.com",
+            "tool_name": "Obeng",
+            "borrow_date": "2026-10-01T10:00:00",
+        },
+    )
+    assert resp.status_code == 200 and len(sent) == 1
+    emails = admin_client.get("/api/admin/emails").get_json()["emails"]
+    assert [(m["kind"], m["success"], m["student_name"]) for m in emails] == [
+        ("manual", True, "Budi")
+    ]

@@ -1,7 +1,8 @@
 /*
  * /admin/history: transactions for a date range (/api/admin/transactions),
  * export as CSV / Excel (/api/admin/export, fetched so errors show as a
- * toast) or by email (/api/admin/send_export_email).
+ * toast) or by email (/api/admin/send_export_email). Below: the reminder
+ * emails sent to students (/api/admin/emails).
  */
 (function () {
     'use strict';
@@ -177,6 +178,36 @@
         }
     }
 
+    const EMAIL_KINDS = { due: 'Batas waktu', overdue: 'Terlambat', manual: 'Manual admin' };
+
+    async function loadEmails() {
+        const body = $('emails-body');
+        let res;
+        try {
+            res = await UI.fetchJSON('/api/admin/emails');
+        } catch (e) {
+            res = { success: false };
+        }
+        body.textContent = '';
+        const emails = res.success ? res.emails || [] : [];
+        if (!emails.length) {
+            body.appendChild(h('tr', null, h('td', { colspan: '5', class: 'empty',
+                text: res.success ? 'Belum ada email pengingat.' : 'Riwayat email belum dapat dimuat.' })));
+            return;
+        }
+        emails.forEach(function (m) {
+            const result = m.success
+                ? h('span', { class: 'status status--brand', text: 'Terkirim' })
+                : h('span', { class: 'status status--danger', text: 'Gagal', title: m.error || '' });
+            body.appendChild(h('tr', null,
+                h('td', { class: 'num', text: UI.formatWibDate(m.at) }),
+                h('td', { text: EMAIL_KINDS[m.kind] || m.kind }),
+                h('td', null, h('span', { text: m.student_name || '—' }), h('span', { class: 'sub', text: m.recipient })),
+                h('td', { text: m.tool_name || '—' }),
+                h('td', null, result)));
+        });
+    }
+
     document.querySelectorAll('[data-range]').forEach(function (b) {
         b.addEventListener('click', function () {
             setRange(b.getAttribute('data-range'));
@@ -197,4 +228,5 @@
 
     setRange(range);
     load();
+    loadEmails();
 })();
