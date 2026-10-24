@@ -78,7 +78,7 @@
         if (alarms.length) {
             banners.appendChild(h('div', { class: 'bar bar--danger', role: 'alert' },
                 'Alarm: ' + alarms.map(function (a) { return a.tool_name; }).join(', ') +
-                ' diambil tanpa sesi NFC.'));
+                ' diambil tanpa sesi KTM.'));
         }
     }
 

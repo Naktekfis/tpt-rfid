@@ -125,27 +125,27 @@
         clearTimeout(timer);
         updateSubmit();
         $('nfc-start').disabled = false;
-        $('nfc-start').textContent = 'Baca kartu NFC';
+        $('nfc-start').textContent = 'Baca KTM';
         status(message);
     }
     async function pollCapture(current) {
         if (current !== generation) return;
         if (Date.now() >= expiresAt) {
-            resetCapture('Waktu pembacaan habis. Tekan Baca kartu NFC, lalu tempelkan lagi.');
+            resetCapture('Waktu pembacaan habis. Tekan Baca KTM, lalu tempelkan lagi.');
             return;
         }
         try {
             const res = await UI.fetchJSON('/api/nfc/registration');
             if (current !== generation) return;
             if (!res.success) {
-                resetCapture(res.error || 'Pembacaan kartu berakhir. Silakan ulangi.');
+                resetCapture(res.error || 'Pembacaan KTM berakhir. Silakan ulangi.');
                 return;
             }
             ready = !!res.ready;
             updateSubmit();
-            status(ready ? 'Kartu terbaca. Periksa data Anda, lalu simpan sebelum waktu pembacaan habis.'
-                : res.connected ? 'Tempelkan kartu NFC ke pembaca. Angkat kembali setelah terbaca.'
-                    : 'Pembaca NFC belum tersambung. Periksa perangkat; pembacaan akan dilanjutkan.');
+            status(ready ? 'KTM terbaca. Periksa data Anda, lalu simpan sebelum waktu pembacaan habis.'
+                : res.connected ? 'Tempelkan KTM ke pembaca. Angkat kembali setelah terbaca.'
+                    : 'Pembaca KTM belum tersambung. Periksa perangkat; pembacaan akan dilanjutkan.');
         } catch (e) {
             ready = false;
             updateSubmit();
@@ -154,7 +154,7 @@
         if (current === generation) timer = setTimeout(function () { pollCapture(current); }, 750);
     }
     async function startCapture() {
-        resetCapture('Menyiapkan pembaca NFC…');
+        resetCapture('Menyiapkan pembaca KTM…');
         const current = generation;
         $('nfc-start').disabled = true;
         $('form-error').textContent = '';
@@ -204,7 +204,7 @@
             return;
         }
         if (!ready || !token || Date.now() >= expiresAt) {
-            resetCapture('Baca kartu NFC terlebih dahulu.');
+            resetCapture('Baca KTM terlebih dahulu.');
             return;
         }
         saving = true;

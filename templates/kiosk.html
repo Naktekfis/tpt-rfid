@@ -29,24 +29,20 @@
                 {{ brand('Lab Fabrikasi · Teknik Fisika ITB') }}
                 <span class="brandbar__clock num" data-clock>--.--</span>
             </div>
-            <div class="side__visual nfc-panel" aria-hidden="true">
-                <svg class="nfc-panel__card" viewBox="0 0 240 160" fill="none">
-                    <rect x="8" y="8" width="224" height="144" rx="14" stroke="currentColor" stroke-width="5"/>
-                    <rect x="35" y="45" width="44" height="34" rx="5" stroke="currentColor" stroke-width="4"/>
-                    <path d="M127 52 Q155 80 127 108 M147 35 Q192 80 147 125 M108 68 Q119 80 108 92" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
-                </svg>
+            <div class="side__visual side__hero">
+                <img src="{{ url_for('static', filename='assets/hero_itb.jpg') }}" alt="Kampus Institut Teknologi Bandung">
             </div>
             <div class="side__text" aria-live="polite">
                 <p class="side__reason" id="idle-reason" hidden></p>
                 <div class="stack-sm" data-view="idle">
                     <p class="eyebrow">Peminjaman mandiri</p>
-                    <h1 class="hero">Tempelkan kartu NFC untuk mulai</h1>
-                    <p class="hero-sub">Tunggu sampai nama Anda muncul, lalu angkat kartu.</p>
+                    <h1 class="hero">Tempelkan KTM untuk mulai</h1>
+                    <p class="hero-sub">Gunakan KTM (Kartu Tanda Mahasiswa) Anda. Tunggu sampai nama Anda muncul, lalu angkat KTM.</p>
                 </div>
                 <div class="unknown" data-view="unknown_card" hidden>
                     <div class="stack-sm">
-                        <h1 class="hero">Kartu belum terdaftar</h1>
-                        <p class="hero-sub">Daftarkan kartu ini bersama data diri Anda agar dapat meminjam alat.</p>
+                        <h1 class="hero">KTM belum terdaftar</h1>
+                        <p class="hero-sub">Daftarkan KTM ini bersama data diri Anda agar dapat meminjam alat.</p>
                     </div>
                     <div class="unknown__actions">
                         <a class="btn btn--primary btn--lg" href="/daftar">Daftar sekarang</a>
@@ -55,7 +51,7 @@
                 </div>
             </div>
             <ol class="kiosk-steps" aria-label="Cara meminjam dan mengembalikan">
-                <li><span>1</span> Tempelkan kartu</li>
+                <li><span>1</span> Tempelkan KTM</li>
                 <li><span>2</span> Ambil atau kembalikan alat</li>
                 <li><span>3</span> Tekan Selesai</li>
             </ol>
@@ -75,7 +71,7 @@
             </div>
             <div class="legend" id="rack-legend"></div>
             <div class="rack__foot">
-                <span>Belum terdaftar? <a href="/daftar">Daftarkan kartu Anda</a></span>
+                <span>Belum terdaftar? <a href="/daftar">Daftarkan KTM Anda</a></span>
                 <span>Pinjaman berlaku {{ config.get('LOAN_DAYS', 2) }} hari</span>
                 <a class="rack__admin" href="{{ url_for('admin_login') }}">Admin</a>
             </div>
@@ -89,7 +85,7 @@
                 {{ brand('Lab Fabrikasi · TF ITB') }}
                 <span class="brandbar__clock num" data-clock>--.--</span>
             </div>
-            <p class="side__copy">Sesi kartu NFC</p>
+            <p class="side__copy">Sesi KTM</p>
             <div class="stack-xs">
                 <span class="side__name" id="ses-name"></span>
                 <span class="side__nim num" id="ses-nim"></span>
@@ -140,7 +136,7 @@
             </div>
         <div class="stack-sm">
             <h2 class="hero" id="alarm-title">Alat diambil tanpa verifikasi</h2>
-            <p class="hero-sub alarm__look">Peminjam: tempelkan kartu NFC untuk mencatat peminjaman.</p>
+            <p class="hero-sub alarm__look">Peminjam: tempelkan KTM untuk mencatat peminjaman.</p>
         </div>
     </div>
     <div class="alarm__main">
@@ -150,7 +146,7 @@
             <span class="section-head__meta" id="alarm-count"></span>
         </div>
         <ul class="alarm__list" id="alarm-list"></ul>
-        <p class="alarm__text">Alat diambil tanpa sesi NFC. Kembalikan alat, atau tempelkan kartu NFC dalam
+        <p class="alarm__text">Alat diambil tanpa sesi KTM. Kembalikan alat, atau tempelkan KTM dalam
             30 detik untuk mencatat peminjaman. Alarm tetap tercatat untuk admin.</p>
         <div class="alarm__admin">
             <button type="button" class="btn btn--primary" id="alarm-close-btn">Tutup</button>

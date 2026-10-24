@@ -216,3 +216,9 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
 - Registration needs a face photo when the kiosk camera is on (utils/photo_capture.py: YuNet, one face,
   facing, sharp; 1 s + 3-2-1 beeps + cekrek). Without a camera it is optional.
 - "Anda pinjam" mark is dashed blue; kiosk logos moved to the top-left brand line (idle, session, alarm).
+
+## Update v2026.10.24.18
+- Copy: "kartu NFC" -> "KTM (Kartu Tanda Mahasiswa)" everywhere user-facing (lab admin's instruction: enforce KTM).
+- Kiosk idle hero: campus photo `static/assets/hero_itb.jpg` replaces the NFC card drawing (alarm overlay keeps it).
+- README rewritten for the lab team (skill crafting-effective-readmes, internal template): banner, screenshots
+  from synthetic data in docs/images/, mermaid flow, runbook, troubleshooting. `.env.example` refreshed.

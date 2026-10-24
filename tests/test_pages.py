@@ -69,17 +69,17 @@ def test_daftar_is_the_register_page(client):
     a = client.get("/daftar").get_data(as_text=True)
     b = client.get("/register").get_data(as_text=True)
     assert 'id="reg-form"' in a and 'id="reg-form"' in b
-    assert "kartu NFC" in a
+    assert "KTM (Kartu Tanda Mahasiswa)" in a
     assert "/api/face/" not in a
 
 
 def test_register_admin_mode_needs_session(client, admin_client, student):
     sid = student["student_id"]
     html = client.get(f"/daftar?student_id={sid}").get_data(as_text=True)
-    assert "Hubungkan kartu NFC" not in html
+    assert "Hubungkan KTM" not in html
     admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
     html = admin_client.get(f"/daftar?student_id={sid}").get_data(as_text=True)
-    assert "Hubungkan kartu NFC" in html
+    assert "Hubungkan KTM" in html
     assert student["nim"] in html
 
 

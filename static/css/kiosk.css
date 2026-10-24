@@ -555,6 +555,19 @@
 }
 
 /* ---------- NFC card illustration ---------- */
+/* Idle hero: campus photo, cropped to fill the panel. */
+.side__hero {
+  overflow: hidden;
+  background: var(--c-dark-2);
+}
+.side__hero img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 55% 40%;
+}
+
 .nfc-panel {
   display: flex;
   align-items: center;

@@ -174,14 +174,14 @@ class DatabaseHandler:
             raise ValueError("Mahasiswa tidak ditemukan")
         if StudentNFCCard.query.filter_by(student_id=student.id).first():
             raise ValueError(
-                "Mahasiswa sudah memiliki kartu; penggantian perlu prosedur terpisah"
+                "Mahasiswa sudah memiliki KTM terdaftar; penggantian perlu prosedur terpisah"
             )
         db.session.add(StudentNFCCard(student_id=student.id, uid=uid))
         try:
             db.session.commit()
         except IntegrityError:
             db.session.rollback()
-            raise ValueError("Kartu NFC sudah terdaftar") from None
+            raise ValueError("KTM sudah terdaftar") from None
 
     def get_student_by_uid(self, rfid_uid: str) -> Optional[Dict]:
         """

@@ -78,10 +78,10 @@ class NFCService:
                 or not secrets.compare_digest(cap["token"], token)
             ):
                 raise NFCCaptureError(
-                    "Mulai pembacaan kartu kembali; waktu pendaftaran habis"
+                    "Mulai pembacaan KTM kembali; waktu pendaftaran habis"
                 )
             if not cap["uid"]:
-                raise NFCCaptureError("Tempelkan kartu NFC terlebih dahulu")
+                raise NFCCaptureError("Tempelkan KTM terlebih dahulu")
             result = operation(cap["uid"])
             self.capture = None
             return result

@@ -477,7 +477,7 @@ def api_register():
         # Create student
         def create_with_card(uid):
             if database.get_student_by_nfc(uid):
-                raise NFCCaptureError("Kartu NFC sudah terdaftar")
+                raise NFCCaptureError("KTM sudah terdaftar")
             return database.create_student(dict(student_data, nfc_uid=uid))
 
         try:

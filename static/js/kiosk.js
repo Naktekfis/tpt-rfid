@@ -81,7 +81,7 @@
         }
         if (n.connected === false) {
             box.appendChild(h('div', { class: 'bar bar--warn', role: 'status' },
-                'Pembaca NFC tidak terhubung. Sesi baru belum dapat dibuka. Hubungi admin.'));
+                'Pembaca KTM tidak terhubung. Sesi baru belum dapat dibuka. Hubungi admin.'));
         }
     }
 

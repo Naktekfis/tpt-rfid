@@ -3,7 +3,7 @@
 {% block title %}Monitor Mahasiswa — Admin Lab Fabrikasi{% endblock %}
 {% block page %}
 <div class="page-head">
-    <div><h1>Monitor Mahasiswa</h1><p>Kartu NFC, kontak, dan tindak lanjut peminjaman mahasiswa.</p></div>
+    <div><h1>Monitor Mahasiswa</h1><p>KTM terdaftar, kontak, dan tindak lanjut peminjaman mahasiswa.</p></div>
     <span class="section-head__meta num" id="updated"></span>
 </div>
 
@@ -25,17 +25,17 @@
                 <option value="all">Semua mahasiswa</option>
                 <option value="borrowed">Dengan pinjaman aktif</option>
                 <option value="overdue">Dengan pinjaman terlambat</option>
-                <option value="no-card">Belum punya kartu NFC</option>
+                <option value="no-card">KTM belum terdaftar</option>
             </select>
         </div>
     </div>
-    <p class="field__hint">Pinjaman aktif menampilkan alat dan batas kembali. Pengingat, kartu NFC, dan hapus ada di tombol Kelola tiap baris.</p>
+    <p class="field__hint">Pinjaman aktif menampilkan alat dan batas kembali. Pengingat, daftarkan KTM, dan hapus ada di tombol Kelola tiap baris.</p>
     <table class="table">
         <thead>
             <tr>
                 <th scope="col">Mahasiswa</th>
                 <th scope="col">Kontak</th>
-                <th scope="col">Kartu NFC</th>
+                <th scope="col">KTM</th>
                 <th scope="col">Pinjaman aktif</th>
                 <th scope="col"><span class="visually-hidden">Tindakan</span></th>
             </tr>

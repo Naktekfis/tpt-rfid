@@ -66,7 +66,7 @@
                 '; kembalikan dulu sebelum dihapus.', 'warn');
             return;
         }
-        const ok = await confirmation(student.name + ' (' + student.nim + ') hilang dari daftar, kartu NFC dan fotonya dilepas. ' +
+        const ok = await confirmation(student.name + ' (' + student.nim + ') hilang dari daftar, KTM dan fotonya dilepas. ' +
             'Riwayat peminjamannya tetap tersimpan. Kalau mendaftar lagi dengan NIM yang sama, datanya dipulihkan.',
             'Hapus mahasiswa?', 'Hapus mahasiswa', true);
         if (!ok) return;
@@ -95,7 +95,7 @@
             });
         });
         $('students-count').textContent = students.length + ' mahasiswa · ' +
-            students.filter(function (s) { return s.has_nfc; }).length + ' dengan kartu NFC';
+            students.filter(function (s) { return s.has_nfc; }).length + ' dengan KTM terdaftar';
         const body = $('students-body');
         body.textContent = '';
         if (!rows.length) {
@@ -111,7 +111,7 @@
                         text: (loan.is_overdue ? 'Terlambat · ' : 'Batas: ') + UI.formatWibDate(loan.due_at, true) })));
             });
             const items = [];
-            if (!student.has_nfc) items.push({ label: 'Daftarkan kartu NFC', desc: 'Ikat kartu baru ke ' + student.name,
+            if (!student.has_nfc) items.push({ label: 'Daftarkan KTM', desc: 'Hubungkan KTM ke ' + student.name,
                 onSelect: function () {
                     window.location.href = CFG.registerUrl + '?student_id=' + encodeURIComponent(student.student_id);
                 } });
