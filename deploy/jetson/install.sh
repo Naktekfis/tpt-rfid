@@ -138,6 +138,21 @@ else
     mkdir -p "$(dirname "$autostart")"
     sed -e "s|@APP_DIR@|$APP_DIR|g" "$HERE/tpt-rfid-kiosk.desktop" > "$autostart"
 fi
+
+step "Desktop icon"
+# Same kiosk.sh, so the icon reopens the kiosk after it was closed.
+for launcher in "$HOME/Desktop/tpt-rfid-app.desktop" \
+    "$HOME/.local/share/applications/tpt-rfid-app.desktop"; do
+    if [ "$DRY_RUN" = 1 ]; then
+        echo "+ install desktop icon -> $launcher"
+    else
+        mkdir -p "$(dirname "$launcher")"
+        sed -e "s|@APP_DIR@|$APP_DIR|g" "$HERE/tpt-rfid-app.desktop" > "$launcher"
+        chmod +x "$launcher"
+        # Nautilus only runs launchers marked trusted.
+        gio set "$launcher" metadata::trusted true 2>/dev/null || true
+    fi
+done
 if ! command -v chromium-browser >/dev/null && ! command -v chromium >/dev/null \
     && ! command -v firefox >/dev/null; then
     echo "Warning: no chromium-browser/chromium/firefox found; kiosk.sh needs one." >&2

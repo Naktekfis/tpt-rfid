@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Lab Fabrikasi
+Comment=Kiosk peminjaman alat Lab Fabrikasi (layar penuh)
+Exec=@APP_DIR@/deploy/jetson/kiosk.sh
+Icon=@APP_DIR@/static/icons/icon-512.png
+Terminal=false
+Categories=Utility;
