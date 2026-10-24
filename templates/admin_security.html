@@ -14,5 +14,39 @@
         <th scope="col">Kejadian</th><th scope="col">Waktu</th><th scope="col">Dokumentasi</th><th scope="col">Penyelesaian</th><th scope="col">Tindakan</th>
     </tr></thead><tbody id="security-events"><tr><td colspan="5" class="empty">Memuat…</td></tr></tbody></table>
 </section>
+
+<section class="section" aria-labelledby="faces-title">
+    <div class="section-head"><h2 id="faces-title">Wajah admin</h2><span class="section-head__meta" id="faces-count"></span></div>
+    <p class="field__hint">Login wajah hanya di layar kiosk; PIN tetap bisa dipakai. Saat mendaftar, ikuti petunjuk di layar (lihat kamera, toleh, lihat lagi).</p>
+    <table class="table"><thead><tr>
+        <th scope="col">Admin</th><th scope="col">Sampel</th><th scope="col">Didaftarkan</th><th scope="col"><span class="visually-hidden">Tindakan</span></th>
+    </tr></thead><tbody id="faces-body"><tr><td colspan="4" class="empty">Memuat…</td></tr></tbody></table>
+    <form class="form face-enrol" id="enrol-form" autocomplete="off" hidden>
+        <div class="field">
+            <label class="field__label" for="enrol-name">Nama admin baru</label>
+            <input class="input" id="enrol-name" maxlength="80" required>
+        </div>
+        <div class="form__actions"><button type="submit" class="btn btn--primary" id="enrol-start">Daftarkan wajah</button></div>
+    </form>
+    <p class="field__hint" id="enrol-remote" hidden>Pendaftaran wajah hanya bisa dari layar kiosk.</p>
+    <div class="face-login__live face-enrol" id="enrol-live" hidden>
+        <div class="camera-panel camera-panel--mirror face-login__camera">
+            <img class="camera-panel__img" id="enrol-stream" alt="">
+            <span class="camera-panel__label">Kamera kiosk</span>
+        </div>
+        <p class="face-login__instruction" id="enrol-instruction" role="status" aria-live="polite"></p>
+        <p class="field__hint" id="enrol-hint"></p>
+        <div class="form__actions"><button type="button" class="btn btn--secondary" id="enrol-cancel">Batal</button></div>
+    </div>
+    <p class="form-error" id="enrol-error" role="alert"></p>
+</section>
+<section class="section" aria-labelledby="logins-title">
+    <div class="section-head"><h2 id="logins-title">Riwayat login admin</h2><span class="section-head__meta">50 percobaan terakhir · waktu WIB</span></div>
+    <table class="table"><thead><tr>
+        <th scope="col">Waktu</th><th scope="col">Cara</th><th scope="col">Hasil</th><th scope="col">Admin</th><th scope="col">Foto</th>
+    </tr></thead><tbody id="logins-body"><tr><td colspan="5" class="empty">Memuat…</td></tr></tbody></table>
+</section>
 {% endblock %}
-{% block page_scripts %}<script src="{{ url_for('static', filename='js/admin_security.js') }}"></script>{% endblock %}
+{% block page_scripts %}<script src="{{ url_for('static', filename='js/admin_security.js') }}"></script>
+<script src="{{ url_for('static', filename='js/face_attempt.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin_faces.js') }}"></script>{% endblock %}

@@ -169,3 +169,16 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
   as is, no admin redesign. Known leftover if ever wanted: at 360 px the admin tables
   squeeze (monitor table columns wrap per letter); not requested.
 - Next: step 5 (face admin login), starting with anti-spoofing research.
+- Step 5 code DONE (tag v2026.10.24.6), deployed with `FACE_LOGIN_ENABLED` unset (off).
+  User choices: layered RGB check with the current camera, kiosk-screen only (loopback),
+  one shared PIN. `utils/admin_face.py` (FaceAuth), `routes/admin_face_routes.py`,
+  `utils/face.py` + `utils/liveness.py` (from legacy), tables `admin_faces`,
+  `admin_login_events`; login page button, Keamanan page: admin faces + login log.
+  test-review found a photo-swap bypass (key frames only matched); fixed (every frame
+  embedded + scored, continuity to the matched admin), re-review clean. Face login
+  sessions end after FACE_SESSION_MINUTES (15). MiniFASNet scored random noise 0.98
+  on the laptop: passive model alone is weak; calibrate on site.
+- To enable (with the user, on the Jetson): change the default PIN first
+  (`scripts/set_admin_pin.py`), set `FACE_LOGIN_ENABLED=true` in `.env`, HUP, PIN-login
+  at the kiosk, enrol each admin on /admin/security, then try a printed photo and a
+  phone replay and tune FACE_LIVENESS_THRESHOLD / FACE_MATCH_THRESHOLD from the log.

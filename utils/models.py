@@ -257,6 +257,43 @@ class LoanReminder(db.Model):
     __table_args__ = (db.UniqueConstraint("transaction_id", "kind"),)
 
 
+class AdminFace(db.Model):
+    """One face embedding (float32 bytes) of a named admin; several per admin."""
+
+    __tablename__ = "admin_faces"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(80), nullable=False, index=True)
+    engine = db.Column(db.String(32), nullable=False)
+    vector = db.Column(db.LargeBinary, nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+class AdminLoginEvent(db.Model):
+    """Every admin login attempt (face or PIN), with a face photo when there is one."""
+
+    __tablename__ = "admin_login_events"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+    method = db.Column(db.String(10), nullable=False)  # face | pin | enroll
+    success = db.Column(db.Boolean, nullable=False)
+    admin_name = db.Column(db.String(80), nullable=True)
+    reason = db.Column(db.String(40), nullable=True)
+    photo = db.Column(db.LargeBinary, nullable=True)
+
+    def to_dict(self):
+        return {
+            "event_id": self.id,
+            "at": _get_utc_to_wib()(self.at),
+            "method": self.method,
+            "success": self.success,
+            "admin_name": self.admin_name,
+            "reason": self.reason,
+            "has_photo": self.photo is not None,
+        }
+
+
 class AlarmEvent(db.Model):
     """A tool left the reader field while it was not borrowed."""
 

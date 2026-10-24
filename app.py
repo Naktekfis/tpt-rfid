@@ -3,6 +3,7 @@ RFID Workshop Tool Monitoring System - Main Flask Application
 A touchscreen kiosk application for workshop tool borrowing using RFID cards
 """
 
+import time
 import os
 import logging
 import functools
@@ -234,6 +235,28 @@ app.register_blueprint(
     create_diagnostics_blueprint(rfid_reader, presence_service, admin_required)
 )
 
+from routes.admin_face_routes import create_admin_face_blueprint  # noqa: E402
+from utils.admin_face import build_face_auth, log_pin_login  # noqa: E402
+
+face_auth = build_face_auth(app, camera)
+app.register_blueprint(
+    create_admin_face_blueprint(
+        face_auth,
+        admin_required,
+        limiter,
+        session_seconds=60 * app.config.get("FACE_SESSION_MINUTES", 15),
+    )
+)
+
+
+@app.before_request
+def expire_face_admin_session():
+    """End a face-login admin session at its deadline (see admin_face_routes)."""
+    until = session.get("admin_until")
+    if until is not None and time.time() > until:
+        for key in ("admin_logged_in", "admin_name", "admin_until"):
+            session.pop(key, None)
+
 from routes.kiosk_routes import create_kiosk_blueprint  # noqa: E402
 
 app.register_blueprint(
@@ -337,6 +360,8 @@ def admin_login():
 def admin_logout():
     """Admin logout"""
     session.pop("admin_logged_in", None)
+    session.pop("admin_name", None)
+    session.pop("admin_until", None)
     return redirect(url_for("admin_login"))
 
 
@@ -726,12 +751,14 @@ def api_admin_login():
         pin = data.get("pin", "")
 
         if isinstance(pin, str) and check_password_hash(ADMIN_PIN_HASH, pin):
+            log_pin_login(True)
             session["admin_logged_in"] = True
-            session.permanent = (
-                True  # Uses config PERMANENT_SESSION_LIFETIME (default 31 days)
-            )
+            session.pop("admin_name", None)
+            session.pop("admin_until", None)
+            session.permanent = True  # PERMANENT_SESSION_LIFETIME
             return jsonify({"success": True, "message": "Login successful"})
 
+        log_pin_login(False)
         return jsonify({"success": False, "error": "PIN salah"}), 401
 
     except Exception as e:

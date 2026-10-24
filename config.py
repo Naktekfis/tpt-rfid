@@ -89,6 +89,23 @@ class Config:
         os.getenv("LOAN_REMINDER_INTERVAL_SECONDS", "300")
     )
 
+    # Admin face login (utils/admin_face.py): only on the kiosk screen, PIN
+    # stays the fallback. Needs CAMERA_ENABLED and the models in FACE_MODEL_DIR.
+    FACE_LOGIN_ENABLED = os.getenv("FACE_LOGIN_ENABLED", "false").lower() == "true"
+    FACE_MODEL_DIR = os.getenv(
+        "FACE_MODEL_DIR",
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", "face"),
+    )
+    FACE_LIVENESS_THRESHOLD = float(os.getenv("FACE_LIVENESS_THRESHOLD", "0.7"))
+    # A face login on the shared kiosk ends after this many minutes.
+    FACE_SESSION_MINUTES = int(os.getenv("FACE_SESSION_MINUTES", "15"))
+    # Empty = SFace default (cosine distance 0.637); lower is stricter.
+    FACE_MATCH_THRESHOLD = (
+        float(os.environ["FACE_MATCH_THRESHOLD"])
+        if os.getenv("FACE_MATCH_THRESHOLD")
+        else None
+    )
+
     # Kiosk session (NFC tap, then tools leaving/returning are
     # attributed to the student). Extended on every tool event, capped at
     # KIOSK_SESSION_MAX_SECONDS from now.
