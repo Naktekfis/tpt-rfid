@@ -44,3 +44,17 @@ the same admin. On random noise MiniFASNet scores 0.97 "real", minifas_se 0.17, 
 Choose models + thresholds from `scripts/face_spoof_bench.py` runs (real / print / screen)
 on the kiosk camera; the log line "Face login passed/failed ..., liveness {...}" gives
 per-attempt means.
+
+## Update 2026-10-24: recognizer ArcFace MobileFaceNet
+- SFace mis-rejected an enrolled admin twice in three tries on the kiosk camera.
+- Now default `FACE_RECOGNIZER=arcface_mbf`: InsightFace buffalo_s `w600k_mbf.onnx`
+  (ArcFace MobileFaceNet, WebFace600K, 512-d; sha256 9cc6e4a7…eb4f; fetched from the
+  buffalo_s.zip v0.7 release by `scripts/fetch_face_models.py`). Licence: InsightFace
+  pretrained models are for non-commercial research use — fine for the lab, revisit if
+  the project ever becomes commercial (then use `sface`, Apache-2.0).
+- Runs in cv2.dnn 5.0 on the Jetson: ~54 ms per face (SFace ~67 ms). Alignment reuses
+  SFace's alignCrop (same ArcFace 5-point template). Input RGB, (x-127.5)/127.5.
+- Default distance threshold 0.65 (cosine 0.35), not yet calibrated: the login log now
+  prints each attempt's median distance to the nearest admin and the threshold.
+- Login rule relaxed from all 6 frames to 5 of 6 matching one admin, none matching another.
+- Faces are stored per engine: switching recognizer means enrolling again.

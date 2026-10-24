@@ -99,6 +99,9 @@ class Config:
     # Passive liveness models and their real-face thresholds; a frame must pass
     # all of them (utils/liveness.py). Calibrate with scripts/face_spoof_bench.py.
     FACE_LIVENESS_MODELS = os.getenv("FACE_LIVENESS_MODELS", "mn3:0.5")
+    # Face recognizer: arcface_mbf (default, more accurate) or sface. Faces
+    # enrolled with one recognizer must be enrolled again after a switch.
+    FACE_RECOGNIZER = os.getenv("FACE_RECOGNIZER", "arcface_mbf")
     # A face login on the shared kiosk ends after this many minutes.
     FACE_SESSION_MINUTES = int(os.getenv("FACE_SESSION_MINUTES", "15"))
     # Empty = SFace default (cosine distance 0.637); lower is stricter.

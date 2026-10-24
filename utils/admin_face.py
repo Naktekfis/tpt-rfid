@@ -6,9 +6,13 @@ just looks at the camera for a moment, no head movement. Every frame used
 must hold exactly one face, big enough and roughly facing the camera; a second
 face or the face leaving the camera for long ends the attempt. Each used frame
 is embedded and checked by the passive liveness models (utils/liveness.py).
-After FRAMES_NEEDED frames, most must be live and every one must match the
-same enrolled admin (login) or the same person (enrolment), so a photo cannot
-be swapped in for part of the attempt.
+After FRAMES_NEEDED frames, most must be live and most must match the same
+enrolled admin with none matching another (login), or all be the same person
+(enrolment), so a photo cannot be swapped in for part of the attempt.
+
+Enrolment is guided: a moment to read "Lihat ke kamera", then a 3-2-1
+countdown with a short beep from the reader's buzzer on each count and a
+longer one ("cekrek") when the capture starts.
 
 Failures are logged with a face photo (AdminLoginEvent); repeated login
 failures lock face login for a while, so the PIN is the way in. The engine,
@@ -25,6 +29,7 @@ import uuid
 from array import array
 from collections import deque
 from dataclasses import dataclass, field
+import math
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from utils.liveness import yaw
@@ -62,11 +67,14 @@ class FaceLocked(RuntimeError):
 class FaceSettings:
     frames_needed: int = 6  # frames looked at per attempt (~2 s on the Jetson)
     min_live: int = 5  # of those, how many must pass liveness
+    min_match: int = 5  # login: how many must match the admin (none another)
+    enrol_prepare: float = 1.0  # enrolment: time to read the instruction
+    enrol_countdown: int = 3  # then 3-2-1, one second each
     match_threshold: Optional[float] = None  # None = engine default
     ambiguous_margin: float = 0.05
     min_face_px: int = 100
     facing_yaw: float = 0.35  # roughly facing the camera
-    timeout: float = 12.0
+    timeout: float = 12.0  # from the start of the capture
     face_lost_seconds: float = 1.5
     lockout_failures: int = 3
     lockout_window: float = 600.0
@@ -88,6 +96,9 @@ class Attempt:
     last_face_at: Optional[float] = None
     photo: Optional[bytes] = None
     needed: int = 6
+    capture_from: float = 0.0  # enrolment: frames are used from this time on
+    countdown: Optional[int] = None  # 3, 2, 1 while counting down
+    distance: Optional[float] = None  # login: median distance to the best admin
 
     @property
     def instruction(self) -> str:
@@ -95,6 +106,10 @@ class Attempt:
             return "Berhasil."
         if self.state == "failed":
             return REASONS.get(self.reason or "", "Gagal.")
+        if self.countdown:
+            return str(self.countdown)
+        if self.mode == ENROLL and self.frames:
+            return "Tahan…"
         return "Lihat ke kamera"
 
     def to_dict(self) -> Dict[str, Any]:
@@ -106,6 +121,7 @@ class Attempt:
             "hint": self.hint,
             "progress": min(1.0, len(self.frames) / max(1, self.needed)),
             "reason": self.reason,
+            "countdown": self.countdown,
             "name": self.name if self.state == "passed" else None,
         }
 
@@ -132,6 +148,7 @@ class FaceAuth:
         photo: Optional[Callable[[Any, Any], Optional[bytes]]] = None,
         clock: Callable[[], float] = time.monotonic,
         threaded: bool = True,
+        beep: Optional[Callable[..., None]] = None,
     ):
         self.app = app
         self.camera = camera
@@ -142,6 +159,7 @@ class FaceAuth:
             None if engine and liveness else "Model wajah tidak tersedia."
         )
         self._photo = photo
+        self._beep = beep
         self._clock = clock
         self._threaded = threaded
         self._lock = threading.Lock()
@@ -170,12 +188,17 @@ class FaceAuth:
             raise FaceUnavailable(self.unavailable)
         if mode == LOGIN and self.locked_for() > 0:
             raise FaceLocked()
+        now = self._clock()
+        s = self.settings
         attempt = Attempt(
             id=uuid.uuid4().hex,
             mode=mode,
-            started=self._clock(),
+            started=now,
             name=name if mode == ENROLL else None,
-            needed=self.settings.frames_needed,
+            needed=s.frames_needed,
+            capture_from=now + s.enrol_prepare + s.enrol_countdown
+            if mode == ENROLL
+            else now,
         )
         with self._lock:
             if self._running is not None:  # one camera: the newest attempt wins
@@ -214,7 +237,7 @@ class FaceAuth:
     def _run(self, attempt: Attempt) -> None:
         try:
             while attempt.state == "running":
-                if self._clock() - attempt.started > self.settings.timeout:
+                if self._clock() - attempt.capture_from > self.settings.timeout:
                     self._finish(attempt, False, "timeout")
                     break
                 frame = self.camera.read()
@@ -235,6 +258,12 @@ class FaceAuth:
         """Feed one camera frame to a running attempt."""
         s = self.settings
         now = self._clock()
+        if now < attempt.capture_from:
+            self._count_down(attempt, now)
+            return
+        if attempt.countdown is not None:  # the capture starts now: "cekrek"
+            attempt.countdown = None
+            self._buzz(active=6, silent=1, times=1)
         detected = self.engine.detect(frame)
         # Small faces (far in the background) are ignored altogether.
         faces = [f for f in detected if min(f.box[2], f.box[3]) >= s.min_face_px]
@@ -267,6 +296,21 @@ class FaceAuth:
         if len(attempt.frames) >= s.frames_needed:
             self._decide(attempt)
 
+    def _count_down(self, attempt: Attempt, now: float) -> None:
+        left = attempt.capture_from - now
+        count = math.ceil(left) if left <= self.settings.enrol_countdown else None
+        if count and count != attempt.countdown:
+            self._buzz(active=2, silent=1, times=1)
+        attempt.countdown = count
+
+    def _buzz(self, **pattern) -> None:
+        if self._beep is None:
+            return
+        try:
+            self._beep(**pattern)
+        except Exception:  # a buzzer fault must not end the enrolment
+            logger.exception("Enrolment beep failed")
+
     def _decide(self, attempt: Attempt) -> None:
         s = self.settings
         if sum(1 for _, live in attempt.frames if live) < s.min_live:
@@ -275,7 +319,12 @@ class FaceAuth:
         vecs = [v for v, _ in attempt.frames]
         gallery = self._gallery()
         if attempt.mode == LOGIN:
-            name = self._match(vecs, gallery)
+            if gallery:
+                best = sorted(
+                    min(self.engine.distance(v, g) for _, g in gallery) for v in vecs
+                )
+                attempt.distance = best[len(best) // 2]
+            name = self._match(vecs, gallery, need=s.min_match)
             if name is None:
                 self._finish(attempt, False, "unknown_face")
                 return
@@ -286,11 +335,11 @@ class FaceAuth:
             self._finish(attempt, False, "face_changed")
             return
         own = [(n, v) for n, v in gallery if n == attempt.name]
-        if own and self._match(vecs, own) != attempt.name:
+        if own and self._match(vecs, own, need=s.min_match) != attempt.name:
             self._finish(attempt, False, "name_taken")
             return
         others = [(n, v) for n, v in gallery if n != attempt.name]
-        if others and self._match(vecs, others, require_all=False):
+        if others and self._match(vecs, others, need=1):
             self._finish(attempt, False, "other_admin")
             return
         self._finish(attempt, True, None, store=vecs)
@@ -301,9 +350,10 @@ class FaceAuth:
             min(self.engine.distance(v, r) for r in reference) <= limit for v in vecs
         )
 
-    def _match(self, vecs, gallery, require_all: bool = True) -> Optional[str]:
-        """The admin every embedding matches (or, with require_all=False, any one
-        embedding matches), else None. Ambiguous best/second-best counts as no match."""
+    def _match(self, vecs, gallery, need: int) -> Optional[str]:
+        """The admin at least `need` embeddings match while no embedding matches
+        another admin (need=1: the first admin any embedding matches), else None.
+        Ambiguous best/second-best counts as no match for that embedding."""
         names = []
         for vec in vecs:
             best: Dict[str, float] = {}
@@ -320,10 +370,11 @@ class FaceAuth:
                     and ranked[1][1] - ranked[0][1] < self.settings.ambiguous_margin
                 )
             )
-            if not require_all and ok:
+            if need <= 1 and ok:
                 return ranked[0][0]
-            names.append(ranked[0][0] if ok else None)
-        if require_all and names and None not in names and len(set(names)) == 1:
+            if ok:
+                names.append(ranked[0][0])
+        if len(set(names)) == 1 and len(names) >= need:
             return names[0]
         return None
 
@@ -347,11 +398,13 @@ class FaceAuth:
                 self._fail(attempt, reason or "error")
             # Per-model liveness means, for calibrating the thresholds from the log.
             logger.info(
-                "Face %s %s%s, liveness %s",
+                "Face %s %s%s, liveness %s, distance %s (threshold %.3f)",
                 attempt.mode,
                 "passed" if ok else "failed",
                 f" ({reason})" if reason else "",
                 {m: round(sum(v) / len(v), 3) for m, v in attempt.scores.items()},
+                None if attempt.distance is None else round(attempt.distance, 3),
+                self.threshold,
             )
             # A passer-by in the picture is bad luck, not an attack attempt.
             if attempt.mode == LOGIN and not ok and reason not in ("cancelled", "multiple_faces"):
@@ -396,15 +449,19 @@ class FaceAuth:
             return [(r.name, unpack(r.vector)) for r in rows]
 
 
-def list_admin_faces() -> List[Dict[str, Any]]:
-    """Enrolled admins: name, number of embeddings, first enrolment (UTC)."""
+def list_admin_faces(engine: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Enrolled admins: name, number of embeddings, first enrolment (UTC).
+    With `engine`, only faces enrolled with that recognizer (the others
+    cannot log in and must be enrolled again)."""
+    query = db.session.query(
+        AdminFace.name,
+        db.func.count(AdminFace.id),
+        db.func.min(AdminFace.created_at),
+    )
+    if engine is not None:
+        query = query.filter(AdminFace.engine == engine)
     rows = (
-        db.session.query(
-            AdminFace.name,
-            db.func.count(AdminFace.id),
-            db.func.min(AdminFace.created_at),
-        )
-        .group_by(AdminFace.name)
+        query.group_by(AdminFace.name)
         .order_by(AdminFace.name)
         .all()
     )
@@ -426,7 +483,7 @@ def log_pin_login(success: bool) -> None:
     db.session.commit()
 
 
-def build_face_auth(app, camera) -> FaceAuth:
+def build_face_auth(app, camera, beep=None) -> FaceAuth:
     """FaceAuth from config; unavailable (with a reason) when off or models fail."""
     cfg = app.config
     settings = FaceSettings(match_threshold=cfg.get("FACE_MATCH_THRESHOLD"))
@@ -438,12 +495,12 @@ def build_face_auth(app, camera) -> FaceAuth:
         return FaceAuth(
             app, camera, settings=settings, unavailable="Kamera tidak aktif."
         )
-    from utils.face import FaceModelsMissing, YuNetSFaceEngine, face_jpeg
+    from utils.face import FaceModelsMissing, create_engine, face_jpeg
     from utils.liveness import Liveness, LivenessUnavailable
 
     model_dir = cfg.get("FACE_MODEL_DIR", "models/face")
     try:
-        engine = YuNetSFaceEngine(model_dir)
+        engine = create_engine(model_dir, cfg.get("FACE_RECOGNIZER", "arcface_mbf"))
         liveness = Liveness(model_dir, cfg.get("FACE_LIVENESS_MODELS", "mn3:0.5"))
     except (FaceModelsMissing, LivenessUnavailable, ValueError) as exc:
         logger.warning("Face login unavailable: %s", exc)
@@ -451,6 +508,10 @@ def build_face_auth(app, camera) -> FaceAuth:
             app, camera, settings=settings, unavailable="Model wajah tidak tersedia."
         )
     logger.info(
-        "Face login on (liveness %s)", cfg.get("FACE_LIVENESS_MODELS", "mn3:0.5")
+        "Face login on (%s, liveness %s)",
+        engine.name,
+        cfg.get("FACE_LIVENESS_MODELS", "mn3:0.5"),
     )
-    return FaceAuth(app, camera, engine, liveness, settings, photo=face_jpeg)
+    return FaceAuth(
+        app, camera, engine, liveness, settings, photo=face_jpeg, beep=beep
+    )

@@ -7,7 +7,7 @@
     'use strict';
 
     const UI = window.UI;
-    const POLL_MS = 300;
+    const POLL_MS = 200;  // fast enough for the enrolment 3-2-1 countdown
 
     // els: { live, stream, instruction, hint, error, cancel }; returns a promise
     // of the final attempt ({state: 'passed'|'failed', ...}) or null.
@@ -30,6 +30,7 @@
         try {
             while (a.state === 'running' && !cancelled) {
                 els.instruction.textContent = a.instruction;
+                els.instruction.classList.toggle('face-login__instruction--count', !!a.countdown);
                 els.hint.textContent = a.hint || '';
                 await new Promise(function (r) { setTimeout(r, POLL_MS); });
                 const next = await UI.fetchJSON('/api/admin/face/attempt');
@@ -43,6 +44,7 @@
             els.cancel.removeEventListener('click', onCancel);
             els.stream.removeAttribute('src');  // closes the MJPEG connection
             els.live.hidden = true;
+            els.instruction.classList.remove('face-login__instruction--count');
             els.hint.textContent = '';
         }
         if (cancelled) return null;

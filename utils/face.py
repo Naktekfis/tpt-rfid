@@ -1,5 +1,11 @@
 """
-Face detection and embedding for admin face login (YuNet + SFace via cv2.dnn).
+Face detection and embedding for admin face login, all via cv2.dnn:
+YuNet detector + one recognizer (FACE_RECOGNIZER):
+
+  arcface_mbf  ArcFace MobileFaceNet trained on WebFace600K (InsightFace
+               buffalo_s w600k_mbf; non-commercial research licence),
+               more accurate than SFace and a bit faster on the Jetson
+  sface        OpenCV zoo SFace (Apache-2.0), the original choice
 
 Brought back from legacy/face/utils/face.py, trimmed to what admin login
 uses. cv2 and numpy are imported lazily, so the app and the tests run without
@@ -20,6 +26,7 @@ from typing import Any, List, Optional, Tuple
 
 YUNET_FILE = "face_detection_yunet_2023mar.onnx"
 SFACE_FILE = "face_recognition_sface_2021dec.onnx"
+ARCFACE_MBF_FILE = "w600k_mbf.onnx"
 
 
 class FaceModelsMissing(RuntimeError):
@@ -95,6 +102,49 @@ class YuNetSFaceEngine:
     def distance(self, a, b) -> float:
         np = self._np
         return float(1.0 - np.dot(np.asarray(a, np.float32), np.asarray(b, np.float32)))
+
+
+class YuNetArcFaceEngine(YuNetSFaceEngine):
+    """YuNet + ArcFace MobileFaceNet. The SFace model is still loaded for its
+    alignCrop (the same 5-point ArcFace template, 112x112)."""
+
+    name = "yunet_arcface_mbf"
+    # Cosine similarity 0.35; calibrate with the distances in the login log.
+    threshold = 0.65
+
+    def __init__(self, model_dir: str, threshold: Optional[float] = None, **kw):
+        super().__init__(model_dir, threshold, **kw)
+        import cv2
+
+        path = os.path.join(model_dir, ARCFACE_MBF_FILE)
+        if not os.path.isfile(path):
+            raise FaceModelsMissing(f"Model file missing: {path}")
+        try:
+            self._arcface = cv2.dnn.readNetFromONNX(path)
+        except cv2.error as exc:
+            raise FaceModelsMissing(f"Cannot load {path}: {exc}") from exc
+        self._cv2 = cv2
+
+    def embed(self, frame, face: Face):
+        np, cv2 = self._np, self._cv2
+        with self._lock:
+            aligned = self._recognizer.alignCrop(frame, face.raw)
+            blob = cv2.dnn.blobFromImage(
+                aligned, 1.0 / 127.5, (112, 112), (127.5, 127.5, 127.5), swapRB=True
+            )
+            self._arcface.setInput(blob)
+            vec = np.asarray(self._arcface.forward(), dtype=np.float32).reshape(-1)
+        norm = float(np.linalg.norm(vec))
+        return vec / norm if norm > 0 else vec
+
+
+ENGINES = {"arcface_mbf": YuNetArcFaceEngine, "sface": YuNetSFaceEngine}
+
+
+def create_engine(model_dir: str, recognizer: str = "arcface_mbf"):
+    if recognizer not in ENGINES:
+        raise ValueError(f"Unknown FACE_RECOGNIZER {recognizer!r} (use {sorted(ENGINES)})")
+    return ENGINES[recognizer](model_dir)
 
 
 def sharpness(frame, face: Face) -> float:

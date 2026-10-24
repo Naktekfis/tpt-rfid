@@ -882,6 +882,11 @@ input[type="date"].input {
   font-weight: 700;
   line-height: 1.15;
 }
+.face-login__instruction--count {
+  font-size: calc(var(--fs-2xl) * 2.5);
+  color: var(--c-brand);
+  font-variant-numeric: tabular-nums;
+}
 .face-login .menu-label {
   margin-bottom: 0;
 }

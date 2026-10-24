@@ -14,6 +14,7 @@ import hashlib
 import os
 import sys
 import urllib.request
+import zipfile
 
 MODEL_DIR = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "face"
@@ -27,8 +28,10 @@ _FACENOX = (
     "2f8dd93dd0fd9d120f08e83d9020719f67ffdb68/models/best/98.20/best_model.onnx"
 )
 _OMZ = "https://storage.openvinotoolkit.org/repositories/open_model_zoo/public/2022.1/"
+# InsightFace buffalo_s pack (~120 MB zip); only w600k_mbf.onnx is kept.
+_BUFFALO_S = "https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_s.zip"
 
-# filename -> (url, sha256)
+# filename -> (url, sha256); a .zip url means "extract the member of that name"
 MODELS = {
     "face_detection_yunet_2023mar.onnx": (
         _ZOO + "face_detection_yunet/face_detection_yunet_2023mar.onnx",
@@ -54,7 +57,31 @@ MODELS = {
         _OMZ + "anti-spoof-mn3/anti-spoof-mn3.onnx",
         "c4c99af04603b62d7e44f6f4daeb33e0daeccc696008c0b1d62f6f5cebbb3262",
     ),
+    "w600k_mbf.onnx": (
+        _BUFFALO_S,
+        "9cc6e4a75f0e2bf0b1aed94578f144d15175f357bdc05e815e5c4a02b319eb4f",
+    ),
 }
+
+
+def download(url: str, name: str, tmp: str) -> None:
+    """Fetch url to tmp; for a zip, keep only the member `name`."""
+    if not url.endswith(".zip"):
+        urllib.request.urlretrieve(url, tmp)
+        return
+    archive = tmp + ".zip"
+    try:
+        urllib.request.urlretrieve(url, archive)
+        with zipfile.ZipFile(archive) as zf:
+            member = next(m for m in zf.namelist() if os.path.basename(m) == name)
+            with zf.open(member) as src, open(tmp, "wb") as dst:
+                for chunk in iter(lambda: src.read(1 << 20), b""):
+                    dst.write(chunk)
+    except (StopIteration, zipfile.BadZipFile) as exc:
+        raise OSError(f"{name} not found in {url}: {exc!r}") from exc
+    finally:
+        if os.path.exists(archive):
+            os.remove(archive)
 
 
 def sha256_of(path: str) -> str:
@@ -76,7 +103,7 @@ def main() -> int:
         tmp = path + ".part"
         try:
             print(f"fetch   {name}")
-            urllib.request.urlretrieve(url, tmp)
+            download(url, name, tmp)
             got = sha256_of(tmp)
         except OSError as exc:
             print(f"FAILED  {name}: {exc}")

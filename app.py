@@ -238,7 +238,7 @@ app.register_blueprint(
 from routes.admin_face_routes import create_admin_face_blueprint  # noqa: E402
 from utils.admin_face import build_face_auth, log_pin_login  # noqa: E402
 
-face_auth = build_face_auth(app, camera)
+face_auth = build_face_auth(app, camera, beep=rfid_reader.beep)
 app.register_blueprint(
     create_admin_face_blueprint(
         face_auth,

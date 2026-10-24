@@ -10,7 +10,7 @@ from utils.admin_face import Attempt, FaceSettings, pack
 from utils.face import Face
 from utils.models import AdminFace, AdminLoginEvent, db
 
-VECS = {"A": [1.0, 0.0], "B": [0.0, 1.0]}
+VECS = {"A": [1.0, 0.0], "B": [0.0, 1.0], "C": [-1.0, 0.0]}
 REMOTE = {"REMOTE_ADDR": "10.42.0.1"}
 
 
@@ -60,7 +60,7 @@ def face(app, monkeypatch):
         "liveness": FakeLiveness(),
         "unavailable": None,
         "camera": FakeCamera(),
-        "settings": FaceSettings(),
+        "settings": FaceSettings(enrol_prepare=0, enrol_countdown=0),
         "_threaded": False,
         "_photo": lambda frame, f: b"jpeg",
         "_attempts": {},
@@ -263,3 +263,42 @@ def test_liveness_spec_parsing():
     assert parse_spec("minifas") == [("minifas", 0.5)]
     with pytest.raises(ValueError):
         parse_spec("nope:0.5")
+
+
+def test_enrol_counts_down_with_beeps_before_capturing(admin_client, face, monkeypatch):
+    now = [0.0]
+    beeps = []
+
+    class TickingCamera(FakeCamera):
+        def read(self):
+            now[0] += 0.5  # each frame is half a second later
+            return super().read()
+
+    monkeypatch.setattr(face, "camera", TickingCamera())
+    monkeypatch.setattr(face, "_clock", lambda: now[0])
+    monkeypatch.setattr(face, "_beep", lambda **p: beeps.append(p["active"]))
+    face.settings.enrol_prepare, face.settings.enrol_countdown = 1.0, 3
+    seen = []
+    real_step = face.step
+    monkeypatch.setattr(
+        face, "step", lambda a, f: (real_step(a, f), seen.append(a.instruction))
+    )
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    # 1 s to read + 3 s countdown = 8 frames ignored, then 6 captured.
+    face.camera.frames.extend([{"faces": [], "live": 0.0}] * 7 + good())
+    admin_client.post("/api/admin/faces/enroll/start", json={"name": "Ahmad"})
+    assert admin_client.get("/api/admin/face/attempt").get_json()["state"] == "passed"
+    assert seen[:7] == ["Lihat ke kamera", "3", "3", "2", "2", "1", "1"]
+    assert beeps == [2, 2, 2, 6]  # three short counts, one long "cekrek"
+    assert AdminFace.query.filter_by(name="Ahmad").count() == 6
+
+
+def test_login_tolerates_one_unmatched_frame_but_not_another_admin(client, face):
+    enrol("Ahmad", "A")
+    stranger = {"faces": [("C", 0.0)], "live": 0.95}
+    _, result = login(client, face, [front()] * 5 + [stranger])
+    assert result["state"] == "passed"
+    client.get("/admin/logout")
+    enrol("Budi", "B")
+    _, result = login(client, face, [front()] * 5 + [front("B")])
+    assert result["reason"] == "unknown_face"

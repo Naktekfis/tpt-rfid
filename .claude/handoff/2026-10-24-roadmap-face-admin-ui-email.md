@@ -203,3 +203,8 @@ Jetson: `tpt@10.42.0.14` over laptop USB ethernet; read-only SSH works from the 
   Installable only on https or localhost; over http://10.42.0.14 browsers offer at most a shortcut.
 - `RFID_ALARM_CONFIRM_SECONDS` 2 -> 1 (user request), also in the Jetson `.env`.
 - Still with the user: change default PIN 133133, enrol admin faces, anti-spoofing later.
+
+## Update v2026.10.24.12
+- Recognizer ArcFace MBF (see FACE_MODELS.md), majority match 5/6, distance in the log.
+- Guided enrolment (user idea): 1 s "Lihat ke kamera", 3-2-1 with short reader beeps, long beep "cekrek", then capture; big countdown number on the page.
+- Existing enrolment "Ujang" was SFace: hidden now, must enrol again.

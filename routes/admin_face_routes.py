@@ -110,7 +110,8 @@ def create_admin_face_blueprint(face_auth, admin_required, limiter, session_seco
     @admin_required
     def faces_list():
         faces = [
-            {**f, "created_at": utc_to_wib(f["created_at"])} for f in list_admin_faces()
+            {**f, "created_at": utc_to_wib(f["created_at"])}
+            for f in list_admin_faces(getattr(face_auth.engine, "name", None))
         ]
         return jsonify({"success": True, "faces": faces, "local": _is_local()})
 
