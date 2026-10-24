@@ -148,9 +148,10 @@ for launcher in "$HOME/Desktop/tpt-rfid-app.desktop" \
     else
         mkdir -p "$(dirname "$launcher")"
         sed -e "s|@APP_DIR@|$APP_DIR|g" "$HERE/tpt-rfid-app.desktop" > "$launcher"
-        chmod +x "$launcher"
-        # Nautilus only runs launchers marked trusted.
-        gio set "$launcher" metadata::trusted true 2>/dev/null || true
+        chmod 755 "$launcher"  # group-writable launchers are not trusted
+        # Nautilus (18.04) shows it as a plain text file unless trusted is
+        # "yes", set before it first sees the file; else re-login.
+        gio set "$launcher" metadata::trusted yes 2>/dev/null || true
     fi
 done
 if ! command -v chromium-browser >/dev/null && ! command -v chromium >/dev/null \
