@@ -146,6 +146,15 @@
   color: var(--c-danger);
   font-weight: 600;
 }
+.rack-item__who {
+  font-size: var(--fs-sm);
+  color: var(--c-text-muted);
+  overflow-wrap: anywhere;
+}
+.rack-item__late {
+  color: var(--c-warn);
+  font-weight: 600;
+}
 
 .unverified {
   border-top: var(--hairline);

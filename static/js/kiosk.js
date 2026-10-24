@@ -154,10 +154,14 @@
             const n = function (kind) { return marks.filter(function (m) { return m.kind === kind; }).length; };
             present += n('present');
             total += marks.length;
+            const borrowers = g.units.filter(function (u) {
+                return u.status === 'borrowed' && u.borrower_name;
+            }).map(function (u) { return { name: u.borrower_name, overdue: !!u.is_overdue }; });
             return {
                 name: g.type_name,
                 photo: g.photo_url,
                 marks: marks,
+                borrowers: borrowers,
                 present: n('present'),
                 overdue: n('overdue'),
                 missing: n('missing'),
@@ -186,6 +190,18 @@
             kind = ' count--danger';
         }
         return h('div', { class: 'count' + kind, text: text });
+    }
+
+    // "Dipinjam: Budi · Sari (terlambat)" under a tool on the idle rack list.
+    function borrowersEl(g) {
+        if (!g.borrowers.length) return null;
+        const line = h('div', { class: 'rack-item__who' }, 'Dipinjam: ');
+        g.borrowers.forEach(function (b, i) {
+            if (i) line.appendChild(document.createTextNode(' · '));
+            line.appendChild(h('span', { class: b.overdue ? 'rack-item__late' : null,
+                text: b.name + (b.overdue ? ' (terlambat)' : '') }));
+        });
+        return line;
     }
 
     function legendInto(box, used) {
@@ -230,7 +246,8 @@
                 h('div', { class: 'rack-item__text' },
                     h('div', { class: 'rack-item__name', text: g.name }),
                     unitsEl(g.marks, false),
-                    countEl(g))));
+                    countEl(g),
+                    borrowersEl(g))));
             grid.appendChild(h('li', { class: 'rack-tile' },
                 toolPhoto(g.photo, g.name, 'md'),
                 h('div', { class: 'rack-tile__name', text: g.name }),
