@@ -1,10 +1,8 @@
 <p align="center"><img src="docs/images/banner.jpg" alt="Kampus Institut Teknologi Bandung" width="100%"></p>
 
-# Lab Fabrikasi TF ITB — Kiosk Peminjaman Alat
+# Lab Fabrikasi TF ITB
 
 Kiosk peminjaman alat workshop Lab Fabrikasi Teknik Fisika ITB. Mahasiswa membuka sesi dengan **KTM (Kartu Tanda Mahasiswa)**. Setiap alat diberi tag UHF RFID yang terus dipantau reader: alat yang diambil saat sesi tercatat sebagai pinjaman, sedangkan alat yang keluar tanpa sesi memicu alarm. Admin mengelola semuanya di layar yang sama, dengan login wajah atau PIN.
-
-**Untuk siapa README ini:** tim dan penerus pengelola lab yang akan menjalankan, merawat, atau mengembangkan kiosk ini.
 
 | Kiosk menunggu KTM | Sesi peminjaman |
 |---|---|
