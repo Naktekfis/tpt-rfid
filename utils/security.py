@@ -60,11 +60,13 @@ class ObstructionDetector:
     GRID = (12, 16)  # blocks of 10x10 px on the 160x120 copy
 
     def __init__(self, lost_fraction: float = 0.2, learn_rate: float = 0.05,
-                 min_reference_blocks: int = 20):
+                 min_reference_blocks: int = 20, warmup_frames: int = 10):
         self.lost_fraction = lost_fraction
         self.learn_rate = learn_rate
         self.min_reference_blocks = min_reference_blocks
+        self.warmup_frames = warmup_frames  # healthy frames before comparing
         self.reference = None  # per-block edge density, healthy frames only
+        self._learned = 0
 
     def condition(self, frame):
         base = frame_condition(frame)
@@ -82,7 +84,7 @@ class ObstructionDetector:
         rows, cols = self.GRID
         density = edges.reshape(rows, 120 // rows, cols, 160 // cols).mean(axis=(1, 3))
         textured = density > 0.02
-        if self.reference is not None:
+        if self.reference is not None and self._learned >= self.warmup_frames:
             ref_textured = self.reference > 0.02
             known = int(ref_textured.sum())
             if known >= self.min_reference_blocks:
@@ -93,6 +95,7 @@ class ObstructionDetector:
             self.reference = density
         else:
             self.reference = (1 - self.learn_rate) * self.reference + self.learn_rate * density
+        self._learned += 1
         return "healthy"
 
 

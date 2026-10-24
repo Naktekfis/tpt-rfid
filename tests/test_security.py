@@ -268,7 +268,7 @@ def test_cover_that_lets_light_through_is_seen_by_lost_edges():
     scene = (rng.integers(0, 2, (12, 16)) * 200).astype("uint8")
     scene = np.kron(scene, np.ones((40, 40), dtype="uint8"))  # 480x640 checker scene
     detector = ObstructionDetector()
-    for _ in range(3):
+    for _ in range(detector.warmup_frames):
         assert detector.condition(scene) == "healthy"
     # A bright, slightly uneven cover (paper/hand with light behind it).
     cover = np.clip(120 + rng.normal(0, 12, scene.shape), 0, 255).astype("uint8")
