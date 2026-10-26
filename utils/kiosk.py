@@ -85,12 +85,23 @@ class Kiosk:
             with self.app.app_context():
                 student = self.database.get_student_by_nfc(uid)
             if student is None:
-                self._reset_all()
-                self._state = "unknown_card"
-                self._until = self._clock() + UNKNOWN_CARD_SECONDS
-                return "unknown_card"
+                return self._unknown_card_locked()
             self._start_session_locked(student)
             return "session"
+
+    def reject_card(self) -> str:
+        """Show the unknown-card screen for a tap the policy refused."""
+        with self._lock:
+            self._tick_locked()
+            if self._state == "session":
+                return "busy"
+            return self._unknown_card_locked()
+
+    def _unknown_card_locked(self) -> str:
+        self._reset_all()
+        self._state = "unknown_card"
+        self._until = self._clock() + UNKNOWN_CARD_SECONDS
+        return "unknown_card"
 
     # ---- session ----
 

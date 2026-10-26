@@ -165,13 +165,17 @@ class DatabaseHandler:
         )
         return student.to_dict() if student else None
 
-    def bind_student_nfc(self, student_id, uid):
+    def bind_student_nfc(self, student_id, uid, policy=None):
         """Bind an unbound account, preserving all legacy student-card fields."""
         from sqlalchemy.exc import IntegrityError
 
         student = db.session.get(Student, int(student_id))
         if student is None or db.session.get(DeletedStudent, student.id):
             raise ValueError("Mahasiswa tidak ditemukan")
+        if policy is not None:
+            error = policy.check_student(uid, student.nim)
+            if error:
+                raise ValueError(error)
         if StudentNFCCard.query.filter_by(student_id=student.id).first():
             raise ValueError(
                 "Mahasiswa sudah memiliki KTM terdaftar; penggantian perlu prosedur terpisah"

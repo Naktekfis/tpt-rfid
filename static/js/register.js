@@ -152,6 +152,7 @@
             ready = !!res.ready;
             updateSubmit();
             status(ready ? 'KTM terbaca. Periksa data Anda, lalu simpan sebelum waktu pembacaan habis.'
+                : res.rejected ? res.rejected + '. Angkat kartu, lalu tempelkan KTM.'
                 : res.connected ? 'Tempelkan KTM ke pembaca. Angkat kembali setelah terbaca.'
                     : 'Pembaca KTM belum tersambung. Periksa perangkat; pembacaan akan dilanjutkan.');
         } catch (e) {

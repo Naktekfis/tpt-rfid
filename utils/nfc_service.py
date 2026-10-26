@@ -6,14 +6,17 @@ import secrets
 import threading
 import time
 
+from .nfc_policy import CardPolicy
+
 
 class NFCCaptureError(ValueError):
     pass
 
 
 class NFCService:
-    def __init__(self, app, reader, kiosk, clock=time.monotonic):
+    def __init__(self, app, reader, kiosk, clock=time.monotonic, policy=None):
         self.app, self.reader, self.kiosk = app, reader, kiosk
+        self.policy = policy or CardPolicy(enforce=False)
         self.clock = clock
         self.lock = threading.RLock()
         self.capture = None
@@ -35,6 +38,7 @@ class NFCService:
                 owner=owner,
                 token=token,
                 uid=None,
+                error=None,
                 expires=self.clock() + 120,
                 after=self.reader.status()["sequence"],
             )
@@ -46,6 +50,14 @@ class NFCService:
             return bool(
                 self.capture and self.capture["owner"] == owner and self.capture["uid"]
             )
+
+    def rejection(self, owner):
+        """Why the last tap was refused (a message, never the card data)."""
+        with self.lock:
+            self._expire()
+            if self.capture and self.capture["owner"] == owner:
+                return self.capture["error"]
+            return None
 
     def cancel(self, owner, token):
         with self.lock:
@@ -63,10 +75,26 @@ class NFCService:
                 if event["sequence"] <= self.capture["after"]:
                     return
                 if self.capture["uid"] is None:
-                    self.capture["uid"] = event["uid"]
+                    error = self.policy.check_tap(event)
+                    self.capture["error"] = error
+                    if error is None:
+                        self.capture["uid"] = event["uid"]
                 return
             with self.app.app_context():
-                self.kiosk.on_card(event["uid"])
+                if self._refused(event):
+                    self.kiosk.reject_card()
+                else:
+                    self.kiosk.on_card(event["uid"])
+
+    def _refused(self, event):
+        if self.policy.check_tap(event):
+            return True
+        if self.policy.is_special(event["uid"]):
+            student = self.kiosk.database.get_student_by_nfc(event["uid"])
+            return bool(
+                student and self.policy.check_student(event["uid"], student["nim"])
+            )
+        return False
 
     def submit(self, owner, token, operation):
         with self.lock:

@@ -31,6 +31,7 @@ def create_nfc_blueprint(service, database, admin_required):
         return jsonify(
             success=True,
             ready=service.ready(capture_owner()),
+            rejected=service.rejection(capture_owner()),
             connected=service.reader.status().get("connected", False),
         )
 
@@ -51,7 +52,9 @@ def create_nfc_blueprint(service, database, admin_required):
             service.submit(
                 capture_owner(),
                 str(data.get("nfc_token", "")),
-                lambda uid: database.bind_student_nfc(student_id, uid),
+                lambda uid: database.bind_student_nfc(
+                    student_id, uid, service.policy
+                ),
             )
             return jsonify(success=True)
         except (NFCCaptureError, ValueError) as exc:

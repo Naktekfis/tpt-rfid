@@ -26,6 +26,28 @@ def normalize_uid(uid) -> str:
     return value
 
 
+_CMD_IN_LIST_PASSIVE_TARGET = 0x4A
+# ISO-DEP cards append their ATS (KTM: 13 bytes); the library default of 19
+# bytes truncates that frame and fails its checksum.
+_TARGET_RESPONSE_LENGTH = 48
+
+
+def parse_target(response):
+    """(uid, chip data) from an InListPassiveTarget answer; (None, None) if empty."""
+    if not response or response[0] != 1 or len(response) < 6:
+        return None, None
+    uid_length = response[5]
+    if len(response) < 6 + uid_length:
+        return None, None
+    uid = bytes(response[6 : 6 + uid_length])
+    card = {
+        "atqa": bytes(response[2:4]).hex().upper(),
+        "sak": response[4],
+        "ats": bytes(response[6 + uid_length :]).hex().upper(),
+    }
+    return uid, card
+
+
 class NFCReaderMock:
     """Thread-safe event source; simulate_scan represents one explicit tap."""
 
@@ -65,7 +87,9 @@ class NFCReaderMock:
                 "firmware": self._firmware,
             }
 
-    def _publish(self, uid: str, debounce: bool = False) -> Optional[dict]:
+    def _publish(
+        self, uid: str, debounce: bool = False, card: Optional[dict] = None
+    ) -> Optional[dict]:
         with self._lock:
             if debounce and not self._debouncer.update([uid]):
                 return None
@@ -73,6 +97,7 @@ class NFCReaderMock:
             event = {
                 "sequence": self._sequence,
                 "uid": uid,
+                "card": dict(card) if card else None,
                 "observed_at": self._clock(),
             }
             self._event = event
@@ -84,16 +109,16 @@ class NFCReaderMock:
                 logger.error("NFC event listener failed")
         return dict(event)
 
-    def simulate_scan(self, uid) -> dict:
-        return self._publish(normalize_uid(uid))
+    def simulate_scan(self, uid, card: Optional[dict] = None) -> dict:
+        return self._publish(normalize_uid(uid), card=card)
 
-    def set_present(self, uid) -> Optional[dict]:
+    def set_present(self, uid, card: Optional[dict] = None) -> Optional[dict]:
         """Feed one mock polling observation (None means no card)."""
         if uid is None:
             with self._lock:
                 self._debouncer.update([])
             return None
-        return self._publish(normalize_uid(uid), debounce=True)
+        return self._publish(normalize_uid(uid), debounce=True, card=card)
 
     def start(self) -> None:
         pass
@@ -157,9 +182,19 @@ class PN532Reader(NFCReaderMock):
                 self._thread.join(timeout=self.poll_timeout + 3)
 
     def poll_once(self, device) -> Optional[dict]:
-        return self.set_present(device.read_passive_target(timeout=self.poll_timeout))
+        try:
+            response = device.call_function(
+                _CMD_IN_LIST_PASSIVE_TARGET,
+                params=[0x01, 0x00],
+                response_length=_TARGET_RESPONSE_LENGTH,
+                timeout=self.poll_timeout,
+            )
+        except RuntimeError:  # one corrupt frame; the next poll retries
+            return None
+        uid, card = parse_target(response)
+        return self.set_present(uid, card)
 
-    def simulate_scan(self, uid) -> dict:
+    def simulate_scan(self, uid, card: Optional[dict] = None) -> dict:
         raise RuntimeError("Mock scans are disabled for the real NFC reader")
 
     def _run(self) -> None:

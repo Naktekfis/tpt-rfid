@@ -9,6 +9,7 @@ from utils.nfc_reader import (
     PN532Reader,
     create_nfc_reader,
     normalize_uid,
+    parse_target,
 )
 
 UID = "04A1B2C3"
@@ -99,10 +100,11 @@ def test_thread_reconnects_configures_sam_and_closes_bus_without_logging_uid(cap
         def SAM_configuration(self):
             self.ready = True
 
-        def read_passive_target(self, timeout):
+        def call_function(self, command, params, response_length, timeout):
             assert self.ready
-            assert timeout == 0.05
-            return bytes.fromhex(UID)
+            assert timeout == 0.05 and command == 0x4A
+            # Targets, tg, ATQA, SAK, UID length, UID, ATS.
+            return bytes.fromhex("0101" + "0004" + "28" + "04" + UID + "0C788071")
 
     def factory():
         attempts.append(1)
@@ -120,6 +122,11 @@ def test_thread_reconnects_configures_sam_and_closes_bus_without_logging_uid(cap
         assert reader.status()["connected"]
         assert reader.status()["firmware"] == (0x32, 1, 6, 7)
         assert reader.latest_event()["uid"] == UID
+        assert reader.latest_event()["card"] == {
+            "atqa": "0004",
+            "sak": 0x28,
+            "ats": "0C788071",
+        }
     finally:
         reader.stop()
     assert not reader.status()["connected"]
@@ -135,3 +142,9 @@ def test_real_reader_disallows_mock_injection_and_factory_has_no_side_effect():
     with pytest.raises(RuntimeError, match="disabled"):
         reader.simulate_scan(UID)
     assert not reader.status()["connected"]
+
+
+def test_parse_target_handles_empty_and_truncated_answers():
+    assert parse_target(None) == (None, None)
+    assert parse_target(bytes([0])) == (None, None)
+    assert parse_target(bytes.fromhex("0101000428040102")) == (None, None)

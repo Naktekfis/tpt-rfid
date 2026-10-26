@@ -65,6 +65,13 @@ class Config:
     RFID_ALARM_ENABLED = os.getenv("RFID_ALARM_ENABLED", "true").lower() == "true"
 
     NFC_READER_ENABLED = os.getenv("NFC_READER_ENABLED", "false").lower() == "true"
+    # Only KTM chips may register or open a session; see utils/nfc_policy.py.
+    # The exempt card and its one NIM are HMAC digests keyed by the pepper
+    # (scripts/set_special_card.py writes all three into .env).
+    NFC_CARD_POLICY = os.getenv("NFC_CARD_POLICY", "true").lower() == "true"
+    NFC_POLICY_PEPPER = os.getenv("NFC_POLICY_PEPPER", "")
+    NFC_SPECIAL_UID_HMAC = os.getenv("NFC_SPECIAL_UID_HMAC", "")
+    NFC_SPECIAL_NIM_HMAC = os.getenv("NFC_SPECIAL_NIM_HMAC", "")
 
     # Camera remains available for tool photography.
     CAMERA_ENABLED = os.getenv("CAMERA_ENABLED", "false").lower() == "true"

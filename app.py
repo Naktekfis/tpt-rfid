@@ -41,6 +41,7 @@ from utils import (
 )
 from utils.camera import create_camera
 from utils.kiosk import Kiosk
+from utils.nfc_policy import CardPolicy
 from utils.nfc_reader import create_nfc_reader
 from utils.nfc_service import NFCService, NFCCaptureError
 from routes.nfc_routes import create_nfc_blueprint, capture_owner
@@ -147,7 +148,13 @@ _reloader_parent = (
     and os.environ.get("WERKZEUG_RUN_MAIN") != "true"
 )
 nfc_reader = create_nfc_reader(enabled=app.config.get("NFC_READER_ENABLED", False))
-nfc_service = NFCService(app, nfc_reader, kiosk)
+card_policy = CardPolicy(
+    pepper=app.config.get("NFC_POLICY_PEPPER", ""),
+    special_uid_hmac=app.config.get("NFC_SPECIAL_UID_HMAC", ""),
+    special_nim_hmac=app.config.get("NFC_SPECIAL_NIM_HMAC", ""),
+    enforce=app.config.get("NFC_CARD_POLICY", True),
+)
+nfc_service = NFCService(app, nfc_reader, kiosk, policy=card_policy)
 
 
 def send_reminder_mail(recipient: str, subject: str, body: str) -> None:
@@ -476,6 +483,9 @@ def api_register():
 
         # Create student
         def create_with_card(uid):
+            error = card_policy.check_student(uid, nim)
+            if error:
+                raise NFCCaptureError(error)
             if database.get_student_by_nfc(uid):
                 raise NFCCaptureError("KTM sudah terdaftar")
             return database.create_student(dict(student_data, nfc_uid=uid))
