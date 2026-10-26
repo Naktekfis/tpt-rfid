@@ -4,6 +4,7 @@ import app as app_module
 from utils.nfc_policy import MSG_BROKEN, MSG_NOT_KTM, CardPolicy
 
 KTM = {"atqa": "0004", "sak": 0x28, "ats": "0D78007003990200D103042201"}
+KTM_B = {"atqa": "0004", "sak": 0x28, "ats": "0D7800A10257694C4C20230307"}
 EMONEY = {"atqa": "0004", "sak": 0x28, "ats": "0C788071024D49464152452B"}
 SPECIAL_UID = "04A1B2C3"
 SPECIAL_NIM = "13323018"
@@ -24,6 +25,7 @@ def make_policy():
 def test_ats_not_just_sak_identifies_a_ktm():
     policy = make_policy()
     assert policy.check_tap({"uid": "01020304", "card": KTM}) is None
+    assert policy.check_tap({"uid": "01020304", "card": KTM_B}) is None
     assert policy.check_tap({"uid": "01020304", "card": EMONEY}) == MSG_NOT_KTM
     assert (
         policy.check_tap({"uid": "01020304", "card": dict(KTM, ats="")}) == MSG_NOT_KTM
@@ -81,3 +83,11 @@ def test_kiosk_refuses_non_ktm_tap(monkeypatch):
     monkeypatch.setattr(app_module.nfc_service, "policy", make_policy())
     app_module.nfc_reader.simulate_scan("01020304", EMONEY)
     assert app_module.kiosk.state_dict()["state"] == "unknown_card"
+
+
+def test_refusal_is_logged_without_the_uid(monkeypatch, caplog):
+    monkeypatch.setattr(app_module.nfc_service, "policy", make_policy())
+    with caplog.at_level("INFO"):
+        app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)
+    assert "ATS=0C788071024D49464152452B" in caplog.text
+    assert "0A0B0C0D" not in caplog.text

@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 import threading
 import time
 
 from .nfc_policy import CardPolicy
+
+logger = logging.getLogger(__name__)
 
 
 class NFCCaptureError(ValueError):
@@ -77,6 +80,7 @@ class NFCService:
                 if self.capture["uid"] is None:
                     error = self.policy.check_tap(event)
                     self.capture["error"] = error
+                    self._log_refusal(event, error)
                     if error is None:
                         self.capture["uid"] = event["uid"]
                 return
@@ -86,8 +90,21 @@ class NFCService:
                 else:
                     self.kiosk.on_card(event["uid"])
 
+    def _log_refusal(self, event, error):
+        card = event.get("card")
+        if error and card:  # chip type only, never the UID
+            logger.info(
+                "NFC tap refused: %s (ATQA=%s SAK=0x%02X ATS=%s)",
+                error,
+                card.get("atqa"),
+                card.get("sak") or 0,
+                card.get("ats"),
+            )
+
     def _refused(self, event):
-        if self.policy.check_tap(event):
+        error = self.policy.check_tap(event)
+        if error:
+            self._log_refusal(event, error)
             return True
         if self.policy.is_special(event["uid"]):
             student = self.kiosk.database.get_student_by_nfc(event["uid"])

@@ -13,8 +13,12 @@ import hashlib
 import hmac
 from typing import Optional, Tuple
 
-# (ATQA hex, SAK, ATS hex) measured on three KTMs, 2026-10-26.
-KTM_PROFILES = (("0004", 0x28, "0D78007003990200D103042201"),)
+# (ATQA hex, SAK, ATS hex) measured on KTMs, 2026-10-26. Batches differ in the
+# ATS, so a KTM refused at the kiosk usually just needs its profile added here.
+KTM_PROFILES = (
+    ("0004", 0x28, "0D78007003990200D103042201"),
+    ("0004", 0x28, "0D7800A10257694C4C20230307"),
+)
 
 MSG_NOT_KTM = "Kartunya bukan KTM, silakan daftar menggunakan KTM"
 MSG_BROKEN = "Kartu rusak"
