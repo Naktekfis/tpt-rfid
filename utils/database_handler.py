@@ -24,6 +24,7 @@ from .models import (
     AlarmEvent,
     DeletedStudent,
     FaceEmbedding,
+    NFCCardException,
 )
 from .helpers import utc_to_wib
 
@@ -186,6 +187,41 @@ class DatabaseHandler:
         except IntegrityError:
             db.session.rollback()
             raise ValueError("KTM sudah terdaftar") from None
+
+    def get_card_exception(self, uid_hmac):
+        row = NFCCardException.query.filter_by(uid_hmac=uid_hmac).first()
+        return {"kind": row.kind, "nim_hmac": row.nim_hmac} if row else None
+
+    def add_card_exception(self, uid_hmac, kind, nim_hmac=""):
+        from sqlalchemy.exc import IntegrityError
+
+        db.session.add(
+            NFCCardException(uid_hmac=uid_hmac, kind=kind, nim_hmac=nim_hmac)
+        )
+        try:
+            db.session.commit()
+        except IntegrityError:
+            db.session.rollback()
+            raise ValueError("Kartu ini sudah ada di daftar pengecualian") from None
+
+    def list_card_exceptions(self):
+        rows = NFCCardException.query.order_by(NFCCardException.id.desc()).all()
+        return [
+            {
+                "id": r.id,
+                "kind": r.kind,
+                "created_at": utc_to_wib(r.created_at).isoformat(),
+            }
+            for r in rows
+        ]
+
+    def delete_card_exception(self, exception_id):
+        row = db.session.get(NFCCardException, int(exception_id))
+        if row is None:
+            return False
+        db.session.delete(row)
+        db.session.commit()
+        return True
 
     def get_student_by_uid(self, rfid_uid: str) -> Optional[Dict]:
         """

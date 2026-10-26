@@ -10,7 +10,10 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional
+
+from .helpers import utc_to_wib
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +233,7 @@ def _entry(txn: Dict[str, Any], late: bool = False) -> Dict[str, Any]:
         "tool_id": txn["tool_id"],
         "tool_name": txn["tool_name"],
         "due_at": due.isoformat() if due is not None else None,
+        "at": utc_to_wib(datetime.utcnow()).isoformat(),
     }
     if late:
         entry["late_identify"] = True

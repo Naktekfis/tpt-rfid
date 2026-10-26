@@ -36,3 +36,10 @@ ATQA+SAK do not separate them; the full ATS does. Only 3 KTMs (same batch) were 
 
 ## Parked
 - HW-VX6330K SDK read (protocol is the UHFReader18 family; `0x35` there is Set WorkMode, so the VX6336 beep-mode code must never be sent to it; it needs RS232/RS485/TCP, 6-8 m range). See the conversation; nothing implemented.
+
+## Update 2026-10-26 (later): v2026.10.26 and v2026.10.26.1 are deployed; revisions below are in the working tree, NOT committed or deployed
+- Second KTM batch profile (ATS `0D7800A10257694C4C20230307`) and the refusal log line (chip type only) shipped in v2026.10.26.1.
+- Admin page `/admin/cards` (`templates/admin_cards.html`, `static/js/admin_cards.js`, routes in `routes/nfc_routes.py`): table `nfc_card_exceptions` keeps HMAC digests only. kind `ktm` = real KTM the chip check rejects (any NIM may use it); kind `other` = non-KTM card tied to one NIM (else "Kartu rusak"). Needs `NFC_POLICY_PEPPER` (already on the Jetson). `CardPolicy.lookup` reads the table.
+- Register page: no subtitle, step cues (check on finished steps, next step filled), live NIM-taken check (`/api/register/nim`).
+- Kiosk: "Anda pinjam" merged into "dipinjam"; session shows a log (newest first, WIB time per row); rack photos/tiles/marks about 20% larger.
+- Checks: ruff clean, 422 passed, 2 skipped. Not yet looked at on a real screen (1360x768 layout).

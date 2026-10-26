@@ -149,7 +149,7 @@
   min-width: 0;
 }
 .rack-item__name {
-  font-size: var(--fs-lg);
+  font-size: 1.35rem;
   font-weight: 700;
   line-height: 1.2;
 }
@@ -290,7 +290,7 @@
   overflow-wrap: anywhere;
 }
 .session-lists .txn__meta,
-.session-lists .txn__tag {
+.session-lists .txn__time {
   font-size: var(--fs-sm);
 }
 .txn-group {
@@ -337,13 +337,9 @@
 .txn__meta--muted {
   color: var(--c-text-muted);
 }
-.txn__tag {
+.txn__time {
   flex: none;
-  font-size: var(--fs-md);
-  font-weight: 600;
-  color: var(--c-brand);
-}
-.txn__tag--muted {
+  font-size: var(--fs-lg);
   color: var(--c-text-muted);
 }
 .session-hint {
@@ -363,7 +359,7 @@
 }
 .rack-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(8.4rem, 1fr));
   gap: var(--sp-4);
   flex: 1;
   min-height: 0;
@@ -394,7 +390,7 @@
   min-width: 0;
 }
 .rack-tile__name {
-  font-size: var(--fs-base);
+  font-size: 1.2rem;
   font-weight: 700;
   line-height: 1.2;
 }

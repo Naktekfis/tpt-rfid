@@ -155,6 +155,7 @@ card_policy = CardPolicy(
     enforce=app.config.get("NFC_CARD_POLICY", True),
 )
 nfc_service = NFCService(app, nfc_reader, kiosk, policy=card_policy)
+card_policy.lookup = database.get_card_exception
 
 
 def send_reminder_mail(recipient: str, subject: str, body: str) -> None:
@@ -363,6 +364,13 @@ def admin_menu():
     return render_template("admin_welcome.html")
 
 
+@app.route("/admin/cards")
+@admin_required
+def admin_cards():
+    """Cards let past the KTM chip check (false negatives, no-KTM students)"""
+    return render_template("admin_cards.html")
+
+
 @app.route("/admin/login")
 def admin_login():
     """Admin login page"""
@@ -437,6 +445,15 @@ def check_rfid():
     except Exception as e:
         logger.error(f"Error checking RFID: {str(e)}")
         return jsonify({"success": False, "error": "Failed to check RFID"}), 500
+
+
+@app.route("/api/register/nim")
+@limiter.limit("30 per minute")
+def api_register_nim():
+    """Whether a NIM is already registered (checked while the form is filled)."""
+    nim = sanitize_input(request.args.get("nim", ""))
+    taken = bool(validate_nim(nim) and database.get_student_by_nim(nim))
+    return jsonify(success=True, taken=taken)
 
 
 @app.route("/api/register", methods=["POST"])

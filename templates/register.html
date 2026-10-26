@@ -11,13 +11,13 @@
     <div class="page-head">
         <div>
             <h1>{% if enroll_student %}Daftarkan KTM{% else %}Daftar mahasiswa{% endif %}</h1>
-            <p>{% if enroll_student %}Hubungkan KTM ke {{ enroll_student.name }} ({{ enroll_student.nim }}).{% else %}Tiga langkah: isi data diri, ambil foto wajah, lalu tempelkan KTM.{% endif %}</p>
+            {% if enroll_student %}<p>{{ enroll_student.name }} ({{ enroll_student.nim }})</p>{% endif %}
         </div>
     </div>
     <form class="form reg-form" id="reg-form" autocomplete="off" novalidate>
         <div class="reg-grid{% if enroll_student %} reg-grid--card-only{% endif %}">
             <div class="reg-col" {% if enroll_student %}hidden{% endif %}>
-                <h2 class="reg-step__title"><span class="reg-step__no">1</span> Data diri</h2>
+                <h2 class="reg-step__title" id="step-data"><span class="reg-step__no">1</span> Data diri</h2>
                 <div class="field">
                     <label class="field__label" for="name">Nama lengkap</label>
                     <input class="input" id="name" name="name" type="text" maxlength="200" required {% if not enroll_student %}autofocus{% endif %}>
@@ -28,6 +28,7 @@
                         <input class="input" id="nim" name="nim" type="text" inputmode="numeric" maxlength="8" pattern="[0-9]{8}" required
                             aria-describedby="nim-hint">
                         <span class="field__hint" id="nim-hint">8 digit angka</span>
+                        <span class="field__error" id="nim-taken" role="alert" hidden>NIM ini sudah terdaftar.</span>
                     </div>
                     <div class="field">
                         <label class="field__label" for="phone">No. HP</label>
@@ -44,7 +45,7 @@
             <div class="reg-col">
                 {% if not enroll_student %}
                 <div class="reg-photo" id="photo-field" hidden>
-                    <h2 class="reg-step__title"><span class="reg-step__no">2</span> Foto wajah</h2>
+                    <h2 class="reg-step__title" id="step-photo"><span class="reg-step__no">2</span> Foto wajah</h2>
                     <div class="reg-photo__row">
                         <div class="reg-photo__frame">
                             <div class="camera-panel camera-panel--mirror reg-photo__live" id="photo-live" hidden>
@@ -65,12 +66,11 @@
                 </div>
                 {% endif %}
                 <div class="reg-card">
-                    <h2 class="reg-step__title"><span class="reg-step__no">{% if enroll_student %}1{% else %}<span class="reg-step__photo-no">3</span>{% endif %}</span> KTM (Kartu Tanda Mahasiswa)</h2>
+                    <h2 class="reg-step__title" id="step-card"><span class="reg-step__no">{% if enroll_student %}1{% else %}<span class="reg-step__photo-no">3</span>{% endif %}</span> KTM (Kartu Tanda Mahasiswa)</h2>
                     <p id="nfc-status" role="status" aria-live="polite">Tekan Baca KTM, lalu tempelkan KTM ke pembaca.</p>
                     <div class="form__actions">
                         <button type="button" class="btn btn--secondary" id="nfc-start">Baca KTM</button>
                     </div>
-                    <span class="field__hint">Wajib memakai KTM Anda sendiri, sesuai arahan admin lab. Tidak ada data yang ditulis ke KTM.</span>
                 </div>
             </div>
         </div>

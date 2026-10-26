@@ -29,7 +29,7 @@ class NFCService:
         if self.capture and self.clock() >= self.capture["expires"]:
             self.capture = None
 
-    def start(self, owner):
+    def start(self, owner, any_card=False):
         with self.lock:
             self._expire()
             if self.kiosk.state_dict()["state"] == "session":
@@ -42,6 +42,7 @@ class NFCService:
                 token=token,
                 uid=None,
                 error=None,
+                any_card=any_card,  # admin card exceptions read every chip
                 expires=self.clock() + 120,
                 after=self.reader.status()["sequence"],
             )
@@ -72,23 +73,26 @@ class NFCService:
                 self.capture = None
 
     def on_card(self, event):
-        with self.lock:
+        with self.lock, self.app.app_context():
             self._expire()
             if self.capture:
                 if event["sequence"] <= self.capture["after"]:
                     return
                 if self.capture["uid"] is None:
-                    error = self.policy.check_tap(event)
+                    error = (
+                        None
+                        if self.capture["any_card"]
+                        else self.policy.check_tap(event)
+                    )
                     self.capture["error"] = error
                     self._log_refusal(event, error)
                     if error is None:
                         self.capture["uid"] = event["uid"]
                 return
-            with self.app.app_context():
-                if self._refused(event):
-                    self.kiosk.reject_card()
-                else:
-                    self.kiosk.on_card(event["uid"])
+            if self._refused(event):
+                self.kiosk.reject_card()
+            else:
+                self.kiosk.on_card(event["uid"])
 
     def _log_refusal(self, event, error):
         card = event.get("card")
@@ -106,7 +110,7 @@ class NFCService:
         if error:
             self._log_refusal(event, error)
             return True
-        if self.policy.is_special(event["uid"]):
+        if self.policy.is_exempt(event["uid"]):
             student = self.kiosk.database.get_student_by_nfc(event["uid"])
             return bool(
                 student and self.policy.check_student(event["uid"], student["nim"])

@@ -692,6 +692,15 @@ input[type="date"].input {
   font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
+/* A finished step shows a check in its number box; the next open one is
+   filled, so people see where to go. */
+.reg-step__title.is-done .reg-step__no,
+.reg-step__title.is-next .reg-step__no {
+  background: var(--c-ink);
+  color: var(--c-bg, #fff);
+}
+.reg-step__title.is-done .reg-step__no > * { display: none; }
+.reg-step__title.is-done .reg-step__no::before { content: "\2713"; }
 .reg-photo,
 .reg-card {
   display: flex;

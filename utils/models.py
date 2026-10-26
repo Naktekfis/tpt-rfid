@@ -85,6 +85,21 @@ class StudentNFCCard(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class NFCCardException(db.Model):
+    """A card admitted past the KTM chip check, kept only as HMAC digests.
+
+    kind "ktm": a real KTM whose chip data is not recognised; anyone may use it.
+    kind "other": a non-KTM card tied to one NIM (nim_hmac); any other NIM is refused.
+    """
+
+    __tablename__ = "nfc_card_exceptions"
+    id = db.Column(db.Integer, primary_key=True)
+    uid_hmac = db.Column(db.String(64), nullable=False, unique=True)
+    kind = db.Column(db.String(8), nullable=False)
+    nim_hmac = db.Column(db.String(64), nullable=False, default="")
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
 class DeletedStudent(db.Model):
     """Soft-delete marker: the student row stays so history keeps its name/NIM."""
 

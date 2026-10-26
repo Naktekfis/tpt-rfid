@@ -76,10 +76,10 @@ def test_daftar_is_the_register_page(client):
 def test_register_admin_mode_needs_session(client, admin_client, student):
     sid = student["student_id"]
     html = client.get(f"/daftar?student_id={sid}").get_data(as_text=True)
-    assert "Hubungkan KTM" not in html
+    assert "Daftarkan KTM" not in html
     admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
     html = admin_client.get(f"/daftar?student_id={sid}").get_data(as_text=True)
-    assert "Hubungkan KTM" in html
+    assert "Daftarkan KTM" in html
     assert student["nim"] in html
 
 

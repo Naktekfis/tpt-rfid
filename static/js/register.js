@@ -18,9 +18,32 @@
     let photoToken = null;
     let photoReady = false;
     let photoGen = 0;
+    let nimTaken = false;
+    let nimCheck = 0;
+
+    // Step cues: a check on finished steps, the next open one filled in.
+    function dataDone() {
+        if (CFG.student) return true;
+        return FIELDS.every(function (f) { return $(f).value.trim() && $(f).checkValidity(); }) &&
+            /^[0-9]{8}$/.test($('nim').value.trim()) && !nimTaken;
+    }
+    function updateSteps() {
+        const steps = [['step-data', dataDone()]];
+        if (photoRequired) steps.push(['step-photo', photoReady]);
+        steps.push(['step-card', ready]);
+        let next = true;
+        steps.forEach(function (st) {
+            const el = $(st[0]);
+            if (!el) return;
+            el.classList.toggle('is-done', st[1]);
+            el.classList.toggle('is-next', !st[1] && next);
+            if (!st[1]) next = false;
+        });
+    }
 
     function updateSubmit() {
-        $('form-submit').disabled = !ready || saving || (photoRequired && !photoReady);
+        updateSteps();
+        $('form-submit').disabled = !ready || saving || nimTaken || (photoRequired && !photoReady);
     }
 
     function photoStatus(text, hint) {
@@ -196,6 +219,10 @@
             fail('nim', 'NIM harus 8 digit angka.');
             return false;
         }
+        if (nimTaken) {
+            fail('nim', 'NIM ini sudah terdaftar.');
+            return false;
+        }
         if (!/^[0-9+\-\s]{8,20}$/.test($('phone').value.trim())) {
             fail('phone', 'Nomor HP berisi 8 sampai 20 angka.');
             return false;
@@ -260,9 +287,37 @@
     if ($('photo-start')) $('photo-start').addEventListener('click', startPhoto);
     initPhoto();
     $('reg-form').addEventListener('submit', submit);
+    async function checkNim() {
+        const nim = $('nim').value.trim();
+        const current = ++nimCheck;
+        if (!/^[0-9]{8}$/.test(nim)) {
+            nimTaken = false;
+            $('nim-taken').hidden = true;
+            return;
+        }
+        try {
+            const res = await UI.fetchJSON('/api/register/nim?nim=' + encodeURIComponent(nim));
+            if (current !== nimCheck) return;
+            nimTaken = !!(res.success && res.taken);
+        } catch (e) {
+            nimTaken = false;  // the server checks again on save
+        }
+        $('nim-taken').hidden = !nimTaken;
+        if (nimTaken) $('nim').setAttribute('aria-invalid', 'true');
+        updateSubmit();
+    }
     FIELDS.forEach(function (f) {
-        $(f).addEventListener('input', function () { $(f).removeAttribute('aria-invalid'); });
+        $(f).addEventListener('input', function () {
+            $(f).removeAttribute('aria-invalid');
+            if (f === 'nim') {
+                nimTaken = false;
+                $('nim-taken').hidden = true;
+                checkNim();
+            }
+            updateSteps();
+        });
     });
+    updateSteps();
     window.addEventListener('pagehide', function () {
         photoGen += 1;
         generation += 1;

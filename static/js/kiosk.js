@@ -22,7 +22,6 @@
     // Unit mark kinds, in legend order.
     const MARKS = [
         ['present', 'di rak'],
-        ['mine', 'Anda pinjam'],
         ['borrowed', 'dipinjam'],
         ['overdue', 'terlambat'],
         ['missing', 'hilang'],
@@ -121,10 +120,10 @@
         return tile;
     }
 
-    function markOf(u, mine) {
+    function markOf(u) {
         if (u.status === 'borrowed') {
             if (u.is_overdue) return 'overdue';
-            return mine[String(u.tool_id)] ? 'mine' : 'borrowed';
+            return 'borrowed';
         }
         if (u.status === 'available') {
             if (u.presence === 'present') return 'present';
@@ -136,18 +135,18 @@
     function markTitle(u, kind) {
         const label = MARKS.filter(function (m) { return m[0] === kind; })[0][1];
         let text = u.name + ': ' + label;
-        if (u.borrower_name && kind !== 'mine') text += ' (' + u.borrower_name + ')';
+        if (u.borrower_name) text += ' (' + u.borrower_name + ')';
         if (u.due_at) text += ', batas ' + UI.formatWibDate(u.due_at, true);
         return text;
     }
 
-    function summarize(board, mine) {
+    function summarize(board) {
         const used = {};
         let present = 0;
         let total = 0;
         const groups = board.map(function (g) {
             const marks = g.units.map(function (u) {
-                const kind = markOf(u, mine);
+                const kind = markOf(u);
                 used[kind] = true;
                 return { kind: kind, title: markTitle(u, kind) };
             });
@@ -215,8 +214,8 @@
 
     // ---------- Board (idle list + session grid) ----------
 
-    function renderBoard(board, mine) {
-        const key = JSON.stringify([board, mine]);
+    function renderBoard(board) {
+        const key = JSON.stringify(board);
         if (key === lastBoardKey) return;
         lastBoardKey = key;
 
@@ -227,7 +226,7 @@
             });
         });
 
-        const sum = summarize(board, mine);
+        const sum = summarize(board);
         const countText = sum.present + ' dari ' + sum.total + ' unit';
         $('rack-count').textContent = countText;
         $('grid-count').textContent = countText;
@@ -271,35 +270,19 @@
         $('unverified').hidden = rows.length === 0;
     }
 
-    // ---------- Transactions of this session ----------
+    // ---------- Log of this session ----------
 
-    function txnRow(it, returned) {
+    function logRow(it, returned) {
         const info = toolInfo[String(it.tool_id)] || {};
-        let meta;
-        if (returned) {
-            meta = h('div', { class: 'txn__meta txn__meta--muted', text: 'Sudah kembali di rak' });
-        } else if (it.due_at) {
-            meta = h('div', { class: 'txn__meta' }, 'Kembalikan paling lambat ',
-                h('strong', { text: UI.formatWibDay(it.due_at) }));
-        }
+        let meta = returned ? 'Dikembalikan' : 'Diambil';
+        if (!returned && it.due_at) meta += ' · kembalikan paling lambat ' + UI.formatWibDay(it.due_at);
+        if (it.late_identify) meta += ' · dicatat setelah alarm';
         return h('li', { class: 'txn' },
             toolPhoto(info.photo, info.typeName || it.tool_name, 'lg'),
             h('div', { class: 'txn__text' },
                 h('div', { class: 'txn__name', text: it.tool_name }),
-                meta || null,
-                it.late_identify ? h('div', { class: 'txn__meta txn__meta--muted', text: 'Dicatat setelah alarm' }) : null),
-            h('span', {
-                class: 'txn__tag' + (returned ? ' txn__tag--muted' : ''),
-                text: returned ? 'dikembalikan' : 'baru saja',
-            }));
-    }
-
-    function txnGroup(title, items, returned, small) {
-        const ul = h('ul', { class: 'txn-list' });
-        items.forEach(function (it) { ul.appendChild(txnRow(it, returned)); });
-        return h('section', { class: 'txn-group' },
-            h(small ? 'h2' : 'h1', { class: 'txn-group__title' + (small ? ' txn-group__title--sm' : ''), text: title }),
-            ul);
+                h('div', { class: 'txn__meta' + (returned ? ' txn__meta--muted' : ''), text: meta })),
+            h('span', { class: 'txn__time num', text: it.at ? UI.formatWibTime(it.at) : '' }));
     }
 
     function renderLists(s, summary) {
@@ -310,28 +293,19 @@
         if (key === lastListsKey) return;
         lastListsKey = key;
 
+        const rows = borrowed.map(function (it) { return { it: it, returned: false }; })
+            .concat(returned.map(function (it) { return { it: it, returned: true }; }))
+            .sort(function (a, b) { return String(b.it.at || '').localeCompare(String(a.it.at || '')); });
         const box = $('ses-lists');
         box.textContent = '';
-        if (summary) {
-            box.appendChild(h('h1', { class: 'txn-group__title', text: 'Selesai. Terima kasih, ' + name }));
-            if (borrowed.length) box.appendChild(txnGroup('Anda pinjam', borrowed, false, true));
-            if (returned.length) box.appendChild(txnGroup('Anda kembalikan', returned, true, true));
-            if (!borrowed.length && !returned.length) {
-                box.appendChild(h('p', { class: 'session-hint', text: 'Tidak ada alat yang dipinjam atau dikembalikan.' }));
-            }
+        box.appendChild(h('h1', { class: 'txn-group__title', text: summary ? 'Selesai. Terima kasih, ' + name : 'Riwayat sesi' }));
+        if (!rows.length) {
+            box.appendChild(h('p', { class: 'session-hint', text: summary ? 'Tidak ada alat yang dipinjam atau dikembalikan.' : 'Belum ada alat yang diambil atau dikembalikan.' }));
             return;
         }
-        if (borrowed.length || !returned.length) {
-            const g = txnGroup('Anda pinjam', borrowed, false, false);
-            if (!borrowed.length) {
-                g.querySelector('ul').appendChild(h('li', { class: 'txn session-hint', text: 'Belum ada alat yang diambil.' }));
-            }
-            box.appendChild(g);
-        }
-        if (returned.length) box.appendChild(txnGroup('Anda kembalikan', returned, true, !!borrowed.length));
-        else if (borrowed.length) {
-            box.appendChild(h('p', { class: 'session-hint', text: 'Alat yang Anda kembalikan di sesi ini akan muncul di sini juga.' }));
-        }
+        const ul = h('ul', { class: 'txn-list' });
+        rows.forEach(function (r) { ul.appendChild(logRow(r.it, r.returned)); });
+        box.appendChild(ul);
     }
 
     // ---------- Screens ----------
@@ -558,13 +532,6 @@
         };
     }
 
-    function mineOf(s) {
-        const mine = {};
-        if (s.state === 'session' || s.state === 'summary') {
-            (s.borrowed || []).forEach(function (b) { mine[String(b.tool_id)] = true; });
-        }
-        return mine;
-    }
 
     // One poll chain; an extra call (after a button) just polls early.
     async function poll() {
@@ -590,7 +557,7 @@
                     serverDown = false;
                     renderBanners();
                 }
-                renderBoard(s.board || [], mineOf(s));
+                renderBoard(s.board || []);
                 renderUnverified(s.unverified_returns || []);
                 render(s);
                 if (timing) {

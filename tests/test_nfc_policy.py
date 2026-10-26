@@ -91,3 +91,69 @@ def test_refusal_is_logged_without_the_uid(monkeypatch, caplog):
         app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)
     assert "ATS=0C788071024D49464152452B" in caplog.text
     assert "0A0B0C0D" not in caplog.text
+
+
+def admin_session(client):
+    with client.session_transaction() as sess:
+        sess["admin_logged_in"] = True
+        sess["admin_until"] = 9999999999
+
+
+def policy_with_db(database):
+    policy = make_policy()
+    policy.lookup = database.get_card_exception
+    return policy
+
+
+def add_card(client, kind, nim=""):
+    token = client.post("/api/admin/cards/start").get_json()["token"]
+    app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)
+    return client.post(
+        "/api/admin/cards", json={"nfc_token": token, "kind": kind, "nim": nim}
+    )
+
+
+def test_admin_ktm_exception_lets_a_rejected_ktm_register(
+    client, database, monkeypatch
+):
+    policy = policy_with_db(database)
+    monkeypatch.setattr(app_module.nfc_service, "policy", policy)
+    monkeypatch.setattr(app_module, "card_policy", policy)
+    admin_session(client)
+    assert policy.check_tap({"uid": "0A0B0C0D", "card": EMONEY}) == MSG_NOT_KTM
+    assert add_card(client, "ktm").status_code == 200
+    assert policy.check_tap({"uid": "0A0B0C0D", "card": EMONEY}) is None
+    assert policy.check_student("0A0B0C0D", "87654321") is None  # any NIM
+    assert "0A0B0C0D" not in str(database.list_card_exceptions())
+
+
+def test_admin_other_card_works_for_one_nim_only(client, database, monkeypatch):
+    policy = policy_with_db(database)
+    monkeypatch.setattr(app_module.nfc_service, "policy", policy)
+    monkeypatch.setattr(app_module, "card_policy", policy)
+    admin_session(client)
+    assert add_card(client, "other").status_code == 400  # NIM required
+    assert add_card(client, "other", "87654321").status_code == 200
+    token = client.post("/api/nfc/registration/start").get_json()["token"]
+    app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)
+    wrong = client.post(
+        "/api/register", data=dict(FORM, nim="87654322", nfc_token=token)
+    )
+    assert wrong.status_code == 409 and wrong.get_json()["error"] == MSG_BROKEN
+    right = client.post("/api/register", data=dict(FORM, nfc_token=token))
+    assert right.status_code == 200
+
+
+def test_register_nim_check(client, student):
+    assert client.get("/api/register/nim?nim=12345678").get_json()["taken"] is True
+    assert client.get("/api/register/nim?nim=99999999").get_json()["taken"] is False
+
+
+def test_session_entries_carry_a_wib_time(client, student, tool, database):
+    app_module.kiosk.start_session(student)
+    from utils.kiosk import _entry
+
+    entry = _entry(
+        {"transaction_id": 1, "tool_id": 1, "tool_name": "x", "due_at": None}
+    )
+    assert len(entry["at"]) >= 16 and "Z" not in entry["at"]
