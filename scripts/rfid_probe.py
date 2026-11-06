@@ -180,6 +180,12 @@ def main() -> int:
     parser.add_argument(
         "--beep-mode", choices=("read", "off", "on"), help="beep on tag read (0x35)"
     )
+    parser.add_argument(
+        "--power",
+        type=int,
+        help="set RF power 0..%d (0x2F, stored in the reader), print info and exit"
+        % vx6336.MAX_POWER,
+    )
     parser.add_argument("--single", action="store_true", help="poll with 0x0F")
     parser.add_argument("--duration", type=float, help="stop after S seconds")
     parser.add_argument("--stats", action="store_true", help="print read statistics")
@@ -222,6 +228,19 @@ def main() -> int:
             status = f"0x{responses[0].status:02X}" if responses else "no answer"
             print(f"\nBuzzer {active},{silent},{times}: {status}")
             return 0 if responses else 1
+
+        if args.power is not None:
+            responses, _ = transact(
+                ser,
+                vx6336.set_power_command(args.power, addr),
+                vx6336.CMD_SET_POWER,
+                args.raw,
+            )
+            status = f"0x{responses[0].status:02X}" if responses else "no answer"
+            print(f"\nSet power {args.power}: {status}\n")
+            if not responses or responses[0].status != vx6336.STATUS_SUCCESS:
+                return 1
+            return 0 if probe_info(ser, addr, args.raw) else 1
 
         if args.beep_mode:
             return beep_mode(ser, addr, args.beep_mode, args.raw)

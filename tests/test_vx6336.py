@@ -131,3 +131,13 @@ def test_splitter_skips_corrupt_frame():
     good = response_frame(0x01, 0x01, inventory_data(EPC_B))
     out = vx6336.FrameSplitter().feed(bytes(bad) + good)
     assert [vx6336.inventory_epcs(r) for r in out] == [[EPC_B]]
+
+
+def test_set_power_frame_and_range():
+    frame = vx6336.set_power_command(20)
+    assert frame[:4] == bytes((0x05, 0x00, vx6336.CMD_SET_POWER, 20))
+    assert vx6336.crc16(frame[:4]) == frame[4] | (frame[5] << 8)
+    with pytest.raises(ValueError):
+        vx6336.set_power_command(21)
+    with pytest.raises(ValueError):
+        vx6336.set_power_command(-1)

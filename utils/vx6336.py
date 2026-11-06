@@ -20,6 +20,7 @@ CMD_INVENTORY = 0x01
 CMD_INVENTORY_SINGLE = 0x0F
 CMD_GET_READER_INFO = 0x21
 CMD_SET_SCAN_TIME = 0x25
+CMD_SET_POWER = 0x2F
 CMD_ACOUSTO_OPTIC = 0x33
 CMD_BEEP_MODE = 0x35  # undocumented in manual v1.2, see RFID_VX6336.md
 
@@ -127,6 +128,26 @@ def set_scan_time_command(scan_time: int, addr: int = DEFAULT_ADDR) -> bytes:
     if not 3 <= scan_time <= 255:
         raise ValueError("scan_time must be 3..255 (x100 ms)")
     return build_command(CMD_SET_SCAN_TIME, bytes((scan_time,)), addr=addr)
+
+
+# Datasheet: 0-13 dBm; the vendor C# demo offers 0-13 and "Recovery" writes
+# 13. Manual v1.2 says 20-30 (family text). Reader 2 shipped reporting 20 and
+# works, so 20 is the highest value allowed here; 21-30 is untested.
+MAX_POWER = 20
+
+
+def set_power_command(power: int, addr: int = DEFAULT_ADDR) -> bytes:
+    """Set the RF output power (0x2F). Stored persistently in the reader.
+
+    0x2F stays out of SAFE_COMMANDS so build_command still refuses it; this
+    is the only, range-checked way to build it (user-approved 2026-11-07).
+    The app never sends it; only scripts/rfid_probe.py --power does.
+    """
+    if not 0 <= power <= MAX_POWER:
+        raise ValueError("power must be 0..{}".format(MAX_POWER))
+    if not 0 <= addr <= 0xFF:
+        raise ValueError(f"Invalid reader address: {addr}")
+    return _with_crc(bytes((0x05, addr, CMD_SET_POWER, power)))
 
 
 def buzzer_command(
