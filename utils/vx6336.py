@@ -131,9 +131,10 @@ def set_scan_time_command(scan_time: int, addr: int = DEFAULT_ADDR) -> bytes:
 
 
 # Datasheet: 0-13 dBm; the vendor C# demo offers 0-13 and "Recovery" writes
-# 13. Manual v1.2 says 20-30 (family text). Reader 2 shipped reporting 20 and
-# works, so 20 is the highest value allowed here; 21-30 is untested.
-MAX_POWER = 20
+# 13. Manual v1.2 says 20-30 with default 30 (family text). Reader 2 shipped
+# reporting 20. Writing 30 (2026-11-07) answers 0x00 but reads back 23, so
+# firmware 2.32 clamps at 23. Best reads came at 13; both readers are on 13.
+MAX_POWER = 30
 
 
 def set_power_command(power: int, addr: int = DEFAULT_ADDR) -> bytes:

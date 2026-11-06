@@ -138,6 +138,6 @@ def test_set_power_frame_and_range():
     assert frame[:4] == bytes((0x05, 0x00, vx6336.CMD_SET_POWER, 20))
     assert vx6336.crc16(frame[:4]) == frame[4] | (frame[5] << 8)
     with pytest.raises(ValueError):
-        vx6336.set_power_command(21)
+        vx6336.set_power_command(31)
     with pytest.raises(ValueError):
         vx6336.set_power_command(-1)
