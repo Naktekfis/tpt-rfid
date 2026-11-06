@@ -68,10 +68,10 @@ run "$APP_DIR/.venv/bin/pip" install -r "$APP_DIR/requirements-nfc.txt"
 step ".env"
 if [ -f "$APP_DIR/.env" ]; then
     echo ".env exists; not touching it. Make sure it has FLASK_ENV=production,"
-    echo "RFID_READER_ENABLED=true, RFID_READER_PORT=/dev/rfid-reader,"
+    echo "RFID_READER_ENABLED=true, RFID_READER_PORTS=/dev/rfid-reader-1,/dev/rfid-reader-2,"
     echo "NFC_READER_ENABLED=true, CAMERA_ENABLED=true and no postgresql DATABASE_URL."
 elif [ "$DRY_RUN" = 1 ]; then
-    echo "+ create .env (FLASK_ENV=production, new SECRET_KEY, reader on /dev/rfid-reader, camera on)"
+    echo "+ create .env (FLASK_ENV=production, new SECRET_KEY, readers on /dev/rfid-reader-1,2, camera on)"
 else
     secret="$("$APP_DIR/.venv/bin/python" -c 'import secrets; print(secrets.token_hex(32))')"
     umask 077
@@ -80,6 +80,7 @@ FLASK_ENV=production
 SECRET_KEY=$secret
 RFID_READER_ENABLED=true
 RFID_READER_PORT=/dev/rfid-reader
+RFID_READER_PORTS=/dev/rfid-reader-1,/dev/rfid-reader-2
 NFC_READER_ENABLED=true
 CAMERA_ENABLED=true
 CAMERA_INDEX=0
@@ -95,7 +96,7 @@ else
     echo "Using the default admin PIN 133133 (change it with scripts/set_admin_pin.py)."
 fi
 
-step "Reader and camera access (dialout/video groups, udev rule -> /dev/rfid-reader)"
+step "Reader and camera access (dialout/video groups, udev rule -> /dev/rfid-reader-1, -2)"
 # brltty claims the reader's CH340 bridge (1a86:7523) and the tty disappears.
 if dpkg-query -W -f='${Status}' brltty 2>/dev/null | grep -q 'ok installed'; then
     run sudo apt-get remove -y brltty

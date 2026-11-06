@@ -74,7 +74,7 @@
         if (!devices) return;
         const r = devices.reader || {};
         const n = devices.nfc || {};
-        if (r.mode === 'vx6336' && !r.connected) {
+        if (r.mode && r.mode !== 'mock' && r.connected === false) {
             box.appendChild(h('div', { class: 'bar bar--warn', role: 'status' },
                 'Pembaca RFID tidak terhubung. Peminjaman dan pengembalian belum tercatat sampai pembaca tersambung kembali.'));
         }

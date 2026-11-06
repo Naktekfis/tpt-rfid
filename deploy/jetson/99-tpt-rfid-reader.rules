@@ -1,6 +1,9 @@
-# HW-VX6336 USB UHF reader -> stable name /dev/rfid-reader
-# The vendor bundle ships both CP210x and CH340 drivers, so match either
-# bridge. Check the real one with `lsusb` and delete the other line.
-# Note: any other CP210x/CH340 device on this board would match too.
-SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", SYMLINK+="rfid-reader", GROUP="dialout", MODE="0660"
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="rfid-reader", GROUP="dialout", MODE="0660"
+# HW-VX6336 USB UHF readers (CH340 bridge 1a86:7523) -> stable names.
+# CH340 has no serial number, so the two readers can only be told apart by
+# the physical USB port. Do not swap the cables; after moving a reader or the
+# hub, find the new path with `udevadm info -q path -n /dev/ttyUSB0`.
+# Reader 1 (the original, Jetson USB port 1-2.4) keeps /dev/rfid-reader too,
+# so an .env with only RFID_READER_PORT=/dev/rfid-reader still works.
+SUBSYSTEM=="tty", KERNELS=="1-2.4", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="rfid-reader-1 rfid-reader", GROUP="dialout", MODE="0660"
+# Reader 2 (added 2026-11-06, Jetson USB port 1-2.3).
+SUBSYSTEM=="tty", KERNELS=="1-2.3", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", SYMLINK+="rfid-reader-2", GROUP="dialout", MODE="0660"

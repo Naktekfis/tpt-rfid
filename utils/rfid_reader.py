@@ -559,16 +559,103 @@ class VX6336Reader(_ScanState):
         return False
 
 
+class MultiReader(_ScanState):
+    """
+    Several readers covering one rack, seen by the app as one reader.
+
+    Every child's inventory round is forwarded as is. PresenceMonitor judges
+    absence by time since the last sighting, so a tag that only one reader
+    sees stays present as long as that reader keeps reading it. Beeps and the
+    scan state ("current UID") go to the primary reader only, so a beep is
+    heard once; the current UID is the newest scan of any reader. A
+    disconnected child is not handled yet: the tags it covers will go missing.
+    """
+
+    mode = "multi"
+
+    def __init__(self, readers: List[_ScanState], primary: int = 0):
+        if not readers:
+            raise ValueError("MultiReader needs at least one reader")
+        if not 0 <= primary < len(readers):
+            raise ValueError("primary reader index out of range: {}".format(primary))
+        super().__init__()
+        self.readers = list(readers)
+        self.primary = self.readers[primary]
+        for reader in self.readers:
+            reader.add_round_listener(self._emit_round)
+
+    def start(self) -> None:
+        for reader in self.readers:
+            reader.start()
+
+    def stop(self) -> None:
+        for reader in self.readers:
+            reader.stop()
+
+    def beep(self, active: int = 2, silent: int = 2, times: int = 3) -> None:
+        self.primary.beep(active, silent, times)
+
+    def report(self, uid: str) -> None:
+        self.primary.report(uid)
+
+    def get_current_uid(self) -> Optional[str]:
+        """The newest unexpired scan of any reader."""
+        newest = None
+        for reader in self.readers:
+            uid = reader.get_current_uid()
+            at = reader._scan_time  # may be cleared meanwhile by another thread
+            if (
+                uid is not None
+                and at is not None
+                and (newest is None or at > newest[0])
+            ):
+                newest = (at, uid)
+        return newest[1] if newest else None
+
+    def clear(self) -> None:
+        for reader in self.readers:
+            reader.clear()
+
+    def status(self) -> dict:
+        children = [reader.status() for reader in self.readers]
+        return {
+            "mode": self.mode,
+            "connected": all(c.get("connected", True) for c in children),
+            "readers": children,
+        }
+
+    def diagnostics(self) -> dict:
+        children = []
+        for reader in self.readers:
+            diagnostics = getattr(reader, "diagnostics", None)
+            children.append(diagnostics() if diagnostics else reader.status())
+        return {**self.status(), "readers": children}
+
+
 def create_rfid_reader(
-    enabled: bool = False, model: str = "vx6336", **kwargs
+    enabled: bool = False,
+    model: str = "vx6336",
+    ports: Optional[List[str]] = None,
+    primary: int = 0,
+    **kwargs,
 ) -> _ScanState:
-    """Select a model explicitly; disabled hardware always uses the app mock."""
+    """
+    Select a model explicitly; disabled hardware always uses the app mock.
+    Two or more `ports` give a MultiReader of the same model.
+    """
     if model not in ("vx6336", "vx6436"):
         raise ValueError("Unknown RFID reader model: {!r}".format(model))
     if not enabled:
         return RFIDReaderMock(scan_duration=kwargs.get("scan_duration", 30.0))
     if model == "vx6436":
-        from .vx6436_reader import VX6436Reader
-
-        return VX6436Reader(**kwargs)
-    return VX6336Reader(**kwargs)
+        from .vx6436_reader import VX6436Reader as reader_class
+    else:
+        reader_class = VX6336Reader
+    if ports and len(ports) > 1:
+        kwargs.pop("port", None)
+        return MultiReader(
+            [reader_class(port=port, **kwargs) for port in ports], primary=primary
+        )
+    if ports:
+        kwargs["port"] = ports[0]
+    return reader_class(**kwargs)

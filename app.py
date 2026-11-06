@@ -100,6 +100,8 @@ rfid_reader = create_rfid_reader(
     enabled=app.config.get("RFID_READER_ENABLED", False),
     model=app.config.get("RFID_READER_MODEL", "vx6336"),
     port=app.config.get("RFID_READER_PORT", "/dev/ttyUSB0"),
+    ports=app.config.get("RFID_READER_PORTS") or None,
+    primary=app.config.get("RFID_BEEP_READER", 0),
     addr=app.config.get("RFID_READER_ADDR", 0),
     absent_timeout=app.config.get("RFID_ABSENT_TIMEOUT", 2.5),
 )

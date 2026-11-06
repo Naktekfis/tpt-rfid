@@ -166,7 +166,7 @@
             const r = (res && res.reader) || {};
             const box = $('banners');
             box.textContent = '';
-            if (r.mode === 'serial' && !r.connected) {
+            if (r.mode && r.mode !== 'mock' && r.connected === false) {
                 box.appendChild(h('div', { class: 'bar bar--warn', role: 'status' },
                     'Pembaca RFID tidak terhubung. Tag baru tidak akan muncul; ketik EPC secara manual.'));
             }

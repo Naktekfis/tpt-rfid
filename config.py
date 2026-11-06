@@ -54,6 +54,12 @@ class Config:
     RFID_READER_MODEL = os.getenv("RFID_READER_MODEL", "vx6336")
     RFID_READER_PORT = os.getenv("RFID_READER_PORT", "/dev/ttyUSB0")
     RFID_READER_ADDR = int(os.getenv("RFID_READER_ADDR", "0"), 0)
+    # Several readers of the same model on one rack, comma separated. Empty =
+    # only RFID_READER_PORT. Beeps go to the reader at RFID_BEEP_READER (index).
+    RFID_READER_PORTS = [
+        p.strip() for p in os.getenv("RFID_READER_PORTS", "").split(",") if p.strip()
+    ]
+    RFID_BEEP_READER = int(os.getenv("RFID_BEEP_READER", "0"))
     # A tag must be away this long (s) before the same tag is reported again.
     RFID_ABSENT_TIMEOUT = float(os.getenv("RFID_ABSENT_TIMEOUT", "2.5"))
     # A tool tag not seen for this long (s) counts as gone from the reader field.

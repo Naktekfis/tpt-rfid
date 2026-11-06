@@ -5,6 +5,7 @@ import pytest
 from tests.test_vx6336 import EPC_A, EPC_B, inventory_data, response_frame
 from utils import vx6336
 from utils.rfid_reader import (
+    MultiReader,
     RFIDReaderMock,
     ScanDebouncer,
     VX6336Reader,
@@ -408,3 +409,80 @@ def test_buzzer_diagnostics_count_dequeue_blocked_by_recovery(monkeypatch):
     assert diagnostics["dequeued_total"] == 1
     assert diagnostics["dequeued_without_write_total"] == 1
     assert diagnostics["write_calls_total"] == 0
+
+
+class _StubReader(RFIDReaderMock):
+    def __init__(self, connected=True):
+        super().__init__()
+        self.connected = connected
+        self.beeps = []
+        self.started = False
+
+    def start(self):
+        self.started = True
+
+    def beep(self, active=2, silent=2, times=3):
+        self.beeps.append((active, silent, times))
+
+    def status(self):
+        return {"mode": "stub", "connected": self.connected}
+
+
+def test_multi_reader_forwards_rounds_from_every_reader():
+    from utils.presence import PresenceMonitor
+
+    now = [0.0]
+    monitor = PresenceMonitor(missing_after=1.5, clock=lambda: now[0])
+    a, b = _StubReader(), _StubReader()
+    multi = MultiReader([a, b])
+    multi.add_round_listener(monitor.update)
+    for _ in range(10):  # EPC_B only ever on reader b, rounds interleaved
+        a._emit_round([EPC_A])
+        b._emit_round([EPC_B])
+        now[0] += 0.5
+    snap = monitor.snapshot()
+    assert snap[EPC_A]["state"] == "present"
+    assert snap[EPC_B]["state"] == "present"
+
+
+def test_multi_reader_beeps_primary_and_merges_status():
+    a, b = _StubReader(), _StubReader(connected=False)
+    multi = MultiReader([a, b], primary=1)
+    multi.start()
+    assert a.started and b.started
+    multi.beep(times=7)
+    assert b.beeps == [(2, 2, 7)] and a.beeps == []
+    status = multi.status()
+    assert status["mode"] == "multi" and status["connected"] is False
+    assert [r["connected"] for r in status["readers"]] == [True, False]
+    multi.report("ABC")
+    assert multi.get_current_uid() == "ABC"
+    multi.clear()
+    assert multi.get_current_uid() is None
+    with pytest.raises(ValueError):
+        MultiReader([a], primary=1)
+
+
+def test_create_rfid_reader_with_ports():
+    multi = create_rfid_reader(
+        enabled=True, ports=["/dev/null1", "/dev/null2"], primary=1, absent_timeout=1
+    )
+    assert isinstance(multi, MultiReader)
+    assert [r.port for r in multi.readers] == ["/dev/null1", "/dev/null2"]
+    assert multi.primary is multi.readers[1]
+    single = create_rfid_reader(enabled=True, port="/dev/x", ports=["/dev/only"])
+    assert isinstance(single, VX6336Reader) and single.port == "/dev/only"
+    assert isinstance(
+        create_rfid_reader(enabled=False, ports=["a", "b"]), RFIDReaderMock
+    )
+
+
+def test_multi_reader_current_uid_is_newest_scan_of_any_reader():
+    a, b = _StubReader(), _StubReader()
+    multi = MultiReader([a, b])
+    a.report("FROM_A")
+    time.sleep(0.01)
+    b.report("FROM_B")
+    assert multi.get_current_uid() == "FROM_B"
+    b.clear()
+    assert multi.get_current_uid() == "FROM_A"
