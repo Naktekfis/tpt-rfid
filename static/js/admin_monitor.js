@@ -3,6 +3,7 @@
  * tools and loans (search, filters, and a "Kelola" menu per row: warning
  * email, edit unit, edit type, delete unit). Alarms and returns
  * poll alerts every 500 ms, tools every second and types every minute/after edits.
+ * With several UHF readers the status cell shows each reader's read rate.
  */
 (function () {
     'use strict';
@@ -22,6 +23,7 @@
     const $ = function (id) { return document.getElementById(id); };
 
     let tools = [];
+    let readers = null; // {epc: [per reader {rate, age_s} or null]} with several readers
     let types = [];
     let editing = null;
     let lastStateKey = '';
@@ -187,13 +189,28 @@
         return today - day < +range;
     }
 
+    function readerRates(epc) {
+        const any = Object.keys(readers || {})[0];
+        const per = (readers && readers[epc]) || (any ? readers[any].map(function () { return null; }) : [null, null]);
+        return per.map(function (r, i) {
+            return 'R' + (i + 1) + ' ' + (r ? r.rate + '%' : '–');
+        }).join(' · ');
+    }
+
+    // Rates change every poll; update the text in place so rows and menus stay put.
+    function updateReaderRates() {
+        document.querySelectorAll('[data-reader-epc]').forEach(function (el) {
+            el.textContent = readerRates(el.getAttribute('data-reader-epc'));
+        });
+    }
+
     function renderTools() {
         const q = $('loan-search').value.trim().toLowerCase();
         const status = $('loan-status').value;
         const range = $('loan-date').value;
         // Inventory timestamps change every scan, without changing anything shown.
         // Include fields used by button closures as well as visible/filter fields.
-        const key = JSON.stringify([q, status, range, range ? Math.floor(nowWib() / DAY) : null,
+        const key = JSON.stringify([q, status, range, range ? Math.floor(nowWib() / DAY) : null, !!readers,
             tools.map(function (t) {
                 return [t.tool_id, t.type_id, t.name, t.category, t.rfid_uid,
                     t.status, t.presence, t.is_overdue, t.borrower_name, t.borrower_nim,
@@ -240,7 +257,10 @@
                 h('td', null, borrowed ? personCell(t.borrower_name, t.borrower_nim, t.borrower_photo_url) : h('span', { class: 'muted', text: '-' })),
                 h('td', { class: 'num', text: borrowed ? UI.formatWibDate(t.borrow_time_wib, true) : '' }),
                 h('td', { class: 'num' + (t.is_overdue ? ' status status--warn' : ''), text: borrowed ? UI.formatWibDate(t.due_at, true) : '' }),
-                h('td', null, toolStatus(t)),
+                h('td', null, toolStatus(t), readers && t.rfid_uid ? h('span', {
+                    class: 'sub num', 'data-reader-epc': t.rfid_uid,
+                    title: 'Persentase putaran baca 10 detik terakhir per pembaca',
+                }) : null),
                 h('td', { class: 'actions' }, menu)));
         });
     }
@@ -338,7 +358,9 @@
             UI.loadNotice('tools-error', '');
             toolsLoaded = true;
             tools = res.tools || [];
+            readers = res.readers || null;
             renderTools();
+            updateReaderRates();
             $('updated').textContent = 'Diperbarui ' + CLOCK.format(new Date()).replace(':', '.');
         } catch (e) {
             UI.loadNotice('tools-error', 'Daftar alat belum dapat diperbarui. Data terakhir tetap ditampilkan; mencoba kembali otomatis.', loadLists);

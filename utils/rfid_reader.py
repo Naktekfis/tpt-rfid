@@ -13,9 +13,11 @@ is decided by the page/route that consumes it.
 from __future__ import annotations
 
 import logging
+import json
 import queue
 import threading
 import time
+from collections import deque
 from typing import Callable, Dict, Iterable, List, Optional, Set
 
 from . import vx6336
@@ -559,6 +561,51 @@ class VX6336Reader(_ScanState):
         return False
 
 
+class ReaderSightings:
+    """
+    Per-EPC read rate of one reader over the last `window` seconds: the share
+    of inventory rounds that saw the EPC, and how long ago it was last seen.
+    """
+
+    def __init__(
+        self, window: float = 10.0, clock: Callable[[], float] = time.monotonic
+    ):
+        self.window = window
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._rounds: deque = deque()  # (time, frozenset of EPCs)
+
+    def add(self, epcs: Iterable[str]) -> None:
+        now = self._clock()
+        with self._lock:
+            self._rounds.append((now, frozenset(epcs)))
+            self._trim(now)
+
+    def _trim(self, now: float) -> None:
+        while self._rounds and now - self._rounds[0][0] > self.window:
+            self._rounds.popleft()
+
+    def snapshot(self) -> Dict[str, dict]:
+        """{epc: {"rate": percent of rounds, "age_s": seconds since seen}}"""
+        now = self._clock()
+        with self._lock:
+            self._trim(now)
+            rounds = list(self._rounds)
+        hits: Dict[str, int] = {}
+        last: Dict[str, float] = {}
+        for at, epcs in rounds:
+            for epc in epcs:
+                hits[epc] = hits.get(epc, 0) + 1
+                last[epc] = at
+        return {
+            epc: {
+                "rate": round(100 * n / len(rounds)),
+                "age_s": round(now - last[epc], 1),
+            }
+            for epc, n in hits.items()
+        }
+
+
 class MultiReader(_ScanState):
     """
     Several readers covering one rack, seen by the app as one reader.
@@ -572,8 +619,14 @@ class MultiReader(_ScanState):
     """
 
     mode = "multi"
+    SIGHTINGS_LOG_INTERVAL = 30.0  # s between "UHF sightings" log lines
 
-    def __init__(self, readers: List[_ScanState], primary: int = 0):
+    def __init__(
+        self,
+        readers: List[_ScanState],
+        primary: int = 0,
+        clock: Callable[[], float] = time.monotonic,
+    ):
         if not readers:
             raise ValueError("MultiReader needs at least one reader")
         if not 0 <= primary < len(readers):
@@ -581,8 +634,27 @@ class MultiReader(_ScanState):
         super().__init__()
         self.readers = list(readers)
         self.primary = self.readers[primary]
-        for reader in self.readers:
-            reader.add_round_listener(self._emit_round)
+        self._clock = clock
+        self._sightings = [ReaderSightings(clock=clock) for _ in self.readers]
+        self._next_log = clock() + self.SIGHTINGS_LOG_INTERVAL
+        for index, reader in enumerate(self.readers):
+            reader.add_round_listener(self._child_listener(index))
+
+    def _child_listener(self, index: int) -> Callable[[List[str]], None]:
+        def on_round(epcs: List[str]) -> None:
+            self._sightings[index].add(epcs)
+            if index == 0 and self._clock() >= self._next_log:
+                self._next_log = self._clock() + self.SIGHTINGS_LOG_INTERVAL
+                logger.info("UHF sightings %s", json.dumps(self.sightings()))
+            self._emit_round(epcs)
+
+        return on_round
+
+    def sightings(self) -> Dict[str, List[Optional[dict]]]:
+        """{epc: [per reader {"rate", "age_s"} or None]} over the last 10 s."""
+        snaps = [s.snapshot() for s in self._sightings]
+        epcs = sorted(set().union(*snaps))
+        return {epc: [snap.get(epc) for snap in snaps] for epc in epcs}
 
     def start(self) -> None:
         for reader in self.readers:

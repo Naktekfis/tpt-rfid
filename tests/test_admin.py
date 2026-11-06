@@ -28,6 +28,7 @@ def test_login_success_grants_access(admin_client, tool):
     resp = admin_client.get("/api/admin/tools_status")
     assert resp.status_code == 200
     assert len(resp.get_json()["tools"]) == 1
+    assert resp.get_json()["readers"] is None  # mock: one reader, no per-reader rates
     assert admin_client.get("/admin").status_code == 200
     # Logged-in users hitting the login page are redirected to /admin.
     assert admin_client.get("/admin/login").status_code == 302

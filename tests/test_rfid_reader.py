@@ -6,6 +6,7 @@ from tests.test_vx6336 import EPC_A, EPC_B, inventory_data, response_frame
 from utils import vx6336
 from utils.rfid_reader import (
     MultiReader,
+    ReaderSightings,
     RFIDReaderMock,
     ScanDebouncer,
     VX6336Reader,
@@ -486,3 +487,28 @@ def test_multi_reader_current_uid_is_newest_scan_of_any_reader():
     assert multi.get_current_uid() == "FROM_B"
     b.clear()
     assert multi.get_current_uid() == "FROM_A"
+
+
+def test_reader_sightings_rate_and_age_over_window():
+    now = [0.0]
+    sightings = ReaderSightings(window=10, clock=lambda: now[0])
+    for i in range(20):  # EPC_A every round, EPC_B every 4th round
+        sightings.add([EPC_A] + ([EPC_B] if i % 4 == 0 else []))
+        now[0] += 0.5
+    snap = sightings.snapshot()
+    assert snap[EPC_A]["rate"] == 100
+    assert snap[EPC_B]["rate"] == 25
+    assert snap[EPC_B]["age_s"] == 2.0
+    now[0] += 11  # window passes with no rounds
+    assert sightings.snapshot() == {}
+
+
+def test_multi_reader_sightings_per_reader():
+    a, b = _StubReader(), _StubReader()
+    multi = MultiReader([a, b])
+    a._emit_round([EPC_A])
+    b._emit_round([EPC_A, EPC_B])
+    b._emit_round([])
+    sightings = multi.sightings()
+    assert sightings[EPC_A][0]["rate"] == 100 and sightings[EPC_A][1]["rate"] == 50
+    assert sightings[EPC_B][0] is None and sightings[EPC_B][1]["rate"] == 50

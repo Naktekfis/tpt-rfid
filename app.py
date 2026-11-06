@@ -272,6 +272,7 @@ def expire_face_admin_session():
         for key in ("admin_logged_in", "admin_name", "admin_until"):
             session.pop(key, None)
 
+
 from routes.kiosk_routes import create_kiosk_blueprint  # noqa: E402
 
 app.register_blueprint(
@@ -810,8 +811,16 @@ def get_admin_tools_status():
             include_email=True, limit=page_limit, offset=page_offset
         )
         _serialize_borrow_timestamps(tools_data)
+        # Per-reader read rates when several readers cover the rack.
+        sightings = getattr(rfid_reader, "sightings", None)
 
-        return jsonify({"success": True, "tools": tools_data})
+        return jsonify(
+            {
+                "success": True,
+                "tools": tools_data,
+                "readers": sightings() if sightings else None,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Error getting admin tools status: {str(e)}")
