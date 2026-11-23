@@ -97,6 +97,8 @@
             '.demo-bar{position:fixed;left:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:6px;align-items:center;' +
             'max-width:calc(100vw - 24px);padding:8px 10px;border-radius:12px;background:rgba(20,24,32,.92);color:#fff;' +
             'font:13px/1.2 system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,.3)}' +
+            // Phone: the admin tab bar (56px) sits at the bottom, so lift the bar above it.
+            '@media(max-width:600px){.demo-bar:not(.demo-bar--kiosk){bottom:calc(68px + env(safe-area-inset-bottom,0px))}}' +
             '.demo-bar b{margin-right:4px;letter-spacing:.04em}' +
             '.demo-bar button,.demo-bar a{font:inherit;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);' +
             'border-radius:8px;padding:6px 10px;cursor:pointer;text-decoration:none}' +

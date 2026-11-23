@@ -1,45 +1,57 @@
 {% extends "app_base.html" %}
-{% set crumbs = [("Admin", None)] %}
-
+{# No admin shell here: hero + form on PC, just the form with a small logo header on phones. #}
 {% block title %}Login Admin — Lab Fabrikasi{% endblock %}
-{% block page_class %}page--menu{% endblock %}
 
-{% block page %}
-<div class="menu-hero">
-    <h1>Akses Admin</h1>
-    <p>Masukkan PIN admin, lalu tekan Enter.</p>
+{% block header %}{% endblock %}
+
+{% block content %}
+<div class="page login">
+    <aside class="login__hero" aria-hidden="true">
+        <p class="login__hero-name">Lab Fabrikasi<br>Teknik Fisika ITB</p>
+    </aside>
+    <div class="login__panel">
+        <div class="login__brand">
+            <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}" alt="Institut Teknologi Bandung">
+            <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
+            <span>Admin Lab</span>
+        </div>
+        <div class="menu-hero">
+            <h1>Akses Admin</h1>
+            <p>Masukkan PIN admin, lalu tekan Enter.</p>
+        </div>
+
+        <section class="face-login" id="face-login" hidden aria-labelledby="face-title">
+            <h2 class="visually-hidden" id="face-title">Masuk dengan wajah</h2>
+            <button type="button" class="btn btn--primary btn--lg" id="face-start">Masuk dengan wajah</button>
+            <div class="face-login__live" id="face-live" hidden>
+                <div class="camera-panel camera-panel--mirror face-login__camera">
+                    <img class="camera-panel__img" id="face-stream" alt="">
+                    <span class="camera-panel__label">Kamera rak peminjaman</span>
+                </div>
+                <p class="face-login__instruction" id="face-instruction" role="status" aria-live="polite"></p>
+                <p class="field__hint" id="face-hint"></p>
+                <div class="form__actions">
+                    <button type="button" class="btn btn--secondary" id="face-cancel">Batal</button>
+                </div>
+            </div>
+            <p class="form-error" id="face-error" role="alert"></p>
+            <p class="menu-label">Atau masukkan PIN</p>
+        </section>
+
+        <form class="form login-form" id="login-form" autocomplete="off" novalidate>
+            <div class="field">
+                <label class="field__label" for="pin">PIN</label>
+                <input class="input input--pin" id="pin" name="pin" type="password" inputmode="numeric" maxlength="12"
+                    autocomplete="off" autofocus required aria-describedby="pin-error">
+            </div>
+            <p class="form-error" id="pin-error" role="alert"></p>
+            <div class="form__actions">
+                <button type="submit" class="btn btn--primary" id="login-btn">Masuk</button>
+                {% if on_kiosk %}<a href="{{ url_for('kiosk_page') }}">Kembali ke Home</a>{% endif %}
+            </div>
+        </form>
+    </div>
 </div>
-
-<section class="face-login" id="face-login" hidden aria-labelledby="face-title">
-    <h2 class="visually-hidden" id="face-title">Masuk dengan wajah</h2>
-    <button type="button" class="btn btn--primary btn--lg" id="face-start">Masuk dengan wajah</button>
-    <div class="face-login__live" id="face-live" hidden>
-        <div class="camera-panel camera-panel--mirror face-login__camera">
-            <img class="camera-panel__img" id="face-stream" alt="">
-            <span class="camera-panel__label">Kamera rak peminjaman</span>
-        </div>
-        <p class="face-login__instruction" id="face-instruction" role="status" aria-live="polite"></p>
-        <p class="field__hint" id="face-hint"></p>
-        <div class="form__actions">
-            <button type="button" class="btn btn--secondary" id="face-cancel">Batal</button>
-        </div>
-    </div>
-    <p class="form-error" id="face-error" role="alert"></p>
-    <p class="menu-label">Atau masukkan PIN</p>
-</section>
-
-<form class="form login-form" id="login-form" autocomplete="off" novalidate>
-    <div class="field">
-        <label class="field__label" for="pin">PIN</label>
-        <input class="input input--pin" id="pin" name="pin" type="password" inputmode="numeric" maxlength="12"
-            autocomplete="off" autofocus required aria-describedby="pin-error">
-    </div>
-    <p class="form-error" id="pin-error" role="alert"></p>
-    <div class="form__actions">
-        <button type="submit" class="btn btn--primary" id="login-btn">Masuk</button>
-        <a href="{{ url_for('kiosk_page') }}">Kembali ke Home</a>
-    </div>
-</form>
 {% endblock %}
 
 {% block page_scripts %}

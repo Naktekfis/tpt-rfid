@@ -381,7 +381,7 @@ def admin_login():
     """Admin login page"""
     if session.get("admin_logged_in"):
         return redirect(url_for("admin_menu"))
-    return render_template("admin_login.html")
+    return render_template("admin_login.html", on_kiosk=is_kiosk_request(request))
 
 
 @app.route("/admin/logout")

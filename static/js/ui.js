@@ -215,8 +215,23 @@
         apply();
     }
 
+    // Phone card layout: each td carries its column header as data-label (the
+    // CSS prints it). Rows with a different cell count (colspan "empty" rows) are skipped.
+    function labelCells(table) {
+        const head = table.tHead && table.tHead.rows[0];
+        const body = table.tBodies[0];
+        if (!head || !body) return;
+        const names = Array.prototype.map.call(head.cells, function (th) { return th.textContent.trim(); });
+        Array.prototype.forEach.call(body.rows, function (row) {
+            if (row.cells.length !== names.length) return;
+            Array.prototype.forEach.call(row.cells, function (td, i) { td.setAttribute('data-label', names[i]); });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         document.querySelectorAll('.page .table').forEach(function (table) {
+            labelCells(table);
+            if (table.tBodies[0]) new MutationObserver(function () { labelCells(table); }).observe(table.tBodies[0], { childList: true });
             const section = table.closest('.section');
             const heading = (section && section.querySelector('h2')) || document.querySelector('.page h1');
             const wrapper = h('div', {
@@ -342,6 +357,7 @@
         lightbox: lightbox,
         rowMenu: rowMenu,
         loadNotice: loadNotice,
+        labelCells: labelCells,
         getCSRFToken: getCSRFToken,
         postForm: postForm,
         startClock: startClock,
