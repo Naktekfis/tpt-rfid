@@ -65,6 +65,7 @@ def face(app, monkeypatch):
         "settings": FaceSettings(enrol_prepare=0, enrol_countdown=0),
         "_threaded": False,
         "_photo": lambda frame, f: b"jpeg",
+        "_quality": lambda frame, f: tuple(frame.get("q", (300.0, 100.0, 1.0))),
         "_attempts": {},
         "_running": None,
         "_failures": deque(),
@@ -191,6 +192,59 @@ def test_remote_spoof_fails_and_bad_frames_are_refused(client, face, frames_as_j
         result = post_frame(client, frame).get_json()
     assert (result["state"], result["reason"]) == ("failed", "spoof")
     assert not is_admin(client)
+
+
+BLURRED = {"faces": [("A", 0.0)], "live": 0.95, "q": (20.0, 100.0, 1.0)}
+
+
+def test_poor_remote_frames_are_skipped_with_a_hint(client, face, frames_as_json):
+    enrol("Ahmad", "A")
+    client.post("/api/admin/face/login/start", headers=PROXIED)
+    for q, hint in [
+        ((20.0, 100.0, 1.0), "Tahan kamera tetap diam"),
+        ((300.0, 40.0, 1.0), "Wajah terlalu gelap, cari tempat yang lebih terang"),
+        (
+            (300.0, 100.0, 2.5),
+            "Cahaya di belakangmu terlalu terang, cari cahaya dari depan",
+        ),
+    ]:
+        result = post_frame(client, {**front(), "q": q}).get_json()
+        assert (result["state"], result["hint"]) == ("running", hint)
+    for frame in good():
+        result = post_frame(client, frame).get_json()
+    assert result["state"] == "passed"
+
+
+def test_only_poor_remote_frames_end_as_poor_image(client, face, frames_as_json):
+    enrol("Ahmad", "A")
+    client.post("/api/admin/face/login/start", headers=PROXIED)
+    post_frame(client, BLURRED)
+    face.settings.timeout = -1.0
+    result = post_frame(client, BLURRED).get_json()
+    assert (result["state"], result["reason"]) == ("failed", "poor_image")
+
+
+def test_kiosk_frames_are_not_gated_on_image_quality(client, face):
+    enrol("Ahmad", "A")
+    _, result = login(client, face, [BLURRED] * 6)
+    assert result["state"] == "passed"
+
+
+def test_image_quality_sees_blur_darkness_and_backlight():
+    cv2 = pytest.importorskip("cv2")
+    import numpy as np
+
+    from utils.liveness import image_quality
+
+    sharp = np.zeros((480, 640, 3), np.uint8)
+    sharp[::4, :] = 255  # fine stripes
+    blurred = cv2.GaussianBlur(sharp, (31, 31), 10)
+    box = Face((200, 120, 240, 240), [], 0.9, None)
+    assert image_quality(sharp, box)[0] > 10 * image_quality(blurred, box)[0]
+    backlit = np.full((480, 640, 3), 230, np.uint8)
+    backlit[120:360, 200:440] = 60  # dark face, bright surround
+    _, light, back = image_quality(backlit, box)
+    assert round(light) == 60 and back > 3
 
 
 def test_only_the_starting_browser_can_feed_a_remote_attempt(

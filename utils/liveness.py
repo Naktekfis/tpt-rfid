@@ -206,3 +206,27 @@ def yaw(landmarks) -> float:
     if eye_dist < 1e-6:
         return 0.0
     return (float(nose[0]) - (float(re[0]) + float(le[0])) / 2.0) / eye_dist
+
+
+def image_quality(frame, face) -> Tuple[float, float, float]:
+    """(sharpness, face brightness, backlight) of one frame.
+
+    Sharpness is the Laplacian variance of the face resized to 112 px (low =
+    motion blur), brightness the face's mean grey (0-255), backlight the mean
+    grey outside the face divided by the face's (above 1 = lit from behind).
+    """
+    import cv2
+
+    height, width = frame.shape[:2]
+    x, y, w, h = [int(v) for v in face.box]
+    x0, y0, x1, y1 = max(0, x), max(0, y), min(width, x + w), min(height, y + h)
+    if x1 <= x0 or y1 <= y0:
+        return 0.0, 0.0, 0.0
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) if frame.ndim == 3 else frame
+    crop = cv2.resize(gray[y0:y1, x0:x1], (112, 112), interpolation=cv2.INTER_AREA)
+    light = float(crop.mean())
+    face_sum = float(gray[y0:y1, x0:x1].sum())
+    rest = gray.size - (x1 - x0) * (y1 - y0)
+    back = (float(gray.sum()) - face_sum) / rest if rest else light
+    sharp = float(cv2.Laplacian(crop, cv2.CV_64F).var())
+    return sharp, light, back / max(light, 1.0)

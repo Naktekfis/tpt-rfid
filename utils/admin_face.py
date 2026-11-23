@@ -19,7 +19,10 @@ the browser posts frames to the attempt (feed) instead of a thread reading the
 kiosk camera. Same checks and lockout, no buzzer, and it never cancels a kiosk
 attempt. Those frames come from the client, so a virtual camera can replay a
 video: remote face login is weaker than at the kiosk and sits behind the
-tunnel's email OTP.
+tunnel's email OTP. Phone cameras move and get backlit, which the liveness
+model reads as a spoof, so a remote frame that is blurred, dark or lit from
+behind is skipped with a hint instead (not at the kiosk: its fixed camera
+passes with lower values, measured on the stored login photos).
 
 Failures are logged with a face photo (AdminLoginEvent); repeated login
 failures lock face login for a while, so the PIN is the way in. The engine,
@@ -59,6 +62,7 @@ REASONS = {
     "face_changed": "Wajah berganti selama pemeriksaan.",
     "multiple_faces": "Lebih dari satu wajah di depan kamera.",
     "error": "Terjadi kesalahan.",
+    "poor_image": "Gambar kurang jelas. Tahan kamera diam dengan cahaya dari depan.",
 }
 
 
@@ -86,6 +90,10 @@ class FaceSettings:
     lockout_failures: int = 10  # generous: a cool-down, not a punishment
     lockout_window: float = 600.0
     lockout_seconds: float = 60.0
+    # Remote frames only; first guesses from 4 phone attempts, tune from the log.
+    remote_min_sharpness: float = 100.0
+    remote_min_light: float = 70.0
+    remote_max_backlight: float = 1.9
 
 
 @dataclass
@@ -107,6 +115,8 @@ class Attempt:
     countdown: Optional[int] = None  # 3, 2, 1 while counting down
     distance: Optional[float] = None  # login: median distance to the best admin
     remote: bool = False  # frames come from the browser's camera (feed)
+    poor: int = 0  # remote frames skipped for image quality
+    quality: List[Tuple[float, float, float]] = field(default_factory=list)
     busy: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @property
@@ -159,6 +169,7 @@ class FaceAuth:
         clock: Callable[[], float] = time.monotonic,
         threaded: bool = True,
         beep: Optional[Callable[..., None]] = None,
+        quality: Optional[Callable[[Any, Any], Tuple[float, float, float]]] = None,
     ):
         self.app = app
         self.camera = camera
@@ -170,6 +181,7 @@ class FaceAuth:
         )
         self._photo = photo
         self._beep = beep
+        self._quality = quality
         self._clock = clock
         self._threaded = threaded
         self._lock = threading.Lock()
@@ -257,7 +269,9 @@ class FaceAuth:
             if attempt.state != "running":
                 return
             if self._clock() - attempt.capture_from > self.settings.timeout:
-                self._finish(attempt, False, "timeout")
+                self._finish(
+                    attempt, False, "poor_image" if attempt.poor else "timeout"
+                )
                 return
             self.step(attempt, frame)
         except Exception:  # request boundary: OpenCV can raise anything
@@ -318,6 +332,11 @@ class FaceAuth:
         if abs(yaw(face.landmarks)) > s.facing_yaw:
             attempt.hint = "Hadapkan wajah ke kamera"
             return
+        hint = self._poor_image(attempt, frame, face)
+        if hint:
+            attempt.hint = hint
+            attempt.poor += 1
+            return
         attempt.hint = None
         if attempt.photo is None and self._photo is not None:
             attempt.photo = self._photo(frame, face)
@@ -327,6 +346,23 @@ class FaceAuth:
         attempt.frames.append((self.engine.embed(frame, face), bool(live)))
         if len(attempt.frames) >= s.frames_needed:
             self._decide(attempt)
+
+    def _poor_image(self, attempt: Attempt, frame, face) -> Optional[str]:
+        """Hint when a remote frame is too poor to judge (and log the values)."""
+        if self._quality is None:
+            return None
+        sharp, light, back = self._quality(frame, face)
+        attempt.quality.append((sharp, light, back))
+        s = self.settings
+        if not attempt.remote:
+            return None
+        if back > s.remote_max_backlight:
+            return "Cahaya di belakangmu terlalu terang, cari cahaya dari depan"
+        if light < s.remote_min_light:
+            return "Wajah terlalu gelap, cari tempat yang lebih terang"
+        if sharp < s.remote_min_sharpness:
+            return "Tahan kamera tetap diam"
+        return None
 
     def _count_down(self, attempt: Attempt, now: float) -> None:
         left = attempt.capture_from - now
@@ -430,7 +466,8 @@ class FaceAuth:
                 self._fail(attempt, reason or "error")
             # Per-model liveness means, for calibrating the thresholds from the log.
             logger.info(
-                "Face %s%s %s%s, liveness %s, distance %s (threshold %.3f)",
+                "Face %s%s %s%s, liveness %s, distance %s (threshold %.3f), "
+                "quality %s, skipped %d",
                 attempt.mode,
                 " (remote)" if attempt.remote else "",
                 "passed" if ok else "failed",
@@ -438,6 +475,8 @@ class FaceAuth:
                 {m: round(sum(v) / len(v), 3) for m, v in attempt.scores.items()},
                 None if attempt.distance is None else round(attempt.distance, 3),
                 self.threshold,
+                [round(sum(q) / len(q), 2) for q in zip(*attempt.quality)] or None,
+                attempt.poor,
             )
             # A passer-by in the picture is bad luck, not an attack attempt.
             if (
@@ -529,7 +568,7 @@ def build_face_auth(app, camera, beep=None) -> FaceAuth:
             app, camera, settings=settings, unavailable="Kamera tidak aktif."
         )
     from utils.face import FaceModelsMissing, create_engine, portrait_jpeg
-    from utils.liveness import Liveness, LivenessUnavailable
+    from utils.liveness import Liveness, LivenessUnavailable, image_quality
 
     model_dir = cfg.get("FACE_MODEL_DIR", "models/face")
     try:
@@ -546,5 +585,12 @@ def build_face_auth(app, camera, beep=None) -> FaceAuth:
         cfg.get("FACE_LIVENESS_MODELS", "mn3:0.3"),
     )
     return FaceAuth(
-        app, camera, engine, liveness, settings, photo=portrait_jpeg, beep=beep
+        app,
+        camera,
+        engine,
+        liveness,
+        settings,
+        photo=portrait_jpeg,
+        beep=beep,
+        quality=image_quality,
     )
