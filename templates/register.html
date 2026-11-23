@@ -1,11 +1,13 @@
 {% extends "app_base.html" %}
 {% if enroll_student %}
 {% set crumbs = [("Admin", url_for('admin_menu')), ("Mahasiswa", url_for('admin_api.students_page')), ("Daftarkan KTM", None)] %}
+{% elif admin_mode %}
+{% set crumbs = [("Admin", url_for('admin_menu')), ("Daftar mahasiswa", None)] %}
 {% else %}
 {% set crumbs = [("Home", url_for('kiosk_page')), ("Daftar", None)] %}
 {% endif %}
 {% block title %}Daftar KTM — Lab Fabrikasi{% endblock %}
-{% block page_class %}page--fill{% endblock %}
+{% block page_class %}{% if not admin_mode %}page--fill{% endif %}{% endblock %}
 {% block page %}
 <section class="reg-step" id="step-form">
     <div class="page-head">
@@ -15,6 +17,15 @@
         </div>
     </div>
     <form class="form reg-form" id="reg-form" autocomplete="off" novalidate>
+        {% if admin_mode %}
+        {# Admin only: the server refuses card_exception without an admin session. #}
+        <fieldset class="card-kind">
+            <legend class="field__label">Jenis kartu</legend>
+            <label class="card-kind__opt"><input type="radio" name="card_kind" value="" checked><span><strong>KTM terbaca</strong><small>Pendaftaran biasa dengan KTM</small></span></label>
+            <label class="card-kind__opt"><input type="radio" name="card_kind" value="ktm"><span><strong>KTM ditolak</strong><small>Punya KTM, tetapi pembaca menolaknya</small></span></label>
+            <label class="card-kind__opt"><input type="radio" name="card_kind" value="other"><span><strong>Tanpa KTM, pakai kartu lain</strong><small>Kartu NFC lain, hanya untuk NIM {% if enroll_student %}ini{% else %}di formulir{% endif %}</small></span></label>
+        </fieldset>
+        {% endif %}
         <div class="reg-grid{% if enroll_student %} reg-grid--card-only{% endif %}">
             <div class="reg-col" {% if enroll_student %}hidden{% endif %}>
                 <h2 class="reg-step__title" id="step-data"><span class="reg-step__no">1</span> Data diri</h2>
@@ -66,7 +77,7 @@
                 </div>
                 {% endif %}
                 <div class="reg-card">
-                    <h2 class="reg-step__title" id="step-card"><span class="reg-step__no">{% if enroll_student %}1{% else %}<span class="reg-step__photo-no">3</span>{% endif %}</span> KTM (Kartu Tanda Mahasiswa)</h2>
+                    <h2 class="reg-step__title" id="step-card"><span class="reg-step__no">{% if enroll_student %}1{% else %}<span class="reg-step__photo-no">3</span>{% endif %}</span> <span id="card-title">KTM (Kartu Tanda Mahasiswa)</span></h2>
                     <p id="nfc-status" role="status" aria-live="polite">Tekan Baca KTM, lalu tempelkan KTM ke pembaca.</p>
                     <div class="form__actions">
                         <button type="button" class="btn btn--secondary" id="nfc-start">Baca KTM</button>
@@ -78,7 +89,7 @@
             <p class="form-error" id="form-error" role="alert"></p>
             <div class="form__actions">
                 <button type="submit" class="btn btn--primary btn--lg" id="form-submit" disabled>{% if enroll_student %}Simpan KTM{% else %}Daftar{% endif %}</button>
-                <a href="{% if enroll_student %}{{ url_for('admin_api.students_page') }}{% else %}{{ url_for('kiosk_page') }}{% endif %}">Batal</a>
+                <a href="{% if admin_mode %}{{ url_for('admin_api.students_page') }}{% else %}{{ url_for('kiosk_page') }}{% endif %}">Batal</a>
             </div>
         </div>
     </form>
@@ -86,9 +97,18 @@
 <section class="result result--ok" id="registration-done" role="status" hidden>
     <h2>KTM tersimpan.</h2>
     <p>Angkat KTM dari pembaca. Kembali ke Home, lalu tempelkan KTM lagi untuk membuka sesi pinjam atau kembali.</p>
-    {% if enroll_student %}<a class="btn btn--primary btn--lg" href="{{ url_for('admin_api.students_page') }}">Kembali ke Mahasiswa</a>
+    {% if admin_mode %}<a class="btn btn--primary btn--lg" href="{{ url_for('admin_api.students_page') }}">Kembali ke Mahasiswa</a>
     {% else %}<a class="btn btn--primary btn--lg" href="{{ url_for('kiosk_page') }}">Kembali ke Home</a>{% endif %}
 </section>
+{% if admin_mode %}
+<section class="section reg-exceptions" aria-labelledby="list-title">
+    <div class="section-head"><h2 id="list-title">Kartu pengecualian</h2><span class="section-head__meta" id="cards-count"></span></div>
+    <p id="cards-warn" class="status status--danger" role="alert" hidden></p>
+    <table class="table" data-page-size="10"><thead><tr>
+        <th scope="col">Jenis</th><th scope="col">Ditambahkan</th><th scope="col"><span class="visually-hidden">Tindakan</span></th>
+    </tr></thead><tbody id="cards-body"><tr><td class="empty" colspan="3">Memuat…</td></tr></tbody></table>
+</section>
+{% endif %}
 {% endblock %}
 {% block page_scripts %}
 <script>
@@ -97,4 +117,5 @@
     };
 </script>
 <script src="{{ url_for('static', filename='js/register.js') }}"></script>
+{% if admin_mode %}<script src="{{ url_for('static', filename='js/admin_cards.js') }}"></script>{% endif %}
 {% endblock %}

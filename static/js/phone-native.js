@@ -1,5 +1,5 @@
 /*
- * Phone variants B and C (?variant=b|c, set on <html data-variant> by app_base.html), phone width only:
+ * Phone layout B (the default; <html data-variant> set by app_base.html, off with ?variant=a), phone width only:
  *  - segmented panes: every [data-pane="Label"] plus the siblings after it, up to the next marker, is one pane
  *    (data-pane-count="id" mirrors that element's last number into the tab);
  *  - a filter bottom sheet: the [data-sheet] nodes move into a <dialog> while it is open and back afterwards.

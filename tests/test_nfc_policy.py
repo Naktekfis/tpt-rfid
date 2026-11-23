@@ -144,6 +144,61 @@ def test_admin_other_card_works_for_one_nim_only(client, database, monkeypatch):
     assert right.status_code == 200
 
 
+def test_admin_registers_with_other_card_in_one_submit(client, database, monkeypatch):
+    policy = policy_with_db(database)
+    monkeypatch.setattr(app_module.nfc_service, "policy", policy)
+    monkeypatch.setattr(app_module, "card_policy", policy)
+    admin_session(client)
+    token = client.post("/api/admin/cards/start").get_json()["token"]
+    app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)
+    res = client.post(
+        "/api/register", data=dict(FORM, nfc_token=token, card_exception="other")
+    )
+    assert res.status_code == 200, res.get_json()
+    assert database.get_student_by_nfc("0A0B0C0D")["nim"] == FORM["nim"]
+    assert [c["kind"] for c in database.list_card_exceptions()] == ["other"]
+    # The card now opens a kiosk session for that student only.
+    assert policy.check_tap({"uid": "0A0B0C0D", "card": EMONEY}) is None
+    assert policy.check_student("0A0B0C0D", "87654322") == MSG_BROKEN
+    app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)
+    assert app_module.kiosk.state_dict()["state"] == "session"
+
+
+def test_admin_binds_a_refused_ktm_with_its_exception(
+    client, database, student, monkeypatch
+):
+    policy = policy_with_db(database)
+    monkeypatch.setattr(app_module.nfc_service, "policy", policy)
+    admin_session(client)
+    token = client.post("/api/admin/cards/start").get_json()["token"]
+    app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)
+    res = client.post(
+        f"/api/admin/students/{student['student_id']}/nfc",
+        json={"nfc_token": token, "card_exception": "ktm"},
+    )
+    assert res.status_code == 200, res.get_json()
+    assert database.get_student_by_nfc("0A0B0C0D")["nim"] == student["nim"]
+    assert policy.check_tap({"uid": "0A0B0C0D", "card": EMONEY}) is None
+
+
+def test_non_admin_cannot_make_an_exception_while_registering(
+    client, database, monkeypatch
+):
+    policy = policy_with_db(database)
+    monkeypatch.setattr(app_module.nfc_service, "policy", policy)
+    monkeypatch.setattr(app_module, "card_policy", policy)
+    assert client.post("/api/admin/cards/start").status_code == 401
+    token = client.post("/api/nfc/registration/start").get_json()["token"]
+    app_module.nfc_reader.simulate_scan("05060708", KTM)
+    for kind in ("ktm", "other"):
+        res = client.post(
+            "/api/register", data=dict(FORM, nfc_token=token, card_exception=kind)
+        )
+        assert res.status_code == 403
+    assert database.list_card_exceptions() == []
+    assert database.get_student_by_nim(FORM["nim"]) is None
+
+
 def test_register_nim_check(client, student):
     assert client.get("/api/register/nim?nim=12345678").get_json()["taken"] is True
     assert client.get("/api/register/nim?nim=99999999").get_json()["taken"] is False

@@ -61,7 +61,7 @@
 {% block page_scripts %}
 <script>
 window.ADMIN_STUDENTS_CONFIG = {
-    registerUrl: {{ url_for('register') | tojson }},
+    registerUrl: {{ url_for('admin_register') | tojson }},
     placeholderPhoto: {{ url_for('static', filename='assets/placeholder_profile.png') | tojson }},
 };
 </script>

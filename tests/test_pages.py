@@ -23,6 +23,7 @@ ADMIN = [
     "/admin/security",
     "/admin/input_tool",
     "/admin/history",
+    "/admin/register",
 ]
 
 
@@ -76,11 +77,63 @@ def test_daftar_is_the_register_page(client):
 def test_register_admin_mode_needs_session(client, admin_client, student):
     sid = student["student_id"]
     html = client.get(f"/daftar?student_id={sid}").get_data(as_text=True)
-    assert "Daftarkan KTM" not in html
+    assert "Daftarkan KTM" not in html and "card_kind" not in html
+    assert client.get(f"/admin/register?student_id={sid}").status_code == 401
     admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
-    html = admin_client.get(f"/daftar?student_id={sid}").get_data(as_text=True)
+    resp = admin_client.get(f"/daftar?student_id={sid}")  # old bind links
+    assert resp.status_code == 302 and "/admin/register" in resp.headers["Location"]
+    html = admin_client.get(f"/admin/register?student_id={sid}").get_data(as_text=True)
     assert "Daftarkan KTM" in html
     assert student["nim"] in html
+
+
+def test_admin_register_has_card_kinds_and_the_exception_list(client, admin_client):
+    # The kiosk page never offers exceptions, even with an admin session.
+    assert "card_kind" not in client.get("/daftar").get_data(as_text=True)
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    assert "card_kind" not in admin_client.get("/daftar").get_data(as_text=True)
+    html = admin_client.get("/admin/register").get_data(as_text=True)
+    assert "Jenis kartu" in html and 'id="cards-body"' in html
+    for value in ('value=""', 'value="ktm"', 'value="other"'):
+        assert value in html
+    assert 'class="topbar topbar--admin"' in html  # admin shell, not the kiosk bar
+    assert 'href="/admin/register"' in html and 'href="/admin/cards"' not in html
+
+
+def test_admin_cards_redirects_to_registration(admin_client):
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    resp = admin_client.get("/admin/cards")
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/admin/register")
+
+
+def test_dashboard_has_cta_instead_of_todo_panel(admin_client):
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    html = admin_client.get("/admin").get_data(as_text=True)
+    assert 'id="todo-cta"' in html
+    assert 'id="todo-list"' not in html and "Perlu tindakan</h2>" not in html
+    # Order: hero, menu, stats, devices.
+    order = [
+        html.index(m)
+        for m in (
+            'id="hero-title"',
+            "menu--dash",
+            'class="stats"',
+            'id="devices-title"',
+        )
+    ]
+    assert order == sorted(order)
+
+
+def test_phone_variant_b_is_default_and_c_is_gone(admin_client):
+    from pathlib import Path
+
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    html = admin_client.get("/admin").get_data(as_text=True)
+    assert "get('variant')!=='a')document.documentElement.dataset.variant='b'" in html
+    static = Path(__file__).resolve().parent.parent / "static"
+    for f in ("css/phone-native.css", "js/phone-native.js"):
+        assert "variant=c" not in (static / f).read_text(encoding="utf-8"), f
 
 
 def _assert_local(html, path):

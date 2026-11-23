@@ -8,35 +8,14 @@
     <p class="eyebrow">Ringkasan hari ini</p>
     <h1 class="hero" id="hero-title">Admin</h1>
     <p id="hero-date" class="hero-sub num"></p>
+    {# Alarms + unverified returns + overdue loans; shown only while above zero. #}
+    <a class="btn btn--danger dash-hero__cta" id="todo-cta" href="{{ url_for('admin_monitor') }}" hidden></a>
 </section>
 
 <div class="load-notice" id="dash-error" role="status" hidden></div>
 
-<div class="stats" aria-label="Ringkasan">
-    <a class="stat stat--danger" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-alarms">–</span><span class="stat__label">Alarm terbuka</span></a>
-    <a class="stat" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-unverified">–</span><span class="stat__label">Belum diverifikasi</span></a>
-    <a class="stat" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-borrowed">–</span><span class="stat__label">Alat dipinjam</span></a>
-    <a class="stat stat--warn" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-overdue">–</span><span class="stat__label">Terlambat</span></a>
-</div>
-
-<div class="dash-grid">
-    <section class="section dash-grid__main" aria-labelledby="todo-title">
-        <div class="section-head"><h2 id="todo-title">Perlu tindakan</h2></div>
-        <ul class="todo" id="todo-list"><li class="empty">–</li></ul>
-    </section>
-    <section class="section dash-grid__side" aria-labelledby="devices-title">
-        <div class="section-head"><h2 id="devices-title">Perangkat</h2></div>
-        <dl class="devices" id="devices-list">
-            <div><dt>Pembaca UHF</dt><dd id="dev-reader">–</dd></div>
-            <div><dt>Pembaca KTM (NFC)</dt><dd id="dev-nfc">–</dd></div>
-            <div><dt>Kamera</dt><dd id="dev-camera">–</dd></div>
-            <div><dt>Kondisi kamera</dt><dd id="dev-condition">–</dd></div>
-        </dl>
-    </section>
-</div>
-
 <p class="menu-label">Menu</p>
-<ul class="menu">
+<ul class="menu menu--dash">
     <li>
         <a class="menu__link" href="{{ url_for('admin_monitor') }}">
             <span class="menu__title">Monitor Alat</span>
@@ -50,9 +29,9 @@
         </a>
     </li>
     <li>
-        <a class="menu__link" href="{{ url_for('admin_cards') }}">
-            <span class="menu__title">Kartu pengecualian</span>
-            <span class="menu__desc">KTM yang tidak terbaca, atau kartu NFC untuk mahasiswa tanpa KTM</span>
+        <a class="menu__link" href="{{ url_for('admin_register') }}">
+            <span class="menu__title">Daftar mahasiswa</span>
+            <span class="menu__desc">Daftarkan mahasiswa dan KTM, termasuk KTM ditolak atau kartu NFC lain</span>
         </a>
     </li>
     <li>
@@ -75,6 +54,22 @@
     </li>
 </ul>
 
+<div class="stats" aria-label="Ringkasan">
+    <a class="stat stat--danger" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-alarms">–</span><span class="stat__label">Alarm terbuka</span></a>
+    <a class="stat" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-unverified">–</span><span class="stat__label">Belum diverifikasi</span></a>
+    <a class="stat" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-borrowed">–</span><span class="stat__label">Alat dipinjam</span></a>
+    <a class="stat stat--warn" href="{{ url_for('admin_monitor') }}"><span class="stat__num num" id="stat-overdue">–</span><span class="stat__label">Terlambat</span></a>
+</div>
+
+<section class="section" aria-labelledby="devices-title">
+    <div class="section-head"><h2 id="devices-title">Perangkat</h2></div>
+    <dl class="devices" id="devices-list">
+        <div><dt>Pembaca UHF</dt><dd id="dev-reader">–</dd></div>
+        <div><dt>Pembaca KTM (NFC)</dt><dd id="dev-nfc">–</dd></div>
+        <div><dt>Kamera</dt><dd id="dev-camera">–</dd></div>
+        <div><dt>Kondisi kamera</dt><dd id="dev-condition">–</dd></div>
+    </dl>
+</section>
 {% endblock %}
 
 {% block page_scripts %}

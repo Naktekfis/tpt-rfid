@@ -45,7 +45,12 @@ from utils.kiosk import Kiosk
 from utils.nfc_policy import CardPolicy
 from utils.nfc_reader import create_nfc_reader
 from utils.nfc_service import NFCService, NFCCaptureError
-from routes.nfc_routes import create_nfc_blueprint, capture_owner
+from routes.nfc_routes import (
+    PEPPER_MISSING,
+    capture_owner,
+    create_nfc_blueprint,
+    save_card_exception,
+)
 from utils.presence import PresenceMonitor
 from utils.tool_presence import ToolPresenceService
 from utils.security import SecurityService
@@ -336,12 +341,25 @@ def index():
 @app.route("/register")
 @app.route("/daftar")
 def register():
-    """NFC self-registration; admins can bind a card to an unbound student."""
+    """NFC self-registration at the kiosk: the KTM flow only, no admin options."""
+    raw = request.args.get("student_id", "")
+    if session.get("admin_logged_in") and raw.isdigit():  # old bind links
+        return redirect(url_for("admin_register", student_id=raw))
+    return render_template("register.html", enroll_student=None, admin_mode=False)
+
+
+@app.route("/admin/register")
+@admin_required
+def admin_register():
+    """Admin registration: a new student or a card for an unbound one, with an
+    optional card exception (refused KTM, or another card tied to the NIM)."""
     enroll_student = None
     raw = request.args.get("student_id", "")
-    if session.get("admin_logged_in") and raw.isdigit():
+    if raw.isdigit():
         enroll_student = database.get_student_by_id(raw)
-    return render_template("register.html", enroll_student=enroll_student)
+    return render_template(
+        "register.html", enroll_student=enroll_student, admin_mode=True
+    )
 
 
 @app.route("/scan")
@@ -370,10 +388,9 @@ def admin_menu():
 
 
 @app.route("/admin/cards")
-@admin_required
 def admin_cards():
-    """Cards let past the KTM chip check (false negatives, no-KTM students)"""
-    return render_template("admin_cards.html")
+    """Card exceptions now live on the admin registration page."""
+    return redirect(url_for("admin_register"))
 
 
 @app.route("/admin/login")
@@ -473,6 +490,15 @@ def api_register():
         email = sanitize_input(request.form.get("email", ""))
         phone = sanitize_input(request.form.get("phone", ""))
         nfc_token = request.form.get("nfc_token", "")
+        # Card exception made in the same submit: admins only, never the kiosk.
+        card_exception = request.form.get("card_exception", "")
+        if card_exception:
+            if not session.get("admin_logged_in"):
+                return jsonify(success=False, error="Unauthorized"), 403
+            if card_exception not in ("ktm", "other"):
+                return jsonify(success=False, error="Jenis kartu tidak valid"), 400
+            if not card_policy.can_hash:
+                return jsonify(success=False, error=PEPPER_MISSING), 409
 
         # Validate required fields
         if not all([name, nim, email, phone]):
@@ -506,16 +532,20 @@ def api_register():
 
         # Create student
         def create_with_card(uid):
-            error = card_policy.check_student(uid, nim)
+            # A card already exempt keeps its own rule (and its NIM check).
+            new_exception = card_exception and not card_policy.is_exempt(uid)
+            error = None if new_exception else card_policy.check_student(uid, nim)
             if error:
                 raise NFCCaptureError(error)
             if database.get_student_by_nfc(uid):
                 raise NFCCaptureError("KTM sudah terdaftar")
+            if new_exception:
+                save_card_exception(database, card_policy, uid, card_exception, nim)
             return database.create_student(dict(student_data, nfc_uid=uid))
 
         try:
             student = nfc_service.submit(capture_owner(), nfc_token, create_with_card)
-        except NFCCaptureError as exc:
+        except (NFCCaptureError, ValueError) as exc:
             return jsonify(success=False, error=str(exc)), 409
 
         if photo_jpeg:

@@ -50,7 +50,7 @@ PAGES = [
     "/admin/students",
     "/admin/security",
     "/admin/history",
-    "/admin/cards",
+    "/admin/register",
 ]
 
 # GET endpoints the page scripts call; demo.js looks them up by path.

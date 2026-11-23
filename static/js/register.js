@@ -1,6 +1,8 @@
 /* Capture one fresh card on the server before creating or binding an account.
  * Self-registration also needs a face photo taken on the server from the
- * kiosk camera (guided 3-2-1 with reader beeps), when the camera is on. */
+ * kiosk camera (guided 3-2-1 with reader beeps), when the camera is on.
+ * Admin mode (/admin/register) adds "Jenis kartu": a card exception (refused
+ * KTM, or another card tied to the NIM) saved with the same submit. */
 (function () {
     'use strict';
     const UI = window.UI;
@@ -141,7 +143,22 @@
         updateSubmit();
     }
 
+    // '' = KTM terbaca, 'ktm' = KTM ditolak, 'other' = another card (admin only).
+    function cardKind() {
+        const el = document.querySelector('input[name="card_kind"]:checked');
+        return el ? el.value : '';
+    }
+    function noun() { return cardKind() === 'other' ? 'kartu' : 'KTM'; }
+    function readLabel() { return cardKind() === 'other' ? 'Baca kartu' : 'Baca KTM'; }
     function status(message) { $('nfc-status').textContent = message; }
+    function cancelServer(keepalive) {
+        if (!token) return;
+        fetch('/api/nfc/registration/cancel', {
+            method: 'POST', credentials: 'same-origin', keepalive: keepalive,
+            headers: { 'X-CSRFToken': UI.getCSRFToken(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nfc_token: token }),
+        }).catch(function () { /* Server capture also expires after 120 seconds. */ });
+    }
     function fail(field, message) {
         $('form-error').textContent = message;
         if (field) {
@@ -156,28 +173,29 @@
         clearTimeout(timer);
         updateSubmit();
         $('nfc-start').disabled = false;
-        $('nfc-start').textContent = 'Baca KTM';
+        $('nfc-start').textContent = readLabel();
         status(message);
     }
     async function pollCapture(current) {
         if (current !== generation) return;
         if (Date.now() >= expiresAt) {
-            resetCapture('Waktu pembacaan habis. Tekan Baca KTM, lalu tempelkan lagi.');
+            resetCapture('Waktu pembacaan habis. Tekan ' + readLabel() + ', lalu tempelkan lagi.');
             return;
         }
         try {
             const res = await UI.fetchJSON('/api/nfc/registration');
             if (current !== generation) return;
             if (!res.success) {
-                resetCapture(res.error || 'Pembacaan KTM berakhir. Silakan ulangi.');
+                resetCapture(res.error || 'Pembacaan ' + noun() + ' berakhir. Silakan ulangi.');
                 return;
             }
             ready = !!res.ready;
             updateSubmit();
-            status(ready ? 'KTM terbaca. Periksa data Anda, lalu simpan sebelum waktu pembacaan habis.'
+            const n = noun();
+            status(ready ? n.charAt(0).toUpperCase() + n.slice(1) + ' terbaca. Periksa data Anda, lalu simpan sebelum waktu pembacaan habis.'
                 : res.rejected ? res.rejected + '. Angkat kartu, lalu tempelkan KTM.'
-                : res.connected ? 'Tempelkan KTM ke pembaca. Angkat kembali setelah terbaca.'
-                    : 'Pembaca KTM belum tersambung. Periksa perangkat; pembacaan akan dilanjutkan.');
+                : res.connected ? 'Tempelkan ' + n + ' ke pembaca. Angkat kembali setelah terbaca.'
+                    : 'Pembaca ' + n + ' belum tersambung. Periksa perangkat; pembacaan akan dilanjutkan.');
         } catch (e) {
             ready = false;
             updateSubmit();
@@ -186,12 +204,13 @@
         if (current === generation) timer = setTimeout(function () { pollCapture(current); }, 750);
     }
     async function startCapture() {
-        resetCapture('Menyiapkan pembaca KTM…');
+        resetCapture('Menyiapkan pembaca ' + noun() + '…');
         const current = generation;
         $('nfc-start').disabled = true;
         $('form-error').textContent = '';
         try {
-            const res = await UI.postJSON('/api/nfc/registration/start');
+            // An exception reads any chip, so it needs the admin-only start.
+            const res = await UI.postJSON(cardKind() ? '/api/admin/cards/start' : '/api/nfc/registration/start');
             if (current !== generation) return;
             if (!res.success || !res.token) {
                 resetCapture(res.error || 'Pembaca belum siap. Coba lagi.');
@@ -240,7 +259,7 @@
             return;
         }
         if (!ready || !token || Date.now() >= expiresAt) {
-            resetCapture('Baca KTM terlebih dahulu.');
+            resetCapture(readLabel() + ' terlebih dahulu.');
             return;
         }
         saving = true;
@@ -251,12 +270,14 @@
         try {
             let res;
             if (CFG.student) {
-                res = await UI.postJSON('/api/admin/students/' + encodeURIComponent(CFG.student.student_id) + '/nfc', { nfc_token: token });
+                res = await UI.postJSON('/api/admin/students/' + encodeURIComponent(CFG.student.student_id) + '/nfc',
+                    { nfc_token: token, card_exception: cardKind() });
             } else {
                 const data = new FormData();
                 FIELDS.forEach(function (f) { data.append(f, $(f).value.trim()); });
                 data.append('nfc_token', token);
                 if (photoRequired) data.append('photo_token', photoToken);
+                if (cardKind()) data.append('card_exception', cardKind());
                 res = await UI.postForm('/api/register', data);
             }
             if (!res.success) {
@@ -270,6 +291,7 @@
                 return;
             }
             generation += 1;
+            if (cardKind() && window.AdminCards) window.AdminCards.load();
             $('step-form').hidden = true;
             $('registration-done').hidden = false;
             $('registration-done').querySelector('a').focus();
@@ -284,6 +306,21 @@
         }
     }
     $('nfc-start').addEventListener('click', startCapture);
+    // Changing the kind drops a running read: the two starts accept different chips.
+    function kindChanged() {
+        const other = cardKind() === 'other';
+        $('card-title').textContent = other ? 'Kartu NFC pengganti' : 'KTM (Kartu Tanda Mahasiswa)';
+        cancelServer(false);
+        resetCapture('Tekan ' + readLabel() + ', lalu tempelkan ' + (other ? 'kartu NFC-nya' : 'KTM') + ' ke pembaca.');
+        $('form-error').textContent = '';
+    }
+    document.querySelectorAll('input[name="card_kind"]').forEach(function (el) {
+        el.addEventListener('change', kindChanged);
+    });
+    // #ktm-ditolak / #kartu-lain preselect an option (links and review shots).
+    const preset = { '#ktm-ditolak': 'ktm', '#kartu-lain': 'other' }[location.hash];
+    const presetEl = preset && document.querySelector('input[name="card_kind"][value="' + preset + '"]');
+    if (presetEl) { presetEl.checked = true; kindChanged(); }
     if ($('photo-start')) $('photo-start').addEventListener('click', startPhoto);
     initPhoto();
     $('reg-form').addEventListener('submit', submit);
@@ -322,11 +359,6 @@
         photoGen += 1;
         generation += 1;
         clearTimeout(timer);
-        if (!token) return;
-        fetch('/api/nfc/registration/cancel', {
-            method: 'POST', credentials: 'same-origin', keepalive: true,
-            headers: { 'X-CSRFToken': UI.getCSRFToken(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nfc_token: token }),
-        }).catch(function () { /* Server capture also expires after 120 seconds. */ });
+        cancelServer(true);
     });
 })();

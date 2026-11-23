@@ -6,8 +6,8 @@
 #}
 
 {% block extra_head %}
-{# Phone layout variants B/C (?variant=b|c), set before the CSS so nothing flashes; saved nowhere. #}
-{% if request.path.startswith('/admin') %}<script>var v=new URLSearchParams(location.search).get('variant');if(/^[bc]$/.test(v))document.documentElement.dataset.variant=v;</script>{% endif %}
+{# Phone layout B is the default; ?variant=a shows the old layout for one more review round. Set before the CSS so nothing flashes. #}
+{% if request.path.startswith('/admin') %}<script>if(new URLSearchParams(location.search).get('variant')!=='a')document.documentElement.dataset.variant='b';</script>{% endif %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/phone-native.css') }}">
 {# Installable admin app: manifest + icons; the worker registers below. #}
@@ -28,7 +28,7 @@
     ('Ringkasan', '/admin', 'M3 11l9-8 9 8M5 9.5V21h5v-6h4v6h5V9.5', false),
     ('Alat', '/admin/monitor', 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z', false),
     ('Mahasiswa', '/admin/students', 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8', false),
-    ('Kartu', '/admin/cards', None, true),
+    ('Daftar mahasiswa', '/admin/register', None, true),
     ('Keamanan', '/admin/security', None, true),
     ('Tambah alat', '/admin/input_tool', None, true),
     ('Riwayat', '/admin/history', 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2', false),
@@ -66,7 +66,7 @@
         <li class="site-nav__lainnya">
             {# Phone only. Class switcher: the script below closes it on an outside click or Escape. #}
             <details class="switcher">
-                <summary{% if request.path.startswith(('/admin/cards', '/admin/security', '/admin/input_tool')) %} aria-current="page"{% endif %}>
+                <summary{% if request.path.startswith(('/admin/register', '/admin/security', '/admin/input_tool')) %} aria-current="page"{% endif %}>
                     <svg class="tab__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3.5"/></svg>
                     <span>Lainnya</span>
                 </summary>

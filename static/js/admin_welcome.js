@@ -1,14 +1,13 @@
 /*
- * /admin dashboard: today's date, four counters, "Perlu tindakan" (alarms,
- * unverified returns, overdue loans) and device state. Polls every 10 s.
+ * /admin dashboard: today's date, a "N perlu tindakan" button in the hero
+ * (alarms + unverified returns + overdue loans), four counters and device
+ * state. Polls every 10 s.
  */
 (function () {
     'use strict';
 
     const UI = window.UI;
-    const h = UI.h;
     const POLL_MS = 10000;
-    const MONITOR = '/admin/monitor';
     const CONDITIONS = {
         disabled: 'Dinonaktifkan', warming_up: 'Memeriksa…', healthy: 'Normal', unavailable: 'Tidak tersedia',
         suspected_obstruction: 'Dugaan tertutup / cahaya kurang', camera_unavailable: 'Tidak tersedia',
@@ -31,12 +30,6 @@
         return res;
     }
 
-    function item(title, meta, danger) {
-        return h('li', null, h('a', { href: MONITOR },
-            h('strong', { class: danger ? 'status status--danger' : 'status status--warn', text: title }),
-            h('span', { class: 'sub', text: meta })));
-    }
-
     // The tile turns red/amber only while its count is above zero.
     function setStat(id, n) {
         $(id).textContent = n;
@@ -53,19 +46,9 @@
         setStat('stat-borrowed', borrowed.length);
         setStat('stat-overdue', overdue.length);
 
-        const list = $('todo-list');
-        list.textContent = '';
-        alarms.forEach(function (a) {
-            list.appendChild(item('Alarm · ' + (a.tool_name || 'Alat #' + a.tool_id), 'Sejak ' + UI.formatWibDate(a.started_at), true));
-        });
-        returns.forEach(function (r) {
-            list.appendChild(item('Belum diverifikasi · ' + r.tool_name,
-                (r.borrower_name || '-') + ' · kembali ' + UI.formatWibDate(r.return_time), false));
-        });
-        overdue.forEach(function (t) {
-            list.appendChild(item('Terlambat · ' + t.name, (t.borrower_name || '-') + ' · batas ' + UI.formatWibDate(t.due_at, true), false));
-        });
-        if (!list.children.length) list.appendChild(h('li', { class: 'empty', text: 'Tidak ada yang perlu ditindaklanjuti.' }));
+        const total = alarms.length + returns.length + overdue.length;
+        $('todo-cta').hidden = total === 0;
+        $('todo-cta').textContent = total + ' perlu tindakan →';
     }
 
     function renderDevices(devices, security) {
