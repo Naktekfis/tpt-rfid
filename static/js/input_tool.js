@@ -181,7 +181,22 @@
         const status = $('local-reader-status');
         let link = null;
         $('local-reader').hidden = false;
-        function setLocal(list) { localEpcs = list; renderEpcs(); }
+        // Status shows the reader is answering, and names tags that are already
+        // registered (they are left out of the list, so say why they do not appear).
+        function setLocal(list, stats) {
+            localEpcs = list;
+            renderEpcs();
+            if (!link || !stats) return;
+            const byEpc = {};
+            tools.forEach(function (t) { byEpc[normalizeEpc(t.rfid_uid)] = t.name; });
+            const registered = list.filter(function (epc) { return byEpc[epc]; })
+                .map(function (epc) { return byEpc[epc]; });
+            let text = 'Reader terhubung (' + stats.rounds + ' kali membaca). ';
+            if (!list.length) text += 'Belum ada tag di reader. Tempelkan tag baru.';
+            else if (registered.length === list.length) text += 'Tag ini sudah terdaftar: ' + registered.join(', ') + '.';
+            else text += list.length + ' tag terbaca' + (registered.length ? ' (' + registered.length + ' sudah terdaftar: ' + registered.join(', ') + ')' : '') + '.';
+            status.textContent = text;
+        }
         btn.addEventListener('click', async function () {
             if (link) {
                 link.close();

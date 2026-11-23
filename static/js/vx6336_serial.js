@@ -7,7 +7,8 @@
  *   const link = await VX6336Serial.connect({ onEpcs, onState });  // user gesture
  *   link.close();
  *
- * onEpcs(list) gets the EPCs (uppercase hex) read within the last HOLD_MS.
+ * onEpcs(list, stats) gets the EPCs (uppercase hex) read within the last
+ * HOLD_MS, and stats {rounds, reads}: answered inventory rounds and tag reads.
  * onState('connected' | 'lost' | 'closed', message?) reports the port.
  */
 (function (root) {
@@ -109,18 +110,21 @@
         const granted = await serial.getPorts();
         const port = granted.length === 1 ? granted[0] : await serial.requestPort();
         await port.open({ baudRate: BAUD, dataBits: 8, stopBits: 1, parity: 'none' });
+        // pyserial (the Jetson) raises DTR and RTS on open; Web Serial does not.
+        try { await port.setSignals({ dataTerminalReady: true, requestToSend: true }); } catch (e) { /* not supported */ }
         const reader = port.readable.getReader();
         const writer = port.writable.getWriter();
         const splitter = new FrameSplitter();
         const frames = [];
         const seen = new Map();  // EPC -> last read time
+        const stats = { rounds: 0, reads: 0 };
         let wake = null;
         let closed = false;
 
         function report() {
             const now = Date.now();
             seen.forEach(function (at, epc) { if (now - at > HOLD_MS) seen.delete(epc); });
-            onEpcs(Array.from(seen.keys()).sort());
+            onEpcs(Array.from(seen.keys()).sort(), { rounds: stats.rounds, reads: stats.reads });
         }
 
         function nextFrame(timeoutMs) {
@@ -158,11 +162,12 @@
                     if (f.cmd !== CMD_INVENTORY) continue;
                     if (DATA_STATUSES.indexOf(f.status) >= 0) {
                         try {
-                            parseEpcs(f.data).forEach(function (epc) { seen.set(epc, Date.now()); });
+                            parseEpcs(f.data).forEach(function (epc) { seen.set(epc, Date.now()); stats.reads++; });
                         } catch (e) { /* malformed round: skip it */ }
                     }
                     if (f.status !== STATUS_MORE) break;
                 }
+                stats.rounds++;
                 report();
                 await new Promise(function (r) { setTimeout(r, ROUND_GAP_MS); });
             }
