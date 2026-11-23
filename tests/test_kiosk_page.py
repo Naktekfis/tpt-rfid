@@ -107,8 +107,9 @@ def test_kiosk_state_gives_alarm_age_and_overlay_timeout(client, database, tool)
 def test_kiosk_page_has_alarm_close_button_and_logos(client):
     html = client.get("/kiosk").get_data(as_text=True)
     assert 'id="alarm-close-btn"' in html
-    assert "assets/Logo_Teknik_Fisika.jpg" in html
-    assert "assets/Logo_Institut_Teknologi_Bandung.png" in html
+    # White variants on the dark brand bar (static/assets/*_white.png).
+    assert "assets/Logo_Teknik_Fisika_white.png" in html
+    assert "assets/Logo_ITB_white.png" in html
 
 
 def test_kiosk_has_a_plain_admin_link(client):

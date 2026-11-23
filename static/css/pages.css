@@ -1053,7 +1053,7 @@ input[type="date"].input {
 .topbar--admin { flex-wrap: nowrap; padding-block: var(--sp-4); background: var(--c-dark); color: var(--c-on-dark); border-bottom: 0; }
 .topbar--admin .topbar__brand, .topbar--admin .topbar__brand:hover { color: var(--c-on-dark); font-weight: 600; font-size: var(--fs-base); }
 .brandbar__brand { display: flex; align-items: center; gap: var(--sp-3); min-width: 0; font-weight: 600; }
-.brandbar__logos { display: flex; align-items: center; gap: var(--sp-2); flex: none; padding: var(--sp-1) var(--sp-2); background: #fff; border-radius: 6px; }
+.brandbar__logos { display: flex; align-items: center; gap: var(--sp-3); flex: none; }
 .topbar .brandbar__logos img, .brandbar__logos img { height: 2rem; width: auto; }
 .eyebrow { font-size: var(--fs-sm); font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-on-dark-muted); }
 .brand-full { display: flex; flex-direction: column; line-height: 1.25; }
