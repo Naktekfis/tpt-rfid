@@ -684,6 +684,22 @@ class DatabaseHandler:
             db.session.rollback()
             raise
 
+    def reset_tool_presence(
+        self, from_state: Optional[str] = None, to_state: str = "unknown"
+    ) -> int:
+        """Set presence of every non-deleted unit (or only those in
+        `from_state`) to `to_state`; returns the number of rows changed."""
+        try:
+            query = db.update(Tool).where(Tool.status != "deleted")
+            if from_state is not None:
+                query = query.where(Tool.presence == from_state)
+            result = db.session.execute(query.values(presence=to_state))
+            db.session.commit()
+            return result.rowcount or 0
+        except Exception:
+            db.session.rollback()
+            raise
+
     def open_alarm_for_tool(self, tool_id: int) -> Optional[AlarmEvent]:
         return AlarmEvent.query.filter_by(tool_id=tool_id, ended_at=None).first()
 

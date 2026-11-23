@@ -60,6 +60,13 @@ class ToolPresenceService:
         # read gap at the edge of the field does not become a false alarm.
         self.alarm_confirm_seconds = alarm_confirm_seconds
         self._pending: Dict[str, tuple] = {}
+        # Presence in the DB is from the previous run: start every unit as
+        # "unknown"; once the reader has run for `missing_after`, units still
+        # not seen become "missing" (no alarm: nobody knows when they left).
+        with app.app_context():
+            database.reset_tool_presence()
+        self._first_round_at: Optional[float] = None
+        self._boot_sweep_done = False
         self._queue: Optional[queue.Queue] = None
         if background:
             self._queue = queue.Queue()
@@ -116,6 +123,22 @@ class ToolPresenceService:
             self._fire_due_alarms(self._clock())
             if epcs is not None:
                 self._touch_last_seen(epcs, now)
+                self._boot_sweep(now)
+
+    def _boot_sweep(self, now: float) -> None:
+        if self._boot_sweep_done:
+            return
+        if self._first_round_at is None:
+            self._first_round_at = now
+            return
+        if now - self._first_round_at <= self.monitor.missing_after:
+            return
+        self._boot_sweep_done = True
+        count = self.database.reset_tool_presence("unknown", "missing")
+        if count:
+            logger.info(
+                "Presence: %d unit(s) not seen since start marked missing", count
+            )
 
     def _handle(self, event: PresenceEvent, now: float) -> None:
         epc = event.epc

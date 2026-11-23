@@ -317,3 +317,30 @@ def test_session_borrow_marks_missing_without_alarm(confirm_env, database):
     clock.t = 7
     service.on_round([])
     assert service.open_alarms() == [] and reader.beeps == 0
+
+
+def test_start_resets_stale_presence_then_unseen_units_go_missing_without_alarm(
+    app, database
+):
+    seen = make_tool(database, "BOOT-SEEN")
+    gone = make_tool(database, "BOOT-GONE")
+    for t in (seen, gone):
+        database.set_tool_presence(int(t["tool_id"]), "present")
+    clock = Clock()
+    reader = FakeReader()
+    service = ToolPresenceService(
+        app, database, reader, PresenceMonitor(5.0, clock=clock), True, clock=clock
+    )
+    presence = lambda t: db.session.get(Tool, int(t["tool_id"])).presence  # noqa: E731
+    assert presence(seen) == "unknown" and presence(gone) == "unknown"
+    service.on_round(["BOOT-SEEN"])
+    clock.t = 3
+    service.on_round(["BOOT-SEEN"])
+    assert presence(gone) == "unknown"
+    clock.t = 6
+    service.on_round(["BOOT-SEEN"])
+    assert presence(seen) == "present" and presence(gone) == "missing"
+    assert service.open_alarms() == [] and reader.beeps == 0
+    clock.t = 7
+    service.on_round(["BOOT-SEEN", "BOOT-GONE"])
+    assert presence(gone) == "present"
