@@ -29,7 +29,7 @@ LAST_SEEN_WRITE_INTERVAL = 10.0  # s between last_seen_at writes per tool
 WORKER_IDLE_CHECK = 0.5  # s; pending alarms still fire if rounds stop
 # No inventory round for this long (s): the reader is gone, so presence is
 # unknown until it reads again (then judged afresh, as on start).
-READER_STALL_AFTER = 10.0
+READER_STALL_AFTER = 30.0  # > the longest VX6336 round (ScanTime 255 = 25.5 s)
 
 
 class ToolPresenceService:
