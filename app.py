@@ -40,6 +40,7 @@ from utils import (
     create_rfid_reader,
 )
 from utils.camera import create_camera
+from utils.helpers import is_kiosk_request
 from utils.kiosk import Kiosk
 from utils.nfc_policy import CardPolicy
 from utils.nfc_reader import create_nfc_reader
@@ -389,7 +390,7 @@ def admin_logout():
     session.pop("admin_logged_in", None)
     session.pop("admin_name", None)
     session.pop("admin_until", None)
-    if request.remote_addr in ("127.0.0.1", "::1"):
+    if is_kiosk_request(request):
         return redirect(url_for("kiosk_page"))
     return redirect(url_for("admin_login"))
 

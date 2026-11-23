@@ -145,6 +145,20 @@ def test_remote_browser_cannot_start_face_login(client, face):
     assert status["local"] is False
 
 
+def test_tailscale_serve_is_remote_though_it_arrives_on_loopback(client, face):
+    enrol("Ahmad", "A")
+    for header in ("X-Forwarded-For", "Tailscale-User-Login"):
+        proxied = {header: "100.64.0.2"}
+        resp, _ = login(client, face, good(), headers=proxied)
+        assert resp.status_code == 403
+        status = client.get("/api/admin/face/status", headers=proxied).get_json()
+        assert status["local"] is False
+        logout = client.get("/admin/logout", headers=proxied)
+        assert logout.headers["Location"].endswith("/admin/login")
+    assert client.get("/api/admin/face/status").get_json()["local"] is True
+    assert client.get("/admin/logout").headers["Location"].endswith("/kiosk")
+
+
 def test_repeated_failures_lock_face_login_but_not_the_pin(client, face):
     enrol("Ahmad", "A")
     for _ in range(face.settings.lockout_failures):
@@ -200,7 +214,6 @@ def test_pin_logins_are_logged(admin_client):
     assert [e["success"] for e in events] == [True, False]
 
 
-
 def test_second_face_during_the_attempt_fails(client, face):
     enrol("Ahmad", "A")
     two = {"faces": [("A", 0.0), ("B", 0.0)], "live": 0.95}
@@ -213,7 +226,9 @@ def test_enrol_under_an_existing_name_needs_the_same_face(admin_client, face):
     enrol("Ahmad", "A")
     face.camera.frames.extend(good("B"))
     admin_client.post("/api/admin/faces/enroll/start", json={"name": "Ahmad"})
-    assert admin_client.get("/api/admin/face/attempt").get_json()["reason"] == "name_taken"
+    assert (
+        admin_client.get("/api/admin/face/attempt").get_json()["reason"] == "name_taken"
+    )
     assert AdminFace.query.filter_by(name="Ahmad").count() == 1
 
 
@@ -247,7 +262,10 @@ def test_enrol_refuses_two_people(admin_client, face):
     admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
     face.camera.frames.extend(good("A", after="B"))
     admin_client.post("/api/admin/faces/enroll/start", json={"name": "Ahmad"})
-    assert admin_client.get("/api/admin/face/attempt").get_json()["reason"] == "face_changed"
+    assert (
+        admin_client.get("/api/admin/face/attempt").get_json()["reason"]
+        == "face_changed"
+    )
 
 
 def test_attempt_asks_only_to_look_at_the_camera():

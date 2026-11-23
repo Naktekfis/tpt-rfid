@@ -7,6 +7,23 @@ import html
 from datetime import datetime, timezone, timedelta
 from werkzeug.utils import secure_filename
 
+LOCAL_ADDRS = ("127.0.0.1", "::1")
+# Set by `tailscale serve` (or any reverse proxy) on the way to gunicorn on loopback.
+PROXY_HEADERS = ("X-Forwarded-For", "Tailscale-User-Login")
+
+
+def is_kiosk_request(request):
+    """True only for the kiosk's own browser: loopback with no proxy header.
+
+    A remote admin reaching gunicorn through `tailscale serve` also arrives
+    from loopback, but with a proxy header. Faking a header only turns the kiosk
+    into "remote", so trusting its presence is safe.
+    """
+    return request.remote_addr in LOCAL_ADDRS and not any(
+        h in request.headers for h in PROXY_HEADERS
+    )
+
+
 # Indonesia Timezone - WIB (Western Indonesia Time) = UTC+7
 WIB_OFFSET = timedelta(hours=7)
 

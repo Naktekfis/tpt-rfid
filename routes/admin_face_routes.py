@@ -1,7 +1,8 @@
 """Admin face login, face enrolment and the admin login log (utils/admin_face.py).
 
 Face login and enrolment only run for requests from the kiosk itself
-(loopback): the camera is the Jetson's, and a remote browser must not be able
+(loopback without a proxy header, utils.helpers.is_kiosk_request): the camera
+is the Jetson's, and a remote browser (also via tailscale serve) must not be able
 to start it. The browser that started a login attempt gets the session when it
 polls the passed attempt; nobody else can.
 """
@@ -20,24 +21,22 @@ from utils.admin_face import (
     delete_admin_face,
     list_admin_faces,
 )
-from utils.helpers import utc_to_wib
+from utils.helpers import is_kiosk_request, utc_to_wib
 from utils.models import AdminLoginEvent
-
-LOCAL_ADDRS = ("127.0.0.1", "::1")
 
 
 def _is_local() -> bool:
-    # Valid only while gunicorn faces clients directly (deploy/jetson binds it
-    # without a proxy). A reverse proxy or an `ssh -L` tunnel would make every
-    # request look local: then trust a proxy header set by the proxy instead.
-    return request.remote_addr in LOCAL_ADDRS
+    # An `ssh -L` tunnel adds no header and would still look local: use tailscale serve.
+    return is_kiosk_request(request)
 
 
 def _error(message: str, status: int, **extra):
     return jsonify({"success": False, "error": message, **extra}), status
 
 
-def create_admin_face_blueprint(face_auth, admin_required, limiter, session_seconds: int = 900):
+def create_admin_face_blueprint(
+    face_auth, admin_required, limiter, session_seconds: int = 900
+):
     bp = Blueprint("admin_face", __name__)
 
     def start(mode, name=None):
