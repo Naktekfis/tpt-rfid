@@ -136,3 +136,14 @@ def test_admin_app_is_installable(client):
     page = client.get("/admin/login").get_data(as_text=True)
     assert 'rel="manifest"' in page and "serviceWorker" in page
     assert client.get("/favicon.ico").status_code == 200
+
+
+def test_tool_page_offers_the_pc_reader_only_remotely(admin_client):
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    kiosk = admin_client.get("/admin/input_tool").get_data(as_text=True)
+    remote = admin_client.get(
+        "/admin/input_tool", headers={"X-Forwarded-For": "100.64.0.2"}
+    ).get_data(as_text=True)
+    assert "localReader: false" in kiosk
+    assert "localReader: true" in remote
+    assert "vx6336_serial.js" in remote

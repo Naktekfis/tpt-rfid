@@ -52,6 +52,10 @@
         <fieldset class="step">
             <legend class="step__title">3. Tag RFID</legend>
             <p class="lead">Letakkan tag baru di depan reader. Tag yang belum terdaftar muncul di sini; pilih satu.</p>
+            <div class="local-reader" id="local-reader" hidden>
+                <button type="button" class="btn btn--secondary" id="local-reader-btn">Hubungkan reader di PC ini</button>
+                <span class="field__hint" id="local-reader-status" role="status">Colokkan reader RFID ke USB komputer ini (Chrome/Edge).</span>
+            </div>
             <div class="epc-list" id="epc-list" role="radiogroup" aria-label="Tag yang terbaca" aria-live="polite">
                 <p class="empty">Belum ada tag baru yang terbaca.</p>
             </div>
@@ -117,8 +121,9 @@
 
 {% block page_scripts %}
 <script>
-    window.INPUT_TOOL_CONFIG = { cameraStream: "/camera/stream" };
+    window.INPUT_TOOL_CONFIG = { cameraStream: "/camera/stream", localReader: {{ 'true' if remote else 'false' }} };
 </script>
+<script src="{{ url_for('static', filename='js/vx6336_serial.js') }}"></script>
 <script src="{{ url_for('static', filename='js/board.js') }}"></script>
 <script src="{{ url_for('static', filename='js/input_tool.js') }}"></script>
 {% endblock %}

@@ -406,7 +406,8 @@ def admin_monitor():
 @admin_required
 def admin_input_tool():
     """Admin tool registration page"""
-    return render_template("input_tool.html")
+    # Remote (admin PC): tags can also come from a reader plugged into that PC.
+    return render_template("input_tool.html", remote=not is_kiosk_request(request))
 
 
 @app.route("/admin/export_history")

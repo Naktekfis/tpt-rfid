@@ -1,7 +1,7 @@
 /*
  * /admin/input_tool: register one physical unit. Pick or create a tool type,
  * pick a tag from the unknown EPCs in the reader field (/api/presence, every
- * 1 s) or type it, save via POST /api/admin/tool_units. The type photo comes
+ * 1 s), from a reader plugged into this PC (remote, vx6336_serial.js), or type it, save via POST /api/admin/tool_units. The type photo comes
  * from the webcam (…/photo/capture) or a file upload (…/photo).
  */
 (function () {
@@ -19,6 +19,7 @@
     let types = [];
     let tools = [];
     let unknown = [];
+    let localEpcs = [];  // read by the reader on this PC (remote admin)
     let selectedEpc = '';
     let lastEpcKey = null;
     let photoBust = Date.now();
@@ -112,21 +113,32 @@
 
     // ---------- Tags in the field ----------
 
+    // Unknown tags from the kiosk readers plus unregistered ones on this PC's reader.
+    function fieldEpcs() {
+        const known = new Set(tools.map(function (t) { return normalizeEpc(t.rfid_uid); }));
+        const list = unknown.slice();
+        localEpcs.forEach(function (epc) {
+            if (!known.has(epc) && list.indexOf(epc) < 0) list.push(epc);
+        });
+        return list;
+    }
+
     function renderEpcs() {
-        const key = JSON.stringify([unknown, selectedEpc]);
+        const inField = fieldEpcs();
+        const key = JSON.stringify([inField, selectedEpc]);
         if (key === lastEpcKey) return;
         lastEpcKey = key;
         const box = $('epc-list');
         box.textContent = '';
         // A picked tag that left the field stays in the list, marked.
-        const list = unknown.slice();
+        const list = inField.slice();
         if (selectedEpc && list.indexOf(selectedEpc) < 0) list.unshift(selectedEpc);
         if (!list.length) {
             box.appendChild(h('p', { class: 'empty', text: 'Belum ada tag baru yang terbaca.' }));
             return;
         }
         list.forEach(function (epc) {
-            const gone = unknown.indexOf(epc) < 0;
+            const gone = inField.indexOf(epc) < 0;
             const input = h('input', {
                 type: 'radio', name: 'epc', value: epc, checked: epc === selectedEpc,
                 onchange: function () {
@@ -158,6 +170,47 @@
             }
         } catch (e) { /* next poll */ }
         setTimeout(pollPresence, POLL_MS);
+    }
+
+    // ---------- Reader on this PC (Web Serial) ----------
+
+    function initLocalReader() {
+        const S = window.VX6336Serial;
+        if (!CFG.localReader || !S || !S.supported()) return;
+        const btn = $('local-reader-btn');
+        const status = $('local-reader-status');
+        let link = null;
+        $('local-reader').hidden = false;
+        function setLocal(list) { localEpcs = list; renderEpcs(); }
+        btn.addEventListener('click', async function () {
+            if (link) {
+                link.close();
+                return;
+            }
+            btn.disabled = true;
+            try {
+                link = await S.connect({
+                    onEpcs: setLocal,
+                    onState: function (state, message) {
+                        if (state === 'connected') {
+                            btn.textContent = 'Putuskan reader';
+                            status.textContent = 'Reader terhubung. Tempelkan tag baru ke reader.';
+                            return;
+                        }
+                        link = null;
+                        btn.textContent = 'Hubungkan reader di PC ini';
+                        status.textContent = message || 'Reader diputuskan.';
+                    },
+                });
+            } catch (e) {
+                // NotFoundError: the port picker was closed without choosing.
+                status.textContent = e && e.name === 'NotFoundError'
+                    ? 'Tidak ada port yang dipilih.'
+                    : 'Reader tidak bisa dibuka (dipakai program lain atau driver belum terpasang).';
+            } finally {
+                btn.disabled = false;
+            }
+        });
     }
 
     async function pollDevices() {
@@ -351,5 +404,6 @@
     loadTypes();
     pollPresence();
     pollDevices();
+    initLocalReader();
     startCamera();
 })();
