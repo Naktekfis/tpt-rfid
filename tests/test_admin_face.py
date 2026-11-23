@@ -38,6 +38,12 @@ class FakeLiveness:
         return frame["live"] >= 0.7, {"fake": frame["live"]}
 
 
+class FakeRemoteLiveness:
+    def check(self, frame, face):
+        live = frame.get("live_remote", frame["live"])
+        return live >= 0.5, {"fake_remote": live}
+
+
 class FakeCamera:
     def __init__(self):
         self.frames = deque()
@@ -60,6 +66,7 @@ def face(app, monkeypatch):
     for key, value in {
         "engine": FakeEngine(),
         "liveness": FakeLiveness(),
+        "remote_liveness": FakeRemoteLiveness(),
         "unavailable": None,
         "camera": FakeCamera(),
         "settings": FaceSettings(enrol_prepare=0, enrol_countdown=0),
@@ -222,6 +229,17 @@ def test_only_poor_remote_frames_end_as_poor_image(client, face, frames_as_json)
     face.settings.timeout = -1.0
     result = post_frame(client, BLURRED).get_json()
     assert (result["state"], result["reason"]) == ("failed", "poor_image")
+
+
+def test_remote_frames_use_the_remote_liveness_models(client, face, frames_as_json):
+    enrol("Ahmad", "A")
+    phone = {**front(live=0.1), "live_remote": 0.9}  # mn3-like low, remote model high
+    _, kiosk = login(client, face, [phone] * 6)
+    assert (kiosk["state"], kiosk["reason"]) == ("failed", "spoof")
+    client.post("/api/admin/face/login/start", headers=PROXIED)
+    for _ in range(6):
+        result = post_frame(client, phone).get_json()
+    assert result["state"] == "passed"
 
 
 def test_kiosk_frames_are_not_gated_on_image_quality(client, face):

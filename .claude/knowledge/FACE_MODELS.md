@@ -58,3 +58,9 @@ per-attempt means.
   prints each attempt's median distance to the nearest admin and the threshold.
 - Login rule relaxed from all 6 frames to 5 of 6 matching one admin, none matching another.
 - Faces are stored per engine: switching recognizer means enrolling again.
+
+## Update 2026-11-24: remote face login (phone/PC camera)
+- Remote attempts (through the Cloudflare tunnel) post frames from the browser's camera; see `utils/admin_face.py`.
+- On 13 real phone photos (one admin, iPhone/Android unknown) mn3 >= 0.3 passed 6, minifas_se >= 0.5 passed 10, minifas 13 (useless: 0.97 on noise). Remote now uses `FACE_LIVENESS_MODELS_REMOTE=minifas_se:0.5`; kiosk keeps mn3.
+- Remote image-quality gate (blur, dark face, backlight) skips frames with a hint; kiosk is not gated (its real logins pass at sharpness 19-28).
+- Not yet measured: print/screen spoofs held to a phone camera. A virtual camera can inject video on a remote device, which passive liveness cannot catch; the email OTP is the main remote gate.

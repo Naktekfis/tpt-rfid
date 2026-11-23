@@ -90,6 +90,7 @@ Semua di `.env`; lihat [`.env.example`](.env.example). Yang paling sering disent
 | `LOAN_REMINDERS_ENABLED` | `false` | Email otomatis saat batas pinjam tiba dan 2 hari setelahnya |
 | `FACE_LOGIN_ENABLED` | `false` | Login wajah admin (hanya di layar rak peminjaman) |
 | `FACE_RECOGNIZER` / `FACE_LIVENESS_MODELS` | `arcface_mbf` / `mn3:0.3` | Model pengenal wajah dan cek keaslian |
+| `FACE_LIVENESS_MODELS_REMOTE` | `minifas_se:0.5` | Cek keaslian untuk login wajah dari HP/PC (kamera perangkat) |
 
 ## Arsitektur
 

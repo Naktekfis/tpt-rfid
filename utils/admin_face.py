@@ -22,7 +22,9 @@ video: remote face login is weaker than at the kiosk and sits behind the
 tunnel's email OTP. Phone cameras move and get backlit, which the liveness
 model reads as a spoof, so a remote frame that is blurred, dark or lit from
 behind is skipped with a hint instead (not at the kiosk: its fixed camera
-passes with lower values, measured on the stored login photos).
+passes with lower values, measured on the stored login photos). Remote frames
+are also judged by their own liveness models (FACE_LIVENESS_MODELS_REMOTE):
+mn3, fine on the kiosk webcam, called most real phone frames a spoof.
 
 Failures are logged with a face photo (AdminLoginEvent); repeated login
 failures lock face login for a while, so the PIN is the way in. The engine,
@@ -170,11 +172,13 @@ class FaceAuth:
         threaded: bool = True,
         beep: Optional[Callable[..., None]] = None,
         quality: Optional[Callable[[Any, Any], Tuple[float, float, float]]] = None,
+        remote_liveness=None,
     ):
         self.app = app
         self.camera = camera
         self.engine = engine
         self.liveness = liveness
+        self.remote_liveness = remote_liveness or liveness  # phone/PC cameras
         self.settings = settings or FaceSettings()
         self.unavailable = unavailable or (
             None if engine and liveness else "Model wajah tidak tersedia."
@@ -340,7 +344,8 @@ class FaceAuth:
         attempt.hint = None
         if attempt.photo is None and self._photo is not None:
             attempt.photo = self._photo(frame, face)
-        live, scores = self.liveness.check(frame, face)
+        liveness = self.remote_liveness if attempt.remote else self.liveness
+        live, scores = liveness.check(frame, face)
         for model, value in scores.items():
             attempt.scores.setdefault(model, []).append(float(value))
         attempt.frames.append((self.engine.embed(frame, face), bool(live)))
@@ -574,15 +579,18 @@ def build_face_auth(app, camera, beep=None) -> FaceAuth:
     try:
         engine = create_engine(model_dir, cfg.get("FACE_RECOGNIZER", "arcface_mbf"))
         liveness = Liveness(model_dir, cfg.get("FACE_LIVENESS_MODELS", "mn3:0.3"))
+        remote_spec = cfg.get("FACE_LIVENESS_MODELS_REMOTE", "minifas_se:0.5")
+        remote_liveness = Liveness(model_dir, remote_spec)
     except (FaceModelsMissing, LivenessUnavailable, ValueError) as exc:
         logger.warning("Face login unavailable: %s", exc)
         return FaceAuth(
             app, camera, settings=settings, unavailable="Model wajah tidak tersedia."
         )
     logger.info(
-        "Face login on (%s, liveness %s)",
+        "Face login on (%s, liveness %s, remote %s)",
         engine.name,
         cfg.get("FACE_LIVENESS_MODELS", "mn3:0.3"),
+        remote_spec,
     )
     return FaceAuth(
         app,
@@ -593,4 +601,5 @@ def build_face_auth(app, camera, beep=None) -> FaceAuth:
         photo=portrait_jpeg,
         beep=beep,
         quality=image_quality,
+        remote_liveness=remote_liveness,
     )
