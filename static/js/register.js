@@ -220,7 +220,8 @@
         if (CFG.student || !$('photo-field')) return;
         try {
             const res = await UI.fetchJSON('/api/register/photo/status');
-            photoRequired = !!(res.success && res.available);
+            // A remote admin may skip the photo (their device may have no usable camera).
+            photoRequired = !REMOTE && !!(res.success && res.available);
         } catch (e) {
             photoRequired = false;
         }

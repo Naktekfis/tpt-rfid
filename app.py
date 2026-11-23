@@ -532,10 +532,12 @@ def api_register():
         # never upload one); required whenever the kiosk camera can take it.
         photo_jpeg = None
         photo_token = request.form.get("photo_token", "")
-        # A remote admin uploads it from its own camera (same token); without
-        # the kiosk camera that photo is optional, as the kiosk's is.
+        # A remote admin uploads it from its own camera (same token); for them
+        # the photo is optional (user decision 2026-11-24: a device without a
+        # usable camera must still be able to register).
         remote_admin = session.get("admin_logged_in") and not is_kiosk_request(request)
-        if photo_capture.available or (photo_token and remote_admin):
+        needs_photo = photo_capture.available and not remote_admin
+        if needs_photo or (photo_token and remote_admin):
             # Peek now, consume only after the account exists, so a failed
             # card read does not cost the student a new photo.
             photo_jpeg = photo_capture.preview(capture_owner(), photo_token)

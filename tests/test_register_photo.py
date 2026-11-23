@@ -187,7 +187,7 @@ def test_remote_admin_uploads_the_photo_and_registers_with_it(admin_client):
     assert client.get(f"/api/student/{sid}/photo").data == jpeg
 
 
-def test_remote_admin_still_needs_a_photo_while_the_kiosk_camera_is_on(
+def test_remote_admin_may_register_without_a_photo_while_the_kiosk_camera_is_on(
     admin_client, photo
 ):
     client = remote_admin(admin_client)
@@ -198,7 +198,7 @@ def test_remote_admin_still_needs_a_photo_while_the_kiosk_camera_is_on(
         data=dict(FORM, nfc_token=nfc.get_json()["token"]),
         environ_base=REMOTE,
     )
-    assert resp.status_code == 400 and resp.get_json()["photo_missing"]
+    assert resp.status_code == 200 and resp.get_json()["success"]
 
 
 def test_upload_needs_an_admin_session(client):
