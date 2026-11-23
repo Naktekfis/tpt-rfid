@@ -1,6 +1,7 @@
 /*
- * /admin/login: "Masuk dengan wajah" on the kiosk screen when face login is
- * available; the PIN form below always works.
+ * /admin/login: "Masuk dengan wajah" when face login is available, with the
+ * kiosk camera on the kiosk screen or this device's camera remotely; the PIN
+ * form below always works.
  */
 (function () {
     'use strict';
@@ -10,7 +11,8 @@
 
     async function init() {
         const status = await UI.fetchJSON('/api/admin/face/status');
-        if (!status.success || !status.available || !status.local) return;
+        if (!status.success || !status.available) return;
+        if (!status.local && !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) return;
         $('face-login').hidden = false;
         const start = $('face-start');
         start.addEventListener('click', async function () {

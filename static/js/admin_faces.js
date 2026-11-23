@@ -31,8 +31,10 @@
             body.appendChild(h('tr', null, h('td', { colspan: '4', class: 'empty', text: 'Data wajah admin belum dapat dimuat.' })));
             return;
         }
-        $('enrol-form').hidden = !res.local;
-        $('enrol-remote').hidden = res.local;
+        // Remote: enrol with this device's camera when the browser has one.
+        const canEnrol = res.local || !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+        $('enrol-form').hidden = !canEnrol;
+        $('enrol-remote').hidden = canEnrol;
         const faces = res.faces || [];
         $('faces-count').textContent = faces.length ? faces.length + ' admin' : '';
         if (!faces.length) {

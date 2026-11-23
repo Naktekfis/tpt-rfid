@@ -1,10 +1,12 @@
 """Admin face login and enrolment with a fake engine, liveness and camera."""
 
+import json
 from collections import deque
 
 import pytest
 
 import app as app_module
+from routes import admin_face_routes
 from tests.conftest import TEST_PIN
 from utils.admin_face import Attempt, FaceSettings, pack
 from utils.face import Face
@@ -137,25 +139,87 @@ def test_face_leaving_the_camera_fails(client, face):
     assert result["reason"] == "face_lost"
 
 
-def test_remote_browser_cannot_start_face_login(client, face):
-    enrol("Ahmad", "A")
-    resp, _ = login(client, face, good(), environ_base=REMOTE)
-    assert resp.status_code == 403
-    status = client.get("/api/admin/face/status", environ_base=REMOTE).get_json()
-    assert status["local"] is False
+PROXIED = {"X-Forwarded-For": "100.64.0.2"}  # cloudflared / tailscale serve
 
 
-def test_tailscale_serve_is_remote_though_it_arrives_on_loopback(client, face):
+@pytest.fixture()
+def frames_as_json(monkeypatch):
+    """Remote frames: the test posts JSON where the browser posts a JPEG."""
+    monkeypatch.setattr(
+        admin_face_routes,
+        "decode_jpeg",
+        lambda data: json.loads(data) if data.startswith(b"{") else None,
+    )
+
+
+def post_frame(client, frame, **kw):
+    return client.post(
+        "/api/admin/face/frame",
+        data=json.dumps(frame).encode(),
+        content_type="image/jpeg",
+        **kw,
+    )
+
+
+def test_remote_login_uses_the_browsers_frames_not_the_kiosk_camera(
+    client, face, frames_as_json
+):
     enrol("Ahmad", "A")
-    for header in ("X-Forwarded-For", "Tailscale-User-Login"):
-        proxied = {header: "100.64.0.2"}
-        resp, _ = login(client, face, good(), headers=proxied)
-        assert resp.status_code == 403
-        status = client.get("/api/admin/face/status", headers=proxied).get_json()
+    face.camera.frames.extend(good())  # must stay unread
+    for env in ({"environ_base": REMOTE}, {"headers": PROXIED}):
+        started = client.post("/api/admin/face/login/start", **env).get_json()
+        assert started["remote"] is True and started["state"] == "running"
+        status = client.get("/api/admin/face/status", **env).get_json()
         assert status["local"] is False
-        logout = client.get("/admin/logout", headers=proxied)
-        assert logout.headers["Location"].endswith("/admin/login")
-    assert client.get("/api/admin/face/status").get_json()["local"] is True
+        for frame in good():
+            result = post_frame(client, frame, **env).get_json()
+        assert result["state"] == "passed" and result["name"] == "Ahmad"
+        assert is_admin(client)
+        client.get("/admin/logout", **env)
+    assert len(face.camera.frames) == 6
+    assert AdminLoginEvent.query.count() == 2
+
+
+def test_remote_spoof_fails_and_bad_frames_are_refused(client, face, frames_as_json):
+    enrol("Ahmad", "A")
+    client.post("/api/admin/face/login/start", headers=PROXIED)
+    bad = client.post(
+        "/api/admin/face/frame", data=b"not a jpeg", content_type="image/jpeg"
+    )
+    assert bad.status_code == 400
+    for frame in good(live=0.3):
+        result = post_frame(client, frame).get_json()
+    assert (result["state"], result["reason"]) == ("failed", "spoof")
+    assert not is_admin(client)
+
+
+def test_only_the_starting_browser_can_feed_a_remote_attempt(
+    app, client, face, frames_as_json
+):
+    enrol("Ahmad", "A")
+    client.post("/api/admin/face/login/start", headers=PROXIED)
+    other = app.test_client()
+    assert post_frame(other, front()).status_code == 404
+
+
+def test_remote_attempt_leaves_the_kiosk_attempt_running(client, face, frames_as_json):
+    kiosk = Attempt(id="kiosk", mode="login", started=0.0)
+    face._running = kiosk
+    client.post("/api/admin/face/login/start", headers=PROXIED)
+    assert face._running is kiosk and kiosk.state == "running"
+
+
+def test_kiosk_attempt_takes_no_posted_frames(client, face, frames_as_json):
+    enrol("Ahmad", "A")
+    client.post("/api/admin/face/login/start")  # kiosk, mock camera: fails at once
+    assert post_frame(client, front()).status_code == 409
+
+
+def test_proxy_header_makes_a_loopback_request_remote(client):
+    logout = client.get("/admin/logout", headers=PROXIED)
+    assert logout.headers["Location"].endswith("/admin/login")
+    logout = client.get("/admin/logout", headers={"Tailscale-User-Login": "a@b"})
+    assert logout.headers["Location"].endswith("/admin/login")
     assert client.get("/admin/logout").headers["Location"].endswith("/kiosk")
 
 

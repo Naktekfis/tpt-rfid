@@ -14,6 +14,13 @@ Enrolment is guided: a moment to read "Lihat ke kamera", then a 3-2-1
 countdown with a short beep from the reader's buzzer on each count and a
 longer one ("cekrek") when the capture starts.
 
+A remote admin (phone or PC behind the Cloudflare tunnel) uses its own camera:
+the browser posts frames to the attempt (feed) instead of a thread reading the
+kiosk camera. Same checks and lockout, no buzzer, and it never cancels a kiosk
+attempt. Those frames come from the client, so a virtual camera can replay a
+video: remote face login is weaker than at the kiosk and sits behind the
+tunnel's email OTP.
+
 Failures are logged with a face photo (AdminLoginEvent); repeated login
 failures lock face login for a while, so the PIN is the way in. The engine,
 liveness, camera, photo encoder and clock are injected, so tests use fakes and
@@ -99,6 +106,8 @@ class Attempt:
     capture_from: float = 0.0  # enrolment: frames are used from this time on
     countdown: Optional[int] = None  # 3, 2, 1 while counting down
     distance: Optional[float] = None  # login: median distance to the best admin
+    remote: bool = False  # frames come from the browser's camera (feed)
+    busy: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
     @property
     def instruction(self) -> str:
@@ -123,6 +132,7 @@ class Attempt:
             "reason": self.reason,
             "countdown": self.countdown,
             "name": self.name if self.state == "passed" else None,
+            "remote": self.remote,
         }
 
 
@@ -183,7 +193,9 @@ class FaceAuth:
 
     # ---------- Attempts ----------
 
-    def start(self, mode: str, name: Optional[str] = None) -> Attempt:
+    def start(
+        self, mode: str, name: Optional[str] = None, remote: bool = False
+    ) -> Attempt:
         if not self.available:
             raise FaceUnavailable(self.unavailable)
         if mode == LOGIN and self.locked_for() > 0:
@@ -199,14 +211,17 @@ class FaceAuth:
             capture_from=now + s.enrol_prepare + s.enrol_countdown
             if mode == ENROLL
             else now,
+            remote=remote,
         )
         with self._lock:
-            if self._running is not None:  # one camera: the newest attempt wins
-                self._fail(self._running, "cancelled")
-            self._running = attempt
             self._attempts[attempt.id] = attempt
             for old in list(self._attempts)[:-10]:
                 del self._attempts[old]
+            if remote:  # no camera to share: the browser feeds frames
+                return attempt
+            if self._running is not None:  # one camera: the newest attempt wins
+                self._fail(self._running, "cancelled")
+            self._running = attempt
         if self._threaded:
             threading.Thread(
                 target=self._run, args=(attempt,), name="face-login", daemon=True
@@ -233,6 +248,23 @@ class FaceAuth:
                 return None
             a.consumed = True
             return a.name
+
+    def feed(self, attempt: Attempt, frame) -> None:
+        """Feed one frame from a remote browser's camera to its attempt."""
+        if not attempt.busy.acquire(blocking=False):
+            return  # the previous frame is still being checked: drop this one
+        try:
+            if attempt.state != "running":
+                return
+            if self._clock() - attempt.capture_from > self.settings.timeout:
+                self._finish(attempt, False, "timeout")
+                return
+            self.step(attempt, frame)
+        except Exception:  # request boundary: OpenCV can raise anything
+            logger.exception("Remote face attempt failed")
+            self._finish(attempt, False, "error")
+        finally:
+            attempt.busy.release()
 
     def _run(self, attempt: Attempt) -> None:
         try:
@@ -263,7 +295,7 @@ class FaceAuth:
             return
         if attempt.countdown is not None:  # the capture starts now: "cekrek"
             attempt.countdown = None
-            self._buzz(active=6, silent=1, times=1)
+            self._buzz(attempt, active=6, silent=1, times=1)
         detected = self.engine.detect(frame)
         # Small faces (far in the background) are ignored altogether.
         faces = [f for f in detected if min(f.box[2], f.box[3]) >= s.min_face_px]
@@ -300,11 +332,11 @@ class FaceAuth:
         left = attempt.capture_from - now
         count = math.ceil(left) if left <= self.settings.enrol_countdown else None
         if count and count != attempt.countdown:
-            self._buzz(active=2, silent=1, times=1)
+            self._buzz(attempt, active=2, silent=1, times=1)
         attempt.countdown = count
 
-    def _buzz(self, **pattern) -> None:
-        if self._beep is None:
+    def _buzz(self, attempt: Attempt, **pattern) -> None:
+        if self._beep is None or attempt.remote:  # the buzzer is at the kiosk
             return
         try:
             self._beep(**pattern)
@@ -398,8 +430,9 @@ class FaceAuth:
                 self._fail(attempt, reason or "error")
             # Per-model liveness means, for calibrating the thresholds from the log.
             logger.info(
-                "Face %s %s%s, liveness %s, distance %s (threshold %.3f)",
+                "Face %s%s %s%s, liveness %s, distance %s (threshold %.3f)",
                 attempt.mode,
+                " (remote)" if attempt.remote else "",
                 "passed" if ok else "failed",
                 f" ({reason})" if reason else "",
                 {m: round(sum(v) / len(v), 3) for m, v in attempt.scores.items()},
@@ -407,7 +440,11 @@ class FaceAuth:
                 self.threshold,
             )
             # A passer-by in the picture is bad luck, not an attack attempt.
-            if attempt.mode == LOGIN and not ok and reason not in ("cancelled", "multiple_faces"):
+            if (
+                attempt.mode == LOGIN
+                and not ok
+                and reason not in ("cancelled", "multiple_faces")
+            ):
                 self._note_failure()
         with self.app.app_context():
             if store:
@@ -460,11 +497,7 @@ def list_admin_faces(engine: Optional[str] = None) -> List[Dict[str, Any]]:
     )
     if engine is not None:
         query = query.filter(AdminFace.engine == engine)
-    rows = (
-        query.group_by(AdminFace.name)
-        .order_by(AdminFace.name)
-        .all()
-    )
+    rows = query.group_by(AdminFace.name).order_by(AdminFace.name).all()
     return [{"name": n, "samples": c, "created_at": t} for n, c, t in rows]
 
 
