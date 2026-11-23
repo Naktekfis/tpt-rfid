@@ -35,3 +35,15 @@
 - Screenshot gallery script: /tmp/claude-1000/-home-ahmad-tpt-rfid/01a1cabe-6637-4f12-a6d2-1c2ca55ee0be/scratchpad/shots.sh (demo on :8765, 16 pages x 4 sizes).
 - PC reader (Web Serial): the user reports no port shows in the browser chooser. Waiting for the PC's OS and browser; the driver and permission checklist was given.
 - Jetson .env is still single-reader (reader 2 unplugged).
+
+## End of day 2026-11-24 (supersedes the "local commits, NOT deployed" notes above)
+- Deployed v2026.11.24.8 (cc31c25) on the Jetson; tests 466 passed there. Tag v2026.11.24.6 exists on origin, points at 3b9c8b6, and was never deployed (an interrupted command); left as is.
+- Live: kiosk-style admin shell, phone variant B as the default (`?variant=a` still shows the old phone layout; delete it once the user confirms), dashboard order (hero with a "perlu tindakan" CTA, menu, stats, Perangkat), /admin/register with card-exception options (/admin/cards redirects there), remote registration photo from the device camera (optional for a remote admin), /admin/nfc-test, admin phone Web NFC capture, and the kiosk chip lock (`nfc_card_profiles`, Reset sidik kartu).
+- Vercel demo (https://tpt-rfid-demo.vercel.app) was rebuilt from cc31c25 by the ui-demo workflow.
+- A/B review page (Artifact): https://claude.ai/artifact/SQiB2nHTq9LQMPQtGn85x5.
+- NOT verified on hardware (the user said to treat it as done):
+  - No kiosk NFC tap since the deploy, so `nfc_card_profiles` was still empty and the 4 bound cards were unchanged.
+  - The chip lock compares ATQA/SAK/ATS exactly. If real KTMs get refused, loosen it to ATQA+SAK.
+  - Phone registration of a new KTM, then completing it at the kiosk, was not seen in the DB.
+- Jetson .env is still single-reader (reader 2 at the PC). Tool 24 kept alarming at the edge of reader 1 (04:12-04:15 WIB).
+- PC Web Serial: the port does not show in the browser chooser; waiting for the PC's OS and browser.
