@@ -26,3 +26,14 @@ Files for running tpt-rfid on the Jetson Nano 4GB (JetPack 4.6.x, Ubuntu 18.04).
 ## NFC transition
 
 See [NFC_ROLLOUT.md](NFC_ROLLOUT.md) for staging, backup, acceptance and rollback. The NFC binding table is additive; old RFID UIDs and biometric data are retained. Real NFC support is optional on laptops and enabled explicitly on the Jetson.
+
+## Remote admin (Cloudflare Tunnel + Access)
+
+ITB blocks Tailscale, ZeroTier and ngrok; Cloudflare Tunnel passes (ports 443 and 7844).
+
+- URL: `https://admin.labfabrikasi-itb.my.id` (domain at Hostinger, DNS on Cloudflare).
+- Jetson: `/usr/local/bin/cloudflared` 2026.10.7, systemd service `cloudflared` from `sudo cloudflared service install <token>` (token from Cloudflare: Networking > Tunnels > tpt-jetson). Gunicorn stays on `127.0.0.1:5000`.
+- Route: tunnel `tpt-jetson`, published application `admin` -> `http://localhost:5000`.
+- Access: Zero Trust application on `admin.labfabrikasi-itb.my.id`, Allow policy `admin-lab` on listed emails, One-time PIN login. Create or change Access before any new route, or the route is public.
+- The app treats a loopback request with `X-Forwarded-For` (cloudflared adds it) as remote: face login stays kiosk-only, logout goes to `/admin/login` (`utils/helpers.is_kiosk_request`).
+- Off: `sudo systemctl stop cloudflared` (disable to keep it off after reboot). The Jetson's internet currently comes through the dev laptop (`10.42.0.1`).

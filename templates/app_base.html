@@ -8,7 +8,7 @@
 {% block extra_head %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
 {# Installable admin app: manifest + icons; the worker registers below. #}
-<link rel="manifest" href="/manifest.webmanifest">
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
 <meta name="theme-color" content="#005aab">
 <meta name="apple-mobile-web-app-capable" content="yes">
