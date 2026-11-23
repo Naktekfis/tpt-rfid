@@ -338,6 +338,12 @@
         box.hidden = !show;
         if (show) box.textContent = REASONS[s.reason];
         if (s.state === 'unknown_card') {
+            // A cloned UID: same number as a registered card, other chip.
+            const mismatch = s.reason === 'card_mismatch';
+            $('unknown-title').textContent = mismatch ? 'Kartu tidak cocok' : 'KTM belum terdaftar';
+            $('unknown-sub').textContent = mismatch ? 'Kartu tidak cocok dengan kartu terdaftar. Hubungi admin.'
+                : 'Daftarkan KTM ini bersama data diri Anda agar dapat meminjam alat.';
+            $('unknown-register').hidden = mismatch;
             $('unknown-ends').textContent = 'Kembali ke Home dalam ' + Math.ceil(s.unknown_ends_in || 0) + ' detik';
         }
     }

@@ -81,7 +81,9 @@
                     <p id="nfc-status" role="status" aria-live="polite">Tekan Baca KTM, lalu tempelkan KTM ke pembaca.</p>
                     <div class="form__actions">
                         <button type="button" class="btn btn--secondary" id="nfc-start">Baca KTM</button>
+                        {% if admin_mode %}<button type="button" class="btn btn--secondary" id="nfc-phone" hidden>Baca dengan HP ini</button>{% endif %}
                     </div>
+                    {% if admin_mode %}<p class="field__hint" id="nfc-phone-hint" hidden>HP ini tidak bisa membaca kartu (perlu Chrome di Android dengan NFC). Pakai pembaca di kiosk.</p>{% endif %}
                 </div>
             </div>
         </div>
@@ -115,6 +117,7 @@
     window.REGISTER_CONFIG = {
         student: {% if enroll_student %}{{ {"student_id": enroll_student.student_id} | tojson }}{% else %}null{% endif %},
         remotePhoto: {{ 'true' if remote_photo else 'false' }},
+        admin: {{ 'true' if admin_mode else 'false' }},
     };
 </script>
 {% if remote_photo %}<script src="{{ url_for('static', filename='js/device_camera.js') }}"></script>{% endif %}

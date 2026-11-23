@@ -4,7 +4,10 @@
  * Admin mode (/admin/register) adds "Jenis kartu": a card exception (refused
  * KTM, or another card tied to the NIM) saved with the same submit. Off the
  * kiosk (remotePhoto) the photo comes from this device's camera and is
- * uploaded once; the kiosk camera endpoints are never called. */
+ * uploaded once; the kiosk camera endpoints are never called. An admin's
+ * reader read skips the KTM chip check, and an Android phone with Web NFC can
+ * read the card itself ("Baca dengan HP ini"); the server turns its UID into
+ * the same capture token. */
 (function () {
     'use strict';
     const UI = window.UI;
@@ -26,6 +29,9 @@
     let cam = null;  // remote: this device's camera while a photo is taken
     let nimTaken = false;
     let nimCheck = 0;
+    const PHONE_NFC = !!CFG.admin && 'NDEFReader' in window;
+    let viaPhone = false;  // token came from this phone, not the kiosk reader
+    let phoneScan = null;  // AbortController of a running Web NFC scan
 
     // Step cues: a check on finished steps, the next open one filled in.
     function dataDone() {
@@ -263,6 +269,10 @@
     function resetCapture(message) {
         ready = false;
         token = null;
+        viaPhone = false;
+        if (phoneScan) phoneScan.abort();
+        phoneScan = null;
+        if ($('nfc-phone')) $('nfc-phone').disabled = false;
         generation += 1;
         clearTimeout(timer);
         updateSubmit();
@@ -303,8 +313,8 @@
         $('nfc-start').disabled = true;
         $('form-error').textContent = '';
         try {
-            // An exception reads any chip, so it needs the admin-only start.
-            const res = await UI.postJSON(cardKind() ? '/api/admin/cards/start' : '/api/nfc/registration/start');
+            // The admin start reads any chip (the admin checks the KTM by eye).
+            const res = await UI.postJSON(CFG.admin ? '/api/admin/cards/start' : '/api/nfc/registration/start');
             if (current !== generation) return;
             if (!res.success || !res.token) {
                 resetCapture(res.error || 'Pembaca belum siap. Coba lagi.');
@@ -318,6 +328,63 @@
         } catch (e) {
             resetCapture('Tidak dapat menghubungi server. Coba lagi.');
         }
+    }
+    // Web NFC: the first reading's serialNumber ("ff:4e:8e:f9") goes to the
+    // admin-only endpoint, which validates it and returns a capture token.
+    async function startPhoneRead() {
+        resetCapture('Tempelkan ' + noun() + ' ke bagian belakang HP ini.');
+        const current = generation;
+        const ctl = new AbortController();
+        phoneScan = ctl;
+        $('nfc-phone').disabled = true;
+        $('form-error').textContent = '';
+        const stop = setTimeout(function () { ctl.abort(); }, 120000);
+        let serial;
+        try {
+            const reader = new window.NDEFReader();
+            serial = await new Promise(function (resolve, reject) {
+                reader.onreading = function (e) { resolve(e.serialNumber); };
+                reader.onreadingerror = function () { status('Kartu belum terbaca. Tahan ' + noun() + ' lebih lama di belakang HP.'); };
+                ctl.signal.addEventListener('abort', function () { reject(new DOMException('', 'AbortError')); });
+                reader.scan({ signal: ctl.signal }).catch(reject);
+            });
+        } catch (e) {
+            if (current !== generation) return;
+            resetCapture(e.name === 'NotAllowedError' ? 'Izin NFC ditolak. Izinkan NFC untuk situs ini, lalu ulangi.'
+                : e.name === 'NotReadableError' || e.name === 'NotSupportedError' ? 'NFC HP ini mati atau tidak tersedia. Nyalakan NFC di pengaturan, lalu ulangi.'
+                : e.name === 'AbortError' ? 'Waktu pembacaan habis. Tekan Baca dengan HP ini, lalu tempelkan lagi.'
+                : 'HP ini belum dapat membaca kartu. Coba lagi atau pakai pembaca kiosk.');
+            return;
+        } finally {
+            clearTimeout(stop);
+            ctl.abort();
+        }
+        if (current !== generation) return;
+        phoneScan = null;
+        if (!serial) {
+            resetCapture('Nomor kartu tidak terbaca. Tekan Baca dengan HP ini, lalu tempelkan lagi.');
+            return;
+        }
+        let res;
+        try {
+            res = await UI.postJSON('/api/admin/nfc/phone-capture', { uid: serial });
+        } catch (e) {
+            res = { success: false, error: 'Tidak dapat menghubungi server. Coba lagi.' };
+        }
+        if (current !== generation) return;
+        if (!res.success || !res.token) {
+            resetCapture(res.error || 'Kartu tidak dapat dipakai. Coba lagi.');
+            return;
+        }
+        token = res.token;
+        viaPhone = true;
+        expiresAt = Date.now() + 120000;
+        ready = true;
+        $('nfc-phone').disabled = false;
+        updateSubmit();
+        // Display only; the server normalizes and validates it again.
+        status(noun().charAt(0).toUpperCase() + noun().slice(1) + ' terbaca di HP ini (' + serial.replace(/:/g, '').toUpperCase() +
+            '). Periksa data, lalu simpan sebelum waktu pembacaan habis. Tempelkan sekali di kiosk sesudahnya.');
     }
     function validate() {
         if (CFG.student) return true;
@@ -361,6 +428,7 @@
         $('nfc-start').disabled = true;
         clearTimeout(timer);
         const current = generation;
+        const phoneToken = viaPhone;
         try {
             let res;
             if (CFG.student) {
@@ -395,11 +463,18 @@
             saving = false;
             if (current === generation) {
                 $('nfc-start').disabled = false;
-                pollCapture(current);
+                if (phoneToken) updateSubmit();
+                else pollCapture(current);
             }
         }
     }
     $('nfc-start').addEventListener('click', startCapture);
+    if (PHONE_NFC) {
+        $('nfc-phone').hidden = false;
+        $('nfc-phone').addEventListener('click', startPhoneRead);
+    } else if (CFG.admin && REMOTE && $('nfc-phone-hint')) {
+        $('nfc-phone-hint').hidden = false;
+    }
     // Changing the kind drops a running read: the two starts accept different chips.
     function kindChanged() {
         const other = cardKind() === 'other';

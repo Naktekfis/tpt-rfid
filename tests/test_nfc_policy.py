@@ -79,13 +79,13 @@ def test_special_card_registers_only_for_its_nim(client, database, monkeypatch):
     assert database.get_student_by_nfc(SPECIAL_UID)
 
 
-def test_kiosk_refuses_non_ktm_tap(monkeypatch):
+def test_kiosk_refuses_non_ktm_tap(app, monkeypatch):
     monkeypatch.setattr(app_module.nfc_service, "policy", make_policy())
     app_module.nfc_reader.simulate_scan("01020304", EMONEY)
     assert app_module.kiosk.state_dict()["state"] == "unknown_card"
 
 
-def test_refusal_is_logged_without_the_uid(monkeypatch, caplog):
+def test_refusal_is_logged_without_the_uid(app, monkeypatch, caplog):
     monkeypatch.setattr(app_module.nfc_service, "policy", make_policy())
     with caplog.at_level("INFO"):
         app_module.nfc_reader.simulate_scan("0A0B0C0D", EMONEY)

@@ -6,6 +6,7 @@ import secrets
 
 from flask import Blueprint, jsonify, request, session
 
+from utils.nfc_reader import normalize_uid
 from utils.nfc_service import NFCCaptureError
 
 
@@ -29,7 +30,7 @@ def save_card_exception(database, policy, uid, kind, nim):
     )
 
 
-def create_nfc_blueprint(service, database, admin_required):
+def create_nfc_blueprint(service, database, admin_required, limiter):
     bp = Blueprint("nfc", __name__)
 
     @bp.route("/api/nfc/registration/start", methods=["POST"])
@@ -79,10 +80,38 @@ def create_nfc_blueprint(service, database, admin_required):
             database.bind_student_nfc(student_id, uid, policy)
 
         try:
-            service.submit(capture_owner(), str(data.get("nfc_token", "")), bind_card)
+            service.submit(
+                capture_owner(), str(data.get("nfc_token", "")), bind_card, bind=True
+            )
             return jsonify(success=True)
         except (NFCCaptureError, ValueError) as exc:
             return jsonify(success=False, error=str(exc)), 409
+
+    @bp.route("/api/admin/nfc/phone-capture", methods=["POST"])
+    @limiter.limit("10 per minute")
+    @admin_required
+    def phone_capture():
+        """A card an admin read with a phone (Web NFC serialNumber, "ff:4e:..").
+        Same capture token as the reader; the chip is learnt on the first tap."""
+        data = request.get_json(silent=True) or {}
+        raw = data.get("uid") if isinstance(data, dict) else None
+        try:
+            if not isinstance(raw, str):
+                raise ValueError
+            uid = normalize_uid(raw.replace(":", ""))
+        except ValueError:
+            return jsonify(success=False, error="Nomor kartu tidak valid"), 400
+        if database.get_student_by_nfc(uid):
+            return jsonify(success=False, error="KTM sudah terdaftar"), 409
+        return jsonify(success=True, token=service.start_phone(capture_owner(), uid))
+
+    @bp.route("/api/admin/students/<int:student_id>/nfc/reset", methods=["POST"])
+    @admin_required
+    def reset_profile(student_id):
+        """Reset sidik kartu: the next kiosk tap learns the chip again."""
+        if not database.reset_nfc_profile(student_id):
+            return jsonify(success=False, error="Mahasiswa belum punya KTM"), 404
+        return jsonify(success=True)
 
     @bp.route("/api/admin/cards", methods=["GET"])
     @admin_required

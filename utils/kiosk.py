@@ -92,13 +92,16 @@ class Kiosk:
             self._start_session_locked(student)
             return "session"
 
-    def reject_card(self) -> str:
-        """Show the unknown-card screen for a tap the policy refused."""
+    def reject_card(self, reason: Optional[str] = None) -> str:
+        """Show the unknown-card screen for a tap the policy refused; reason
+        "card_mismatch" tells the student to see an admin instead."""
         with self._lock:
             self._tick_locked()
             if self._state == "session":
                 return "busy"
-            return self._unknown_card_locked()
+            result = self._unknown_card_locked()
+            self._reason = reason
+            return result
 
     def _unknown_card_locked(self) -> str:
         self._reset_all()

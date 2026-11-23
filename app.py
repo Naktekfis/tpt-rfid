@@ -239,7 +239,9 @@ app.register_blueprint(
 from routes.camera_routes import create_camera_blueprint  # noqa: E402
 
 app.register_blueprint(create_camera_blueprint(camera))
-app.register_blueprint(create_nfc_blueprint(nfc_service, database, admin_required))
+app.register_blueprint(
+    create_nfc_blueprint(nfc_service, database, admin_required, limiter)
+)
 
 from routes.security_routes import create_security_blueprint  # noqa: E402
 from routes.diagnostics_routes import create_diagnostics_blueprint  # noqa: E402
@@ -562,7 +564,9 @@ def api_register():
             return database.create_student(dict(student_data, nfc_uid=uid))
 
         try:
-            student = nfc_service.submit(capture_owner(), nfc_token, create_with_card)
+            student = nfc_service.submit(
+                capture_owner(), nfc_token, create_with_card, bind=True
+            )
         except (NFCCaptureError, ValueError) as exc:
             return jsonify(success=False, error=str(exc)), 409
 

@@ -1,5 +1,6 @@
 /* Student monitoring: loan details and a "Kelola" menu per student (bind an
- * NFC card, confirmed reminder emails, delete with history kept). */
+ * NFC card, reset its chip fingerprint, confirmed reminder emails, delete
+ * with history kept). */
 (function () {
     'use strict';
     const UI = window.UI;
@@ -82,6 +83,29 @@
         }
     }
 
+    async function resetProfile(student, button) {
+        const ok = await confirmation('Sidik chip KTM ' + student.name + ' dihapus. Tempelan berikutnya di kiosk menyimpannya lagi, ' +
+            'jadi pastikan yang menempel nanti adalah ' + student.name + ' dengan KTM aslinya.',
+            'Reset sidik kartu?', 'Reset sidik kartu', true);
+        if (!ok) return;
+        button.disabled = true;
+        try {
+            const result = await UI.postJSON('/api/admin/students/' + encodeURIComponent(student.student_id) + '/nfc/reset', {});
+            UI.toast(result.success ? 'Sidik kartu direset; minta ' + student.name + ' menempel KTM di kiosk.' : result.error || 'Reset gagal.', result.success ? 'ok' : 'danger');
+            if (result.success) load();
+        } catch (error) {
+            UI.toast('Tidak dapat menghubungi server.', 'danger');
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    function cardCell(student) {
+        if (!student.has_nfc) return h('td', null, h('span', { class: 'status status--muted', text: 'Belum ada' }));
+        return h('td', null, h('span', { class: 'status', text: 'Ada' }),
+            h('span', { class: 'sub', text: student.nfc_profile_complete ? 'Lengkap' : 'Belum lengkap (tempel di kiosk sekali)' }));
+    }
+
     function render() {
         const query = $('student-search').value.trim().toLowerCase();
         const filter = $('student-filter').value;
@@ -115,6 +139,9 @@
                 onSelect: function () {
                     window.location.href = CFG.registerUrl + '?student_id=' + encodeURIComponent(student.student_id);
                 } });
+            if (student.has_nfc && student.nfc_profile_complete) items.push({ label: 'Reset sidik kartu',
+                desc: 'Kiosk menyimpan ulang chip KTM pada tempelan berikutnya',
+                onSelect: function () { resetProfile(student, menu); } });
             if (student.email) loans.forEach(function (loan) {
                 items.push({ label: 'Kirim pengingat', desc: loan.name + ' · ke ' + student.email,
                     onSelect: function () { remind(student, loan, menu); } });
@@ -126,7 +153,7 @@
             const actions = h('td', { class: 'actions' }, menu);
             body.appendChild(h('tr', null, h('td', null, person(student)),
                 h('td', null, h('span', { text: student.email }), h('span', { class: 'sub num', text: student.phone })),
-                h('td', null, h('span', { class: 'status' + (student.has_nfc ? '' : ' status--muted'), text: student.has_nfc ? 'Ada' : 'Belum ada' })),
+                cardCell(student),
                 details, actions));
         });
     }

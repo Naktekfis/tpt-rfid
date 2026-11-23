@@ -25,6 +25,7 @@ from .models import (
     DeletedStudent,
     FaceEmbedding,
     NFCCardException,
+    NFCCardProfile,
 )
 from .helpers import utc_to_wib
 
@@ -95,7 +96,10 @@ class DatabaseHandler:
             ).first():
                 return "active"
             db.session.add(DeletedStudent(student_id=student.id))
-            StudentNFCCard.query.filter_by(student_id=student.id).delete()
+            card = StudentNFCCard.query.filter_by(student_id=student.id).first()
+            if card is not None:
+                NFCCardProfile.query.filter_by(uid=card.uid).delete()
+                db.session.delete(card)
             FaceEmbedding.query.filter_by(student_id=student.id).delete()
             student.rfid_uid = None
             student.photo_data = None
@@ -187,6 +191,39 @@ class DatabaseHandler:
         except IntegrityError:
             db.session.rollback()
             raise ValueError("KTM sudah terdaftar") from None
+
+    def get_nfc_profile(self, uid):
+        """None (no row: bound before profiles existed), else {"complete",
+        "chip": (atqa, sak, ats)}."""
+        row = NFCCardProfile.query.filter_by(uid=uid).first()
+        if row is None:
+            return None
+        return {
+            "complete": row.completed_at is not None,
+            "chip": (row.atqa, row.sak, row.ats),
+        }
+
+    def save_nfc_profile(self, uid, chip=None, source=None):
+        """Store a card's (atqa, sak, ats) as complete, or pending if chip is
+        None. A new row gets `source` ("legacy" if none); a row keeps its own."""
+        row = NFCCardProfile.query.filter_by(uid=uid).first()
+        if row is None:
+            row = NFCCardProfile(uid=uid, source=source or "legacy")
+            db.session.add(row)
+        elif source:
+            row.source = source
+        row.atqa, row.sak, row.ats = chip or (None, None, None)
+        row.completed_at = datetime.utcnow() if chip else None
+        db.session.commit()
+
+    def reset_nfc_profile(self, student_id):
+        """Back to pending so the next kiosk tap re-learns the chip; False if
+        the student has no card."""
+        card = StudentNFCCard.query.filter_by(student_id=int(student_id)).first()
+        if card is None:
+            return False
+        self.save_nfc_profile(card.uid)
+        return True
 
     def get_card_exception(self, uid_hmac):
         row = NFCCardException.query.filter_by(uid_hmac=uid_hmac).first()
@@ -628,6 +665,12 @@ class DatabaseHandler:
         """Students for the admin list: contact data, NFC/legacy face data state,
         open loans. Newest first."""
         nfc_ids = {sid for (sid,) in db.session.query(StudentNFCCard.student_id)}
+        complete_ids = {
+            sid
+            for (sid,) in db.session.query(StudentNFCCard.student_id)
+            .join(NFCCardProfile, NFCCardProfile.uid == StudentNFCCard.uid)
+            .filter(NFCCardProfile.completed_at.isnot(None))
+        }
         face_ids = {
             sid for (sid,) in db.session.query(FaceEmbedding.student_id).distinct()
         }
@@ -652,6 +695,7 @@ class DatabaseHandler:
                 "photo_url": f"/api/student/{s.id}/photo" if s.photo_data else "",
                 "has_face": s.id in face_ids,
                 "has_nfc": s.id in nfc_ids,
+                "nfc_profile_complete": s.id in complete_ids,
                 "open_loans": loans.get(s.id, 0),
                 "created_at": utc_to_wib(s.created_at).isoformat(),
             }

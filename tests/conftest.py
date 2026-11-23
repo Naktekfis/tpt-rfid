@@ -28,6 +28,7 @@ app_module.ADMIN_PIN_HASH = generate_password_hash(TEST_PIN)
 @pytest.fixture()
 def app():
     app_module.nfc_service.capture = None
+    app_module.nfc_service.phone.clear()
     app_module.kiosk._to_idle()
     flask_app = app_module.app
     with flask_app.app_context():

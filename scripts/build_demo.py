@@ -124,6 +124,13 @@ def main() -> None:
             database.get_student_by_nim(s["nim"]) for s in seed_database.STUDENTS
         )
 
+        # Card states on the Mahasiswa page: learnt at the kiosk, and an admin
+        # phone registration not yet tapped at the kiosk (Budi has no card).
+        database.bind_student_nfc(ahmad["student_id"], "04A1B2C3")
+        database.save_nfc_profile("04A1B2C3", ("0004", 0x28, "0D78"), "kiosk")
+        database.bind_student_nfc(siti["student_id"], "FF4E8EF9")
+        database.save_nfc_profile("FF4E8EF9", None, "admin_phone")
+
         # Some history: one finished loan, one still open.
         database.borrow_tool_atomic(budi["student_id"], str(tool("Obeng Set #1").id))
         database.close_borrow(tool("Obeng Set #1").id, int(budi["student_id"]), True)

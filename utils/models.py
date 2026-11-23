@@ -100,6 +100,22 @@ class NFCCardException(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class NFCCardProfile(db.Model):
+    """Chip data (ATQA, SAK, ATS) of a bound card; a tap with the same UID but
+    other chip data is a cloned UID. completed_at None = learn it on the next
+    kiosk tap (cards an admin registered from a phone, or reset by an admin)."""
+
+    __tablename__ = "nfc_card_profiles"
+    id = db.Column(db.Integer, primary_key=True)
+    uid = db.Column(db.String(20), nullable=False, unique=True)
+    atqa = db.Column(db.String(8), nullable=True)
+    sak = db.Column(db.Integer, nullable=True)
+    ats = db.Column(db.String(128), nullable=True)
+    source = db.Column(db.String(16), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime, nullable=True)
+
+
 class DeletedStudent(db.Model):
     """Soft-delete marker: the student row stays so history keeps its name/NIM."""
 

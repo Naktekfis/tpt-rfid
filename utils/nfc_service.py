@@ -16,6 +16,15 @@ class NFCCaptureError(ValueError):
     pass
 
 
+def chip_profile(card):
+    """(ATQA, SAK, ATS) as the reader gives them; ATS is "" when the chip sends none."""
+    return (
+        str(card.get("atqa", "")).upper(),
+        card.get("sak"),
+        str(card.get("ats", "")).upper(),
+    )
+
+
 class NFCService:
     def __init__(self, app, reader, kiosk, clock=time.monotonic, policy=None):
         self.app, self.reader, self.kiosk = app, reader, kiosk
@@ -23,11 +32,16 @@ class NFCService:
         self.clock = clock
         self.lock = threading.RLock()
         self.capture = None
+        # owner -> capture from an admin phone (Web NFC); kept apart so it
+        # never holds the kiosk reader.
+        self.phone = {}
         reader.add_listener(self.on_card)
 
     def _expire(self):
         if self.capture and self.clock() >= self.capture["expires"]:
             self.capture = None
+        for owner in [o for o, c in self.phone.items() if self.clock() >= c["expires"]]:
+            del self.phone[owner]
 
     def start(self, owner, any_card=False):
         with self.lock:
@@ -41,10 +55,21 @@ class NFCService:
                 owner=owner,
                 token=token,
                 uid=None,
+                card=None,
                 error=None,
                 any_card=any_card,  # admin card exceptions read every chip
                 expires=self.clock() + 120,
                 after=self.reader.status()["sequence"],
+            )
+            return token
+
+    def start_phone(self, owner, uid):
+        """Capture for a UID an admin's phone read (already normalized)."""
+        with self.lock:
+            self._expire()
+            token = secrets.token_urlsafe(32)
+            self.phone[owner] = dict(
+                owner=owner, token=token, uid=uid, expires=self.clock() + 120
             )
             return token
 
@@ -88,9 +113,11 @@ class NFCService:
                     self._log_refusal(event, error)
                     if error is None:
                         self.capture["uid"] = event["uid"]
+                        self.capture["card"] = event.get("card")
                 return
-            if self._refused(event):
-                self.kiosk.reject_card()
+            refusal = self._refusal(event)
+            if refusal:
+                self.kiosk.reject_card(refusal if refusal == "card_mismatch" else None)
             else:
                 self.kiosk.on_card(event["uid"])
 
@@ -105,32 +132,63 @@ class NFCService:
                 card.get("ats"),
             )
 
-    def _refused(self, event):
-        error = self.policy.check_tap(event)
-        if error:
-            self._log_refusal(event, error)
-            return True
-        if self.policy.is_exempt(event["uid"]):
-            student = self.kiosk.database.get_student_by_nfc(event["uid"])
-            return bool(
-                student and self.policy.check_student(event["uid"], student["nim"])
-            )
-        return False
+    def _refusal(self, event):
+        """None to open the kiosk, else the kiosk's reason for refusing the tap."""
+        uid, card = event["uid"], event.get("card")
+        database = self.kiosk.database
+        student = database.get_student_by_nfc(uid)
+        chip = chip_profile(card) if card else None  # mock taps carry no chip data
+        profile = database.get_nfc_profile(uid) if student and chip else None
+        if profile and profile["complete"]:
+            if tuple(profile["chip"]) != chip:
+                logger.warning(
+                    "NFC tap refused: chip differs from the card registered as ...%s",
+                    uid[-4:],
+                )
+                return "card_mismatch"
+        elif profile is None:  # unbound, mock, or bound before profiles: as before
+            error = self.policy.check_tap(event)
+            if error:
+                self._log_refusal(event, error)
+                return "refused"
+        # A pending profile skips the KTM check: an admin registered the card.
+        if student and self.policy.check_student(uid, student["nim"]):
+            return "refused"
+        if chip and student and not (profile and profile["complete"]):
+            database.save_nfc_profile(uid, chip)
+        return None
 
-    def submit(self, owner, token, operation):
+    def submit(self, owner, token, operation, bind=False):
+        """Run operation(uid) once; bind=True also stores the card's profile."""
         with self.lock:
             self._expire()
-            cap = self.capture
-            if (
-                not cap
-                or cap["owner"] != owner
-                or not secrets.compare_digest(cap["token"], token)
-            ):
+            matches = [
+                c
+                for c in (self.capture, self.phone.get(owner))
+                if c
+                and c["owner"] == owner
+                and secrets.compare_digest(c["token"], token)
+            ]
+            cap = matches[0] if matches else None
+            if cap is None:
                 raise NFCCaptureError(
                     "Mulai pembacaan KTM kembali; waktu pendaftaran habis"
                 )
             if not cap["uid"]:
                 raise NFCCaptureError("Tempelkan KTM terlebih dahulu")
             result = operation(cap["uid"])
-            self.capture = None
+            if bind:
+                self._save_bound_profile(cap)
+            if cap is self.capture:
+                self.capture = None
+            else:
+                del self.phone[owner]
             return result
+
+    def _save_bound_profile(self, cap):
+        database = self.kiosk.database
+        if cap is not self.capture:  # phone: no chip data, learnt on the first tap
+            database.save_nfc_profile(cap["uid"], None, "admin_phone")
+        elif cap["card"]:
+            source = "admin_reader" if cap["any_card"] else "kiosk"
+            database.save_nfc_profile(cap["uid"], chip_profile(cap["card"]), source)
