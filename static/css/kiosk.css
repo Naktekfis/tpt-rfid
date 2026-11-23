@@ -204,9 +204,16 @@
 .rack__foot a {
   font-weight: 600;
 }
+/* Same button as "Keluar" in the admin header (btn--secondary, btn--sm). */
 .rack__foot .rack__admin {
-  font-weight: 400;
-  color: var(--c-text-subtle);
+  padding: 0 var(--sp-3);
+  border: 1px solid var(--c-ink);
+  color: var(--c-ink);
+  font-weight: 600;
+}
+.rack__foot .rack__admin:hover {
+  background: var(--c-fill);
+  text-decoration: none;
 }
 
 /* ---------- D3: session / summary ---------- */

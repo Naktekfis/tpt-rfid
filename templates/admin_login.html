@@ -7,12 +7,26 @@
 {% block content %}
 <div class="page login">
     <aside class="login__hero" aria-hidden="true">
-        <p class="login__hero-name">Lab Fabrikasi<br>Teknik Fisika ITB</p>
+        <div class="brandbar__brand">
+            <span class="brandbar__logos">
+                <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}" alt="Institut Teknologi Bandung">
+                <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
+            </span>
+            <span>Lab Fabrikasi · Teknik Fisika ITB</span>
+        </div>
+        <div class="login__photo"></div>
+        <div class="login__hero-text">
+            <p class="eyebrow">Panel Admin</p>
+            <p class="hero">Kelola peminjaman alat</p>
+            <p class="hero-sub">Pantau rak, mahasiswa, dan riwayat peminjaman Lab Fabrikasi.</p>
+        </div>
     </aside>
     <div class="login__panel">
         <div class="login__brand">
-            <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}" alt="Institut Teknologi Bandung">
-            <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
+            <span class="brandbar__logos">
+                <img src="{{ url_for('static', filename='assets/Logo_Institut_Teknologi_Bandung.png') }}" alt="Institut Teknologi Bandung">
+                <img src="{{ url_for('static', filename='assets/Logo_Teknik_Fisika.jpg') }}" alt="Teknik Fisika ITB">
+            </span>
             <span>Admin Lab</span>
         </div>
         <div class="menu-hero">
