@@ -14,6 +14,7 @@
 - Quick check after Python edits: `ruff check .` and `.venv/bin/python -m py_compile app.py config.py utils/*.py routes/*.py`
 - Deploy: commit, `git tag -a vYYYY.MM.DD[.N]`, push main + tag, then `scripts/deploy_jetson.sh <tag>` (runs the tag's `deploy/jetson/update.sh` on the Jetson: staging pytest, backup to `~/tpt-deploys/`, checkout, HUP, health check, rollback). Never rsync code to the device.
 - Tests: .venv/bin/python -m pytest -q (tests/, SQLite in-memory, CSRF+limiter off). Full check: scripts/check.sh; `PY38=<py38 python> scripts/check.sh` also runs tests on 3.8.
+- Static UI demo (no backend, sample data): `.venv/bin/python scripts/build_demo.py` writes `demo/dist/` (gitignored); `demo/demo.js` fakes fetch() and adds a kiosk state panel. Rebuild after UI changes; `.github/workflows/ui-demo.yml` rebuilds and deploys it to Vercel (project tpt-rfid-demo, secret VERCEL_TOKEN) on pushes to main that touch UI/app code; manual: `npx vercel deploy demo/dist --prod`.
 
 ## Code Direction
 - New logic goes in `utils/` modules or a blueprint under `routes/`, not into `app.py`.

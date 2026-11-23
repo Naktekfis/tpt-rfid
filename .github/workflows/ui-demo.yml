@@ -1,0 +1,44 @@
+# Rebuild the static UI demo (scripts/build_demo.py) and deploy it to Vercel
+# whenever main changes something the pages or their API answers depend on.
+# Needs the repo secret VERCEL_TOKEN (vercel.com/account/tokens).
+name: UI demo
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "templates/**"
+      - "static/**"
+      - "routes/**"
+      - "utils/**"
+      - "app.py"
+      - "config.py"
+      - "seed_database.py"
+      - "requirements.txt"
+      - "scripts/build_demo.py"
+      - "demo/**"
+      - ".github/workflows/ui-demo.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ui-demo
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      # Project ids are not secrets; they point the CLI at tpt-rfid-demo.
+      VERCEL_ORG_ID: team_gWH5DnDZ9ENoQMgBA4ZO2LPF
+      VERCEL_PROJECT_ID: prj_nSafDKKXcllnUqJI6FFz6iJoKBR5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python scripts/build_demo.py
+      - run: npx --yes vercel@66.6.0 deploy demo/dist --prod --yes --token "$VERCEL_TOKEN"
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

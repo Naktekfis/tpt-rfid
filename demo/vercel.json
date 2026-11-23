@@ -1,0 +1,11 @@
+{
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "redirects": [
+    { "source": "/", "destination": "/kiosk" },
+    { "source": "/scan", "destination": "/kiosk" },
+    { "source": "/daftar", "destination": "/register" },
+    { "source": "/admin/logout", "destination": "/kiosk" },
+    { "source": "/admin/export_history", "destination": "/admin/history" }
+  ]
+}
