@@ -6,7 +6,10 @@
 #}
 
 {% block extra_head %}
+{# Phone layout variants B/C (?variant=b|c), set before the CSS so nothing flashes; saved nowhere. #}
+{% if request.path.startswith('/admin') %}<script>var v=new URLSearchParams(location.search).get('variant');if(/^[bc]$/.test(v))document.documentElement.dataset.variant=v;</script>{% endif %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/phone-native.css') }}">
 {# Installable admin app: manifest + icons; the worker registers below. #}
 <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
 <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
@@ -19,6 +22,7 @@
 {% endblock %}
 
 {% set admin_area = request.path.startswith('/admin') and request.path != '/admin/login' %}
+{% set tab_root = request.path in ('/admin', '/admin/monitor', '/admin/students', '/admin/history') %}
 {# (label, path, icon path or None, in the phone "Lainnya" menu) #}
 {% set nav_items = [
     ('Ringkasan', '/admin', 'M3 11l9-8 9 8M5 9.5V21h5v-6h4v6h5V9.5', false),
@@ -33,6 +37,7 @@
 {% block header %}
 {% if admin_area %}
 <header class="topbar topbar--admin">
+    {% if crumbs and crumbs|length > 1 and not tab_root %}<a class="topbar__back" href="{{ crumbs[-2][1] or url_for('admin_menu') }}"><span aria-hidden="true">‹</span> Kembali</a>{% endif %}
     <a class="topbar__brand" href="{{ url_for('admin_menu') }}">
         {# Same white logos as the kiosk header. #}
         <span class="brandbar__logos">
@@ -42,6 +47,7 @@
         </span>
         <span class="brand-full"><span>Lab Fabrikasi · Teknik Fisika ITB</span><small class="eyebrow">Admin</small></span>
         <span class="brand-short">Lab Fabrikasi · TF ITB</span>
+        {% if crumbs %}<span class="topbar__title">{{ crumbs[-1][0] }}</span>{% endif %}
     </a>
     <span class="topbar__clock num" data-clock>--.--</span>
     <a class="btn btn--on-dark-secondary btn--sm topbar__exit" href="{{ url_for('admin_logout') }}">Keluar</a>
@@ -98,7 +104,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="page{% if admin_area %} page--admin{% endif %} {% block page_class %}{% endblock %}">
+<div class="page{% if admin_area %} page--admin{% endif %} {% block page_class %}{% endblock %}"{% if tab_root %} data-tab-root{% endif %}>
     {% if admin_area and crumbs and crumbs|length > 1 %}
     <a class="back" href="{{ crumbs[-2][1] or url_for('admin_menu') }}"><span aria-hidden="true">←</span> Kembali</a>
     {% endif %}
@@ -108,6 +114,7 @@
 {% endblock %}
 
 {% block scripts %}
+{% if request.path.startswith('/admin') %}<script src="{{ url_for('static', filename='js/phone-native.js') }}"></script>{% endif %}
 <script>
 UI.startClock();
 // Page switcher: close on a click outside or Escape.

@@ -8,14 +8,14 @@
 </div>
 <p class="field__hint">Gambar gelap atau datar menunjukkan dugaan kamera tertutup atau cahaya kurang. Foto adalah dokumentasi kejadian, bukan verifikasi identitas. Pengakuan admin tidak menandakan kamera sudah pulih.</p>
 <p id="security-error" class="status status--danger" role="alert" hidden></p>
-<section class="section" aria-labelledby="security-title">
+<section class="section" aria-labelledby="security-title" data-pane="Kejadian">
     <div class="section-head"><h2 id="security-title">Kejadian terbaru</h2><span class="section-head__meta">100 kejadian terakhir · waktu WIB</span></div>
     <table data-page-size="10" class="table"><thead><tr>
         <th scope="col">Kejadian</th><th scope="col">Waktu</th><th scope="col">Dokumentasi</th><th scope="col">Penyelesaian</th><th scope="col">Tindakan</th>
     </tr></thead><tbody id="security-events"><tr><td colspan="5" class="empty">Memuat…</td></tr></tbody></table>
 </section>
 
-<section class="section" aria-labelledby="faces-title">
+<section class="section" aria-labelledby="faces-title" data-pane="Wajah admin" data-pane-count="faces-count">
     <div class="section-head"><h2 id="faces-title">Wajah admin</h2><span class="section-head__meta" id="faces-count"></span></div>
     <p class="field__hint">Login wajah hanya di layar rak peminjaman; PIN tetap bisa dipakai. Saat mendaftar, lihat ke kamera: ada hitungan mundur 3-2-1 dengan bunyi buzzer, lalu tahan sebentar sampai selesai.</p>
     <table data-page-size="5" class="table"><thead><tr>
@@ -40,7 +40,7 @@
     </div>
     <p class="form-error" id="enrol-error" role="alert"></p>
 </section>
-<section class="section" aria-labelledby="logins-title">
+<section class="section" aria-labelledby="logins-title" data-pane="Login">
     <div class="section-head"><h2 id="logins-title">Riwayat login admin</h2><span class="section-head__meta">50 percobaan terakhir · waktu WIB</span></div>
     <table data-page-size="10" class="table"><thead><tr>
         <th scope="col">Waktu</th><th scope="col">Cara</th><th scope="col">Hasil</th><th scope="col">Admin</th><th scope="col">Foto</th>

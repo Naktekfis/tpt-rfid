@@ -16,7 +16,7 @@
     </div>
 </div>
 
-<form class="toolbar history-filter" id="filter-form" novalidate>
+<form class="toolbar history-filter" id="filter-form" novalidate data-sheet data-pane="Riwayat" data-pane-count="history-count">
     <div class="field">
         <label class="field__label" for="start-date">Dari</label>
         <input class="input input--sm" id="start-date" type="date">
@@ -53,7 +53,7 @@
     </tbody>
 </table>
 
-<section class="section" aria-labelledby="emails-title">
+<section class="section" aria-labelledby="emails-title" data-pane="Email pengingat">
     <div class="section-head"><h2 id="emails-title">Email pengingat</h2><span class="section-head__meta">100 email terakhir · waktu WIB</span></div>
     <p class="field__hint">Otomatis saat batas waktu tiba dan 2 hari setelahnya, ditambah peringatan yang dikirim admin.</p>
     <table data-page-size="10" class="table"><thead><tr>

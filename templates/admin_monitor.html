@@ -20,7 +20,7 @@
 <div class="load-notice" id="state-error" role="status" hidden></div>
 
 <div class="admin-queues">
-<section class="section" aria-labelledby="alarms-title">
+<section class="section" aria-labelledby="alarms-title" data-pane="Alarm" data-pane-count="alarms-count">
     <div class="section-head" id="alarms-head">
         <h2 id="alarms-title">Alarm terbuka</h2>
         <span class="section-head__meta" id="alarms-count"></span>
@@ -39,7 +39,7 @@
     </table>
 </section>
 
-<section class="section" aria-labelledby="unverified-title">
+<section class="section" aria-labelledby="unverified-title" data-pane="Belum verifikasi" data-pane-count="unverified-count">
     <div class="section-head">
         <h2 id="unverified-title">Dikembalikan, belum diverifikasi</h2>
         <span class="section-head__meta" id="unverified-count"></span>
@@ -62,7 +62,7 @@
 
 </div>
 
-<section class="section" aria-labelledby="loans-title">
+<section class="section" aria-labelledby="loans-title" data-pane="Alat" data-pane-count="loans-count">
     <div class="section-head">
         <h2 id="loans-title">Alat dan peminjaman</h2>
         <span class="section-head__meta" id="loans-count"></span>
@@ -73,7 +73,7 @@
             <label class="field__label" for="loan-search">Cari</label>
             <input class="input input--sm" id="loan-search" type="search" placeholder="Nama alat, peminjam, atau NIM">
         </div>
-        <div class="field field--half">
+        <div class="field field--half" data-sheet>
             <label class="field__label" for="loan-status">Status</label>
             <select class="input input--sm" id="loan-status">
                 <option value="all">Semua alat</option>
@@ -81,7 +81,7 @@
                 <option value="overdue">Terlambat</option>
             </select>
         </div>
-        <div class="field field--half">
+        <div class="field field--half" data-sheet>
             <label class="field__label" for="loan-date">Dipinjam</label>
             <select class="input input--sm" id="loan-date">
                 <option value="">Kapan saja</option>

@@ -1,0 +1,226 @@
+/*
+ * Phone variants B and C for the admin pages (?variant=b|c sets <html data-variant>, see app_base.html).
+ * Variant A is the unchanged layout in pages.css. Everything here needs data-variant AND a phone width,
+ * so PC, tablet and the kiosk render as before. html[data-variant] is only ever "b" or "c".
+ * C = B plus a system font (the wordmark in the dark bar stays Source Sans 3).
+ * Design D stays: square corners, hairlines, ITB blue, the dark bar.
+ */
+
+/* Markup that exists only for the phone variants. */
+.topbar__back, .topbar__title { display: none; }
+
+@media (max-width: 600px) {
+  html[data-variant] {
+    -webkit-tap-highlight-color: transparent;
+    --inset-line: linear-gradient(var(--c-hairline), var(--c-hairline)) bottom 0 right 0 / calc(100% - 16px) 1px no-repeat;
+    --chev: url("data:image/svg+xml;utf8,<svg xmlns='http%3A//www.w3.org/2000/svg' viewBox='0 0 20 20'><path d='M7 4l6 6-6 6' fill='none' stroke='%2315191e' stroke-opacity='.25' stroke-width='2'/></svg>");
+  }
+  html[data-variant=c] {
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  html[data-variant=c] .brand-short { font-family: "Source Sans 3", "Segoe UI", Roboto, Arial, sans-serif; }
+  html[data-variant] .app { min-height: 100dvh; }
+  html[data-variant] body { font-size: 17px; line-height: 1.35; }
+
+  /* ----- Bar: 44px + safe area, wordmark swaps to the page title once the h1 has scrolled away ----- */
+  html[data-variant] .topbar--admin { height: calc(44px + env(safe-area-inset-top, 0px)); gap: 12px; -webkit-user-select: none; user-select: none; }
+  html[data-variant] .topbar--admin .brandbar__logos img { height: 26px; }
+  html[data-variant] .topbar--admin .topbar__brand { flex: 1; min-width: 0; gap: 8px; }
+  html[data-variant] .brand-short, html[data-variant] .topbar__title { font-size: 17px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  html[data-variant] .topbar__back { display: inline-flex; flex: none; align-items: center; gap: 4px; min-height: 44px; color: #ffffff; font-size: 17px; }
+  html[data-variant] .topbar__back span { font-size: 30px; line-height: 1; margin-top: -4px; }
+  html[data-variant] .topbar__back:hover { color: #ffffff; text-decoration: none; }
+  html.is-scrolled[data-variant] .topbar__title { display: block; }
+  html.is-scrolled[data-variant] .topbar--admin .brand-short { display: none; }
+  html[data-variant] .back { display: none; }
+
+  /* ----- Page and type ----- */
+  html[data-variant] .page--admin { padding: 12px 16px 24px; }
+  html[data-variant] .page-head { gap: 8px 12px; margin-bottom: 12px; }
+  html[data-variant] .page-head p { display: none; }
+  html[data-variant] .page-head h1, html[data-variant] .dash-hero .hero, html[data-variant] .login .menu-hero h1 {
+    font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1;
+  }
+  html[data-variant=c] .page-head h1, html[data-variant=c] .dash-hero .hero, html[data-variant=c] .login .menu-hero h1 {
+    font-size: 34px; letter-spacing: -0.03em;
+  }
+  html[data-variant] .num, html[data-variant] .table td, html[data-variant] .section-head__meta, html[data-variant] .stat__num { font-variant-numeric: tabular-nums; }
+  html[data-variant] .section-head { margin-bottom: 6px; }
+  html[data-variant] .section-head h2, html[data-variant] .menu-label { font-size: 15px; font-weight: 600; color: var(--c-text-muted); }
+  html[data-variant] .menu-label { margin: 20px 0 6px; }
+  html[data-variant] .section-head__meta, html[data-variant] .field__hint, html[data-variant] #updated { font-size: 13px; color: var(--c-text-muted); }
+  html[data-variant] .toolbar + .field__hint { display: none; }
+  html[data-variant] .field__label { font-size: 15px; }
+  html[data-variant] .input, html[data-variant] .input--sm, html[data-variant] input[type="date"].input { font-size: 17px; }
+  html[data-variant] .page-head__actions:has(#updated) { display: contents; }
+  html[data-variant] .page-head__actions:has(#updated) > .btn { flex: 0 0 auto; min-height: 36px; padding: 0 12px; font-size: 15px; }
+  html[data-variant] #updated { order: 3; flex: 1 1 100%; }
+  html[data-variant] .page-head:has(#updated) { align-items: center; }
+  html[data-variant] .admin-queues { display: contents; }
+
+  /* ----- Tab bar ----- */
+  html[data-variant] .site-nav { -webkit-user-select: none; user-select: none; }
+  html[data-variant] .site-nav > ul > li > a, html[data-variant] .site-nav .switcher summary { min-height: 50px; font-size: 11px; font-weight: 600; }
+
+  /* ----- Segmented panes (built by phone-native.js) ----- */
+  html[data-variant] .seg { display: flex; position: sticky; top: 0; z-index: 4; margin: 0 -16px 8px; padding: 6px 16px; background: var(--c-surface); -webkit-user-select: none; user-select: none; }
+  html[data-variant] .seg > button {
+    flex: 1 1 0; min-width: 0; height: 36px; margin: 0 0 0 -1px; padding: 0 4px;
+    border: 1px solid var(--c-text-subtle); border-radius: 0; background: var(--c-surface); color: var(--c-ink);
+    font: 600 13px / 1 var(--font-sans); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+  }
+  html[data-variant] .seg > button:first-child { margin-left: 0; }
+  html[data-variant] .seg > button[aria-selected="true"] { background: var(--c-ink); border-color: var(--c-ink); color: #ffffff; }
+  html[data-variant] .is-pane-off { display: none !important; }
+  html[data-variant] [role="tabpanel"] > .section-head { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* ----- Filters: pinned search + sheet button ----- */
+  html[data-variant] .toolbar { flex-wrap: nowrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+  html[data-variant] .toolbar .field--grow .field__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  html[data-variant] .toolbar:has(#loan-search), html[data-variant] .toolbar:has(#student-search) { position: sticky; z-index: 3; margin-bottom: 0; padding: 4px 0 8px; background: var(--c-surface); }
+  html[data-variant] .toolbar:has(#loan-search) { top: 48px; }
+  html[data-variant] .toolbar:has(#student-search) { top: 0; }
+  html[data-variant] #loan-search, html[data-variant] #student-search { height: 40px; min-height: 40px; border: 0; background: var(--c-fill); }
+  html[data-variant] .sheet-open {
+    flex: none; height: 40px; padding: 0 12px; border: 1px solid var(--c-hairline); border-radius: 0; background: var(--c-surface);
+    color: var(--c-brand); font: 600 15px / 1 var(--font-sans); cursor: pointer;
+  }
+  html[data-variant] .page > .sheet-open { width: 100%; margin-bottom: 8px; text-align: left; }
+  html[data-variant] .page-head__actions:has(#btn-csv) { flex-wrap: nowrap; gap: 8px; width: 100%; }
+  html[data-variant] .page-head__actions > #btn-csv, html[data-variant] .page-head__actions > #btn-xlsx, html[data-variant] .page-head__actions > #btn-email {
+    flex: 1 1 0; order: 0; min-width: 0; min-height: 40px; height: 40px; padding: 0 4px; font-size: 14px; white-space: nowrap;
+  }
+
+  /* ----- Bottom sheet ----- */
+  html[data-variant] [data-sheet] { display: none; }
+  html[data-variant] .sheet [data-sheet] { display: flex; }
+  html[data-variant] .sheet {
+    position: fixed; inset: auto 0 0 0; margin: 0; width: 100%; max-width: none; height: auto; max-height: 85dvh;
+    padding: 0 16px env(safe-area-inset-bottom, 0px); overflow: auto;
+    border: 0; border-top: 1px solid var(--c-ink); border-radius: 0; background: var(--c-surface); color: var(--c-ink);
+    animation: sheet-in 300ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  html[data-variant] .sheet[open] { display: flex; flex-direction: column; }
+  html[data-variant] .sheet.is-closing { transform: translateY(100%); transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1); }
+  @keyframes sheet-in { from { transform: translateY(100%); } }
+  html[data-variant] .sheet::backdrop { background: rgb(18 22 27 / 0.45); }
+  html[data-variant] .sheet__grab { flex: none; width: 36px; height: 4px; margin: 8px auto 4px; background: var(--c-hairline); }
+  html[data-variant] .sheet__title { flex: none; padding: 4px 0 8px; font-size: 17px; font-weight: 600; }
+  html[data-variant] .sheet__body { display: flex; flex-direction: column; gap: 12px; padding-bottom: 12px; }
+  html[data-variant] .sheet .toolbar { flex-direction: column; align-items: stretch; margin: 0; }
+  html[data-variant] .sheet .toolbar .field { flex: none; width: 100%; }
+  html[data-variant] .sheet .toolbar > button[type="submit"] { display: none; }
+  html[data-variant] .sheet .input { width: 100%; }
+  html[data-variant] .sheet__foot { position: sticky; bottom: 0; padding: 8px 0 12px; background: var(--c-surface); }
+  html[data-variant] .sheet__apply { width: 100%; min-height: 48px; font-size: 17px; }
+
+  /* ----- Tables become grouped lists ----- */
+  html[data-variant] .table-scroll { max-width: none; margin: 0 -16px; border-top: var(--hairline); border-bottom: var(--hairline); background: var(--c-surface); }
+  html[data-variant] .table:not(.table--compact) tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px; align-items: center;
+    min-height: 52px; margin: 0; padding: 12px 16px; border: 0; background: var(--inset-line);
+  }
+  html[data-variant] .table:not(.table--compact) tr:last-child { background-image: none; }
+  html[data-variant] .table:not(.table--compact) tr:active { background-color: var(--c-fill); }
+  html[data-variant] .table:not(.table--compact) td {
+    position: static; grid-column: 1 / -1; width: auto; max-width: none; order: 0; padding: 0; border: 0;
+    font-size: 15px; font-weight: 400; color: var(--c-text-muted); text-align: left;
+  }
+  html[data-variant] .table:not(.table--compact) td:first-child { font-size: 17px; font-weight: 600; color: var(--c-ink); padding-right: 0; }
+  html[data-variant] .table:not(.table--compact) td.empty { font-size: 15px; font-weight: 400; color: var(--c-text-muted); padding: 4px 0; }
+  html[data-variant] .table:not(.table--compact) td[data-label]::before { font-size: 13px; }
+  html[data-variant] .table:not(.table--compact) td .sub { font-size: 13px; }
+  html[data-variant] .table:not(.table--compact) td.actions { grid-column: 2; grid-row: 1 / span 3; align-self: center; text-align: right; min-width: 0; }
+  html[data-variant] .table:not(.table--compact) td.actions > .btn { min-height: 44px; width: auto; padding: 0 14px; font-size: 15px; }
+  html[data-variant] .table:not(.table--compact) td.actions > .rowmenu__button {
+    position: static; display: flex; align-items: center; justify-content: center; width: 24px; height: auto; min-height: 44px;
+    padding: 0; border: 0; background: none; font-size: 0;
+  }
+  html[data-variant] .rowmenu__button::before { content: ""; width: 20px; height: 20px; background: var(--chev); }
+  html[data-variant] .rowmenu__button::after { content: ""; position: absolute; inset: 0; }
+  html[data-variant] .rowmenu__button:focus-visible { box-shadow: none; }
+  html[data-variant] .table tr:has(.rowmenu__button:focus-visible) { box-shadow: inset 0 0 0 3px rgb(0 90 171 / 0.45); }
+  html[data-variant] .rowmenu__caret { display: none; }
+
+  /* Alarms and unverified returns: title, detail, one real button on the right. */
+  html[data-variant] :is(#alarms-body, #unverified-body) td[data-label="Alat"] { grid-column: 1; grid-row: 1; }
+  html[data-variant] :is(#alarms-body, #unverified-body) td[data-label]::before { display: none; }
+  html[data-variant] #alarms-body td[data-label="Sejak"] { grid-column: 1; grid-row: 2; }
+  html[data-variant] #unverified-body td[data-label="Peminjam"] { grid-column: 1; grid-row: 2; }
+  html[data-variant] #unverified-body td[data-label="Kembali"] { grid-column: 1; grid-row: 3; }
+
+  /* Monitor loans: "Bor Listrik #1", borrower and due date (or the EPC), status and chevron; the row opens Kelola. */
+  html[data-variant] #loans-body tr { grid-template-columns: auto minmax(0, 1fr) auto 24px; position: relative; }
+  html[data-variant] #loans-body td[data-label="Alat"] { grid-column: 1 / 3; grid-row: 1; }
+  html[data-variant] #loans-body td[data-label="Peminjam"] { grid-column: 1; grid-row: 2; min-width: 0; }
+  html[data-variant] #loans-body td[data-label="Batas kembali"] { grid-column: 2; grid-row: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  html[data-variant] #loans-body td[data-label="Peminjam"]::before { display: none; }
+  html[data-variant] #loans-body td[data-label="Batas kembali"]::before { display: inline; content: "· batas "; font-weight: 400; font-size: 15px; }
+  html[data-variant] #loans-body td[data-label="Peminjam"]:not(:has(.person-cell)) { display: none; }
+  html[data-variant] #loans-body tr:has(.person-cell) td[data-label="Alat"] .sub { display: none; }
+  html[data-variant] #loans-body td[data-label="Status"] { grid-column: 3; grid-row: 1 / span 2; justify-self: end; }
+  html[data-variant] #loans-body td[data-label="Status"] .sub { display: none; }
+  html[data-variant] #loans-body td[data-label="Tindakan"] { grid-column: 4; grid-row: 1 / span 2; align-self: stretch; display: flex; }
+  html[data-variant] #loans-body td[data-label="Tindakan"] > .rowmenu__button { flex: 1; }
+  html[data-variant] .person-cell img, html[data-variant] .person-cell__blank, html[data-variant] .person-cell .sub { display: none; }
+  html[data-variant] .person-cell { display: block; }
+  html[data-variant] .person-cell > div { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Students: name and NIM, active loan on the right, contact and KTM below, chevron opens Kelola. */
+  html[data-variant] #students-body tr { grid-template-columns: minmax(0, 1fr) auto 24px; position: relative; }
+  html[data-variant] #students-body td[data-label="Mahasiswa"] { grid-column: 1; grid-row: 1; }
+  html[data-variant] #students-body td[data-label="Mahasiswa"] .person-cell .sub { display: inline; margin-left: 8px; }
+  html[data-variant] #students-body td[data-label="Mahasiswa"] .person-cell > div { white-space: normal; }
+  html[data-variant] #students-body td[data-label="Pinjaman aktif"] { grid-column: 2; grid-row: 1; justify-self: end; text-align: right; max-width: 11rem; }
+  html[data-variant] #students-body td[data-label="Pinjaman aktif"]:has(> .muted) { display: none; }
+  html[data-variant] #students-body td[data-label="Pinjaman aktif"] strong { color: var(--c-ink); font-weight: 600; }
+  html[data-variant] #students-body td[data-label="Kontak"] { grid-row: 2; display: flex; flex-wrap: wrap; gap: 0 8px; }
+  html[data-variant] #students-body td[data-label="Kontak"] .sub { display: inline; }
+  html[data-variant] #students-body td[data-label="KTM"] { grid-row: 3; }
+  html[data-variant] #students-body td[data-label="KTM"]::before { display: inline; content: "KTM: "; }
+  html[data-variant] #students-body td[data-label="Pinjaman aktif"]::before, html[data-variant] #students-body td[data-label="Kontak"]::before { display: none; }
+  html[data-variant] #students-body td[data-label="Tindakan"] { grid-column: 3; grid-row: 1 / span 3; align-self: stretch; display: flex; }
+  html[data-variant] #students-body td[data-label="Tindakan"] > .rowmenu__button { flex: 1; }
+  html[data-variant] #students-body td[data-label="Mahasiswa"] .person-cell img, html[data-variant] #students-body td[data-label="Mahasiswa"] .person-cell__blank { display: none; }
+
+  /* History: tool and status, borrower, three dates. */
+  html[data-variant] #history-body tr { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  html[data-variant] #history-body td[data-label="Alat"] { grid-column: 1 / 3; grid-row: 1; padding-right: 0; font-size: 17px; font-weight: 600; color: var(--c-ink); }
+  html[data-variant] #history-body td[data-label="Alat"]::before, html[data-variant] #history-body td[data-label="Status"]::before { display: none; }
+  html[data-variant] #history-body td[data-label="Status"] { grid-column: 3; grid-row: 1; justify-self: end; text-align: right; max-width: none; }
+  html[data-variant] #history-body td[data-label="Mahasiswa"] { grid-column: 1 / -1; grid-row: 2; font-size: 15px; font-weight: 400; color: var(--c-text-muted); }
+  html[data-variant] #history-body td[data-label="Mahasiswa"]::before { display: none; }
+  html[data-variant] #history-body td[data-label="Mahasiswa"] .sub { display: inline; margin-left: 8px; }
+  html[data-variant] #history-body td[data-label="Dipinjam"] { grid-column: 1; grid-row: 3; font-size: 13px; padding-right: 0; margin-top: 4px; }
+  html[data-variant] #history-body td[data-label="Batas kembali"] { grid-column: 2; grid-row: 3; font-size: 13px; margin-top: 4px; }
+  html[data-variant] #history-body td[data-label="Kembali"] { grid-column: 3; grid-row: 3; font-size: 13px; margin-top: 4px; }
+
+  /* ----- Dashboard ----- */
+  html[data-variant] .dash-hero { min-height: 96px; height: 96px; margin: -12px -16px 12px; padding: 12px 16px; justify-content: flex-end; }
+  html[data-variant] .dash-hero .eyebrow { display: none; }
+  html[data-variant] .dash-hero .hero-sub { font-size: 15px; }
+  html[data-variant] .stats { gap: 8px; margin-bottom: 16px; }
+  html[data-variant] .stat { min-height: 72px; padding: 8px 12px; justify-content: center; gap: 0; }
+  html[data-variant] .stat__num { font-size: 28px; }
+  html[data-variant] .stat__label { font-size: 15px; }
+  html[data-variant] .dash-grid { gap: 16px; }
+  html[data-variant] .todo, html[data-variant] .devices, html[data-variant] .menu { margin: 0 -16px; border-top: var(--hairline); border-bottom: var(--hairline); }
+  html[data-variant] .todo li, html[data-variant] .menu li, html[data-variant] .devices > div { border: 0; background: var(--inset-line); }
+  html[data-variant] .todo li:last-child, html[data-variant] .menu li:last-child, html[data-variant] .devices > div:last-child { background-image: none; }
+  html[data-variant] .todo li.empty { padding: 14px 16px; }
+  html[data-variant] .todo a, html[data-variant] .menu__link {
+    position: relative; justify-content: center; min-height: 52px; margin: 0; padding: 10px 44px 10px 16px;
+  }
+  html[data-variant] .todo a::after, html[data-variant] .menu__link::after {
+    content: ""; position: absolute; top: 50%; right: 16px; width: 20px; height: 20px; margin-top: -10px; background: var(--chev);
+  }
+  html[data-variant] .todo a:active, html[data-variant] .menu__link:active, html[data-variant] .stat:active, html[data-variant] .sheet-open:active { background-color: var(--c-fill); }
+  html[data-variant] .menu__link:hover { background: none; }
+  html[data-variant] .menu__title, html[data-variant] .menu__link:hover .menu__title { font-size: 17px; font-weight: 600; color: var(--c-ink); text-decoration: none; }
+  html[data-variant] .menu__desc { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+  html[data-variant] .devices > div { align-items: center; min-height: 52px; padding: 12px 16px; }
+
+  /* ----- Forms (cards, add tool, login): type scale and grouped rows ----- */
+  html[data-variant] .form > .field { margin: 0 -16px; padding: 12px 16px; background: var(--inset-line); }
+  html[data-variant] .login__panel .field__label { font-size: 15px; }
+}
