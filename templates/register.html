@@ -114,8 +114,10 @@
 <script>
     window.REGISTER_CONFIG = {
         student: {% if enroll_student %}{{ {"student_id": enroll_student.student_id} | tojson }}{% else %}null{% endif %},
+        remotePhoto: {{ 'true' if remote_photo else 'false' }},
     };
 </script>
+{% if remote_photo %}<script src="{{ url_for('static', filename='js/device_camera.js') }}"></script>{% endif %}
 <script src="{{ url_for('static', filename='js/register.js') }}"></script>
 {% if admin_mode %}<script src="{{ url_for('static', filename='js/admin_cards.js') }}"></script>{% endif %}
 {% endblock %}

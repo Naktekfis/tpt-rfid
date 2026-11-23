@@ -10,58 +10,11 @@
     'use strict';
 
     const UI = window.UI;
+    const DeviceCamera = window.DeviceCamera;  // device_camera.js, loaded first
     const POLL_MS = 200;  // fast enough for the enrolment 3-2-1 countdown
     const FRAME_GAP_MS = 100;  // remote: pause between posted frames
-    const FRAME_WIDTH = 640;  // the server's face detector works at this size
 
     function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
-
-    // Remote camera: a <video> next to the (hidden) kiosk stream image.
-    async function openCamera(els) {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            throw new Error('Browser ini tidak bisa memakai kamera.');
-        }
-        let stream;
-        try {
-            stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: 'user', width: { ideal: FRAME_WIDTH } }, audio: false,
-            });
-        } catch (e) {
-            throw new Error('Izin kamera ditolak atau kamera tidak tersedia.');
-        }
-        const video = document.createElement('video');
-        video.className = els.stream.className;
-        video.muted = true;
-        video.playsInline = true;
-        video.setAttribute('playsinline', '');
-        video.srcObject = stream;
-        els.stream.hidden = true;
-        els.stream.after(video);
-        const label = els.live.querySelector('.camera-panel__label');
-        const oldLabel = label ? label.textContent : null;
-        if (label) label.textContent = 'Kamera perangkat ini';
-        await video.play();
-        return {
-            video: video,
-            canvas: document.createElement('canvas'),
-            close: function () {
-                stream.getTracks().forEach(function (t) { t.stop(); });
-                video.remove();
-                els.stream.hidden = false;
-                if (label) label.textContent = oldLabel;
-            },
-        };
-    }
-
-    function grab(cam) {
-        const w = cam.video.videoWidth, h = cam.video.videoHeight;
-        if (!w || !h) return Promise.resolve(null);  // camera not ready yet
-        const scale = Math.min(1, FRAME_WIDTH / w);
-        cam.canvas.width = Math.round(w * scale);
-        cam.canvas.height = Math.round(h * scale);
-        cam.canvas.getContext('2d').drawImage(cam.video, 0, 0, cam.canvas.width, cam.canvas.height);
-        return new Promise(function (r) { cam.canvas.toBlob(r, 'image/jpeg', 0.85); });
-    }
 
     async function postFrame(blob) {
         try {
@@ -98,7 +51,7 @@
         try {
             if (a.remote) {
                 try {
-                    cam = await openCamera(els);
+                    cam = await DeviceCamera.open(els);
                 } catch (e) {
                     UI.postJSON('/api/admin/face/cancel', {});
                     els.error.textContent = e.message;
@@ -114,7 +67,7 @@
                 let next;
                 if (cam) {
                     await sleep(FRAME_GAP_MS);
-                    const blob = await grab(cam);
+                    const blob = await DeviceCamera.grab(cam);
                     next = blob ? await postFrame(blob) : await UI.fetchJSON('/api/admin/face/attempt');
                 } else {
                     await sleep(POLL_MS);

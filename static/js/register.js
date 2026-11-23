@@ -2,7 +2,9 @@
  * Self-registration also needs a face photo taken on the server from the
  * kiosk camera (guided 3-2-1 with reader beeps), when the camera is on.
  * Admin mode (/admin/register) adds "Jenis kartu": a card exception (refused
- * KTM, or another card tied to the NIM) saved with the same submit. */
+ * KTM, or another card tied to the NIM) saved with the same submit. Off the
+ * kiosk (remotePhoto) the photo comes from this device's camera and is
+ * uploaded once; the kiosk camera endpoints are never called. */
 (function () {
     'use strict';
     const UI = window.UI;
@@ -20,6 +22,8 @@
     let photoToken = null;
     let photoReady = false;
     let photoGen = 0;
+    const REMOTE = !!CFG.remotePhoto;
+    let cam = null;  // remote: this device's camera while a photo is taken
     let nimTaken = false;
     let nimCheck = 0;
 
@@ -31,7 +35,7 @@
     }
     function updateSteps() {
         const steps = [['step-data', dataDone()]];
-        if (photoRequired) steps.push(['step-photo', photoReady]);
+        if (photoRequired || REMOTE) steps.push(['step-photo', photoReady]);
         steps.push(['step-card', ready]);
         let next = true;
         steps.forEach(function (st) {
@@ -127,6 +131,91 @@
         pollPhoto(current);
     }
 
+    function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    function closeCam() {
+        if (cam) cam.close();
+        cam = null;
+        $('photo-live').hidden = true;
+        $('photo-count').textContent = '';
+    }
+
+    // Remote: "Lihat ke kamera", 3-2-1 on screen, one JPEG posted to the server.
+    async function startDevicePhoto() {
+        photoGen += 1;
+        const current = photoGen;
+        closeCam();
+        photoReady = false;
+        photoToken = null;
+        updateSubmit();
+        $('photo-start').disabled = true;
+        $('photo-preview').hidden = true;
+        $('photo-empty').hidden = true;
+        $('form-error').textContent = '';
+        const done = function (text, hint) {
+            closeCam();
+            photoStatus(text, hint);
+            $('photo-empty').hidden = photoReady;
+            $('photo-start').disabled = false;
+            updateSubmit();
+        };
+        $('photo-live').hidden = false;
+        try {
+            cam = await window.DeviceCamera.open({ live: $('photo-live'), stream: $('photo-stream') });
+        } catch (e) {
+            if (current === photoGen) {
+                done(e.message, photoRequired
+                    ? 'Foto wajib diisi. Izinkan kamera lalu ulangi, atau daftar dari perangkat berkamera.'
+                    : 'Foto tidak wajib: lanjutkan tanpa foto, atau izinkan kamera lalu ulangi.');
+            }
+            return;
+        }
+        photoStatus('Lihat ke kamera');
+        await sleep(1000);
+        for (let n = 3; n > 0; n--) {
+            if (current !== photoGen) return;
+            $('photo-count').textContent = n;
+            photoStatus(String(n));
+            await sleep(1000);
+        }
+        if (current !== photoGen) return;
+        $('photo-count').textContent = '';
+        photoStatus('Tahan…');
+        let blob = null;
+        for (let i = 0; i < 10 && !blob; i++) {
+            blob = await window.DeviceCamera.grab(cam);
+            if (!blob) await sleep(100);
+        }
+        if (current !== photoGen) return;
+        closeCam();
+        if (!blob) {
+            done('Kamera tidak mengirim gambar. Ulangi.');
+            return;
+        }
+        let res;
+        try {
+            const r = await fetch('/api/admin/register/photo', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': UI.getCSRFToken(), 'Content-Type': 'image/jpeg' },
+                body: blob,
+            });
+            res = await r.json();
+        } catch (e) {
+            res = { success: false, error: 'Tidak dapat menghubungi server.' };
+        }
+        if (current !== photoGen) return;
+        if (!res.success) {
+            done(res.error || 'Foto gagal. Ulangi.');
+            return;
+        }
+        photoToken = res.token;
+        photoReady = true;
+        $('photo-preview').src = URL.createObjectURL(blob);
+        $('photo-preview').hidden = false;
+        $('photo-start').textContent = 'Ulangi foto';
+        done('Foto tersimpan. Ulangi kalau kurang jelas.');
+    }
+
     async function initPhoto() {
         if (CFG.student || !$('photo-field')) return;
         try {
@@ -135,11 +224,15 @@
         } catch (e) {
             photoRequired = false;
         }
-        $('photo-field').hidden = !photoRequired;
+        $('photo-field').hidden = !photoRequired && !REMOTE;
         // Without the photo step the KTM is step 2.
         document.querySelectorAll('.reg-step__photo-no').forEach(function (el) {
-            el.textContent = photoRequired ? '3' : '2';
+            el.textContent = photoRequired || REMOTE ? '3' : '2';
         });
+        if (REMOTE) {
+            photoStatus('Tekan Ambil foto, lalu lihat ke kamera perangkat ini. Foto diambil setelah hitungan 3-2-1.',
+                photoRequired ? '' : 'Foto tidak wajib.');
+        }
         updateSubmit();
     }
 
@@ -276,7 +369,7 @@
                 const data = new FormData();
                 FIELDS.forEach(function (f) { data.append(f, $(f).value.trim()); });
                 data.append('nfc_token', token);
-                if (photoRequired) data.append('photo_token', photoToken);
+                if (photoRequired || photoReady) data.append('photo_token', photoToken);
                 if (cardKind()) data.append('card_exception', cardKind());
                 res = await UI.postForm('/api/register', data);
             }
@@ -321,7 +414,7 @@
     const preset = { '#ktm-ditolak': 'ktm', '#kartu-lain': 'other' }[location.hash];
     const presetEl = preset && document.querySelector('input[name="card_kind"][value="' + preset + '"]');
     if (presetEl) { presetEl.checked = true; kindChanged(); }
-    if ($('photo-start')) $('photo-start').addEventListener('click', startPhoto);
+    if ($('photo-start')) $('photo-start').addEventListener('click', REMOTE ? startDevicePhoto : startPhoto);
     initPhoto();
     $('reg-form').addEventListener('submit', submit);
     async function checkNim() {
@@ -357,6 +450,7 @@
     updateSteps();
     window.addEventListener('pagehide', function () {
         photoGen += 1;
+        if (cam) cam.close();
         generation += 1;
         clearTimeout(timer);
         cancelServer(true);

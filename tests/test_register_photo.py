@@ -5,6 +5,7 @@ from collections import deque
 import pytest
 
 import app as app_module
+from tests.conftest import TEST_PIN
 from tests.test_students import FORM
 from utils.face import Face
 from utils.photo_capture import PhotoCapture, PhotoSettings
@@ -141,3 +142,82 @@ def test_portrait_box_stays_inside_the_frame():
     face = Face((0, 10, 100, 140), [(20, 50), (80, 50), (50, 90)], 0.9)  # top-left corner
     x, y, w, h = portrait_box((480, 640, 3), face)
     assert x == 0 and y == 0 and y + h <= 480 and x + w <= 640
+
+
+REMOTE = {"REMOTE_ADDR": "10.42.0.1"}  # through the tunnel, not the kiosk screen
+
+
+def jpeg_bytes():
+    cv2 = pytest.importorskip("cv2")
+    import numpy as np
+
+    return cv2.imencode(".jpg", np.full((48, 64, 3), 128, np.uint8))[1].tobytes()
+
+
+def remote_admin(admin_client):
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN}, environ_base=REMOTE)
+    return admin_client
+
+
+def upload(client, body, **kw):
+    return client.post(
+        "/api/admin/register/photo",
+        data=body,
+        content_type="image/jpeg",
+        environ_base=REMOTE,
+        **kw,
+    )
+
+
+def test_remote_admin_uploads_the_photo_and_registers_with_it(admin_client):
+    client = remote_admin(admin_client)
+    jpeg = jpeg_bytes()
+    resp = upload(client, jpeg)
+    assert resp.status_code == 200 and resp.get_json()["state"] == "ready"
+    token = resp.get_json()["token"]
+    nfc = client.post("/api/nfc/registration/start", environ_base=REMOTE)
+    app_module.nfc_reader.simulate_scan("01020304")
+    resp = client.post(
+        "/api/register",
+        data=dict(FORM, nfc_token=nfc.get_json()["token"], photo_token=token),
+        environ_base=REMOTE,
+    )
+    assert resp.status_code == 200
+    sid = resp.get_json()["student"]["student_id"]
+    assert client.get(f"/api/student/{sid}/photo").data == jpeg
+
+
+def test_remote_admin_still_needs_a_photo_while_the_kiosk_camera_is_on(
+    admin_client, photo
+):
+    client = remote_admin(admin_client)
+    nfc = client.post("/api/nfc/registration/start", environ_base=REMOTE)
+    app_module.nfc_reader.simulate_scan("01020304")
+    resp = client.post(
+        "/api/register",
+        data=dict(FORM, nfc_token=nfc.get_json()["token"]),
+        environ_base=REMOTE,
+    )
+    assert resp.status_code == 400 and resp.get_json()["photo_missing"]
+
+
+def test_upload_needs_an_admin_session(client):
+    assert upload(client, b"\xff\xd8\xff").status_code in (401, 403)
+
+
+def test_upload_rejects_non_images_and_oversize_bodies(admin_client):
+    client = remote_admin(admin_client)
+    jpeg_bytes()  # skip without OpenCV
+    assert upload(client, b"not an image").status_code == 400
+    assert upload(client, b"").status_code == 400
+    assert upload(client, b"\xff" * 1_000_001).status_code in (400, 413)
+
+
+def test_register_page_picks_the_camera_by_where_the_admin_is(admin_client):
+    client = remote_admin(admin_client)
+    remote = client.get("/admin/register", environ_base=REMOTE).get_data(as_text=True)
+    assert "remotePhoto: true" in remote and "device_camera.js" in remote
+    local = client.get("/admin/register").get_data(as_text=True)
+    assert "remotePhoto: false" in local and "device_camera.js" not in local
+    kiosk = client.get("/register").get_data(as_text=True)
+    assert "remotePhoto: false" in kiosk

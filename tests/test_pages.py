@@ -24,6 +24,7 @@ ADMIN = [
     "/admin/input_tool",
     "/admin/history",
     "/admin/register",
+    "/admin/nfc-test",
 ]
 
 
@@ -200,3 +201,11 @@ def test_tool_page_offers_the_pc_reader_only_remotely(admin_client):
     assert "localReader: false" in kiosk
     assert "localReader: true" in remote
     assert "vx6336_serial.js" in remote
+
+
+def test_nfc_test_page_needs_an_admin_session(client, admin_client):
+    resp = client.get("/admin/nfc-test", headers={"Accept": "text/html"})
+    assert resp.status_code == 302 and "/admin/login" in resp.headers["Location"]
+    admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
+    html = admin_client.get("/admin/nfc-test").get_data(as_text=True)
+    assert "Tes NFC HP" in html and "admin_nfc_test.js" in html

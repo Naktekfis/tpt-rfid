@@ -1,15 +1,17 @@
 """Registration face photo API: a guided capture owned by this browser's
-session; /api/register later takes the photo by token."""
+session; /api/register later takes the photo by token. A remote admin
+(phone/PC through the tunnel) uploads one JPEG from its own camera instead."""
 
 from __future__ import annotations
 
 from flask import Blueprint, Response, jsonify, request
 
+from routes.admin_face_routes import MAX_FRAME_BYTES, decode_jpeg
 from routes.nfc_routes import capture_owner
 from utils.photo_capture import PhotoCaptureError
 
 
-def create_register_photo_blueprint(capture, limiter) -> Blueprint:
+def create_register_photo_blueprint(capture, limiter, admin_required) -> Blueprint:
     bp = Blueprint("register_photo", __name__)
 
     def _token():
@@ -48,6 +50,22 @@ def create_register_photo_blueprint(capture, limiter) -> Blueprint:
         response = Response(jpeg, mimetype="image/jpeg")
         response.headers["Cache-Control"] = "no-store, private"
         return response
+
+    @bp.route("/api/admin/register/photo", methods=["POST"])
+    @limiter.limit("10 per minute")
+    @admin_required
+    def upload():
+        if not 0 < (request.content_length or 0) <= MAX_FRAME_BYTES:
+            return jsonify(success=False, error="Gambar kosong atau terlalu besar."), 400
+        jpeg = request.get_data(cache=False)
+        try:
+            frame = decode_jpeg(jpeg)
+        except ImportError:  # OpenCV (requirements-cv.txt) not installed
+            return jsonify(success=False, error="Server tidak bisa memeriksa foto."), 503
+        if frame is None:
+            return jsonify(success=False, error="Gambar tidak terbaca."), 400
+        c = capture.store(capture_owner(), jpeg)
+        return jsonify(success=True, **c.to_dict())
 
     @bp.route("/api/register/photo/cancel", methods=["POST"])
     def cancel():

@@ -51,6 +51,7 @@ PAGES = [
     "/admin/security",
     "/admin/history",
     "/admin/register",
+    "/admin/nfc-test",
 ]
 
 # GET endpoints the page scripts call; demo.js looks them up by path.

@@ -260,7 +260,9 @@ from utils.photo_capture import build_photo_capture  # noqa: E402
 from routes.register_photo_routes import create_register_photo_blueprint  # noqa: E402
 
 photo_capture = build_photo_capture(app, camera, beep=rfid_reader.beep)
-app.register_blueprint(create_register_photo_blueprint(photo_capture, limiter))
+app.register_blueprint(
+    create_register_photo_blueprint(photo_capture, limiter, admin_required)
+)
 app.register_blueprint(
     create_admin_face_blueprint(
         face_auth,
@@ -358,8 +360,19 @@ def admin_register():
     if raw.isdigit():
         enroll_student = database.get_student_by_id(raw)
     return render_template(
-        "register.html", enroll_student=enroll_student, admin_mode=True
+        "register.html",
+        enroll_student=enroll_student,
+        admin_mode=True,
+        # Off the kiosk the photo comes from this device's camera, not the kiosk's.
+        remote_photo=not is_kiosk_request(request),
     )
+
+
+@app.route("/admin/nfc-test")
+@admin_required
+def admin_nfc_test():
+    """Web NFC check: what this phone's browser can read. Sends nothing."""
+    return render_template("admin_nfc_test.html")
 
 
 @app.route("/scan")
@@ -515,11 +528,14 @@ def api_register():
 
         student_data = {"name": name, "nim": nim, "email": email, "phone": phone}
 
-        # Face photo taken on the server by the guided capture (never an
-        # upload); required whenever the kiosk camera can take it.
+        # Face photo taken on the server by the guided capture (a student can
+        # never upload one); required whenever the kiosk camera can take it.
         photo_jpeg = None
         photo_token = request.form.get("photo_token", "")
-        if photo_capture.available:
+        # A remote admin uploads it from its own camera (same token); without
+        # the kiosk camera that photo is optional, as the kiosk's is.
+        remote_admin = session.get("admin_logged_in") and not is_kiosk_request(request)
+        if photo_capture.available or (photo_token and remote_admin):
             # Peek now, consume only after the account exists, so a failed
             # card read does not cost the student a new photo.
             photo_jpeg = photo_capture.preview(capture_owner(), photo_token)

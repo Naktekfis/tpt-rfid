@@ -149,6 +149,24 @@ class PhotoCapture:
             self._run(capture)
         return capture
 
+    def store(self, owner: str, jpeg: bytes) -> Capture:
+        """A ready capture holding a photo from the admin's own device camera
+        (remote registration), so /api/register takes it like a kiosk photo."""
+        now = self._clock()
+        capture = Capture(
+            token=secrets.token_urlsafe(18),
+            owner=owner,
+            started=now,
+            shoot_at=now,
+            state="ready",
+            best=jpeg,
+            finished_at=now,
+        )
+        with self._lock:
+            self._captures[owner] = capture
+            self._expire(now)
+        return capture
+
     def get(self, owner: str, token: str) -> Optional[Capture]:
         with self._lock:
             c = self._captures.get(owner)
