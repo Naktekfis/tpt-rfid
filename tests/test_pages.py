@@ -131,7 +131,8 @@ def test_phone_variant_b_is_default_and_c_is_gone(admin_client):
 
     admin_client.post("/api/admin/login", json={"pin": TEST_PIN})
     html = admin_client.get("/admin").get_data(as_text=True)
-    assert "get('variant')!=='a')document.documentElement.dataset.variant='b'" in html
+    assert "<script>document.documentElement.dataset.variant='b';</script>" in html
+    assert "variant')!=='a'" not in html
     static = Path(__file__).resolve().parent.parent / "static"
     for f in ("css/phone-native.css", "js/phone-native.js"):
         assert "variant=c" not in (static / f).read_text(encoding="utf-8"), f

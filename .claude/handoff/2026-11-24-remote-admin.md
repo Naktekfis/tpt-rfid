@@ -47,3 +47,4 @@
   - Phone registration of a new KTM, then completing it at the kiosk, was not seen in the DB.
 - Jetson .env is still single-reader (reader 2 at the PC). Tool 24 kept alarming at the edge of reader 1 (04:12-04:15 WIB).
 - PC Web Serial: the port does not show in the browser chooser; waiting for the PC's OS and browser.
+- Later the same day: reader 2 is back on the Jetson (.env restored to two readers; both connected). The user reports the PC USB reader works. Variant A is retired in code: admin pages always set data-variant=b (local commit; deploy pending approval).

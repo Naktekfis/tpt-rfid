@@ -6,8 +6,8 @@
 #}
 
 {% block extra_head %}
-{# Phone layout B is the default; ?variant=a shows the old layout for one more review round. Set before the CSS so nothing flashes. #}
-{% if request.path.startswith('/admin') %}<script>if(new URLSearchParams(location.search).get('variant')!=='a')document.documentElement.dataset.variant='b';</script>{% endif %}
+{# Admin pages always use phone layout B (user decision 2026-11-24; variant A retired). Set before the CSS so nothing flashes. #}
+{% if request.path.startswith('/admin') %}<script>document.documentElement.dataset.variant='b';</script>{% endif %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pages.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/phone-native.css') }}">
 {# Installable admin app: manifest + icons; the worker registers below. #}
