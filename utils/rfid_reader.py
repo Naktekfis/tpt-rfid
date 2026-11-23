@@ -12,8 +12,10 @@ is decided by the page/route that consumes it.
 
 from __future__ import annotations
 
+import glob
 import logging
 import json
+import os
 import queue
 import threading
 import time
@@ -24,6 +26,67 @@ from . import vx6336
 from .rfid_diagnostics import BuzzerDiagnostics, RoundDiagnostics
 
 logger = logging.getLogger(__name__)
+
+# USB serial bridges of the UHF readers (HW-VX6336 uses a CH340).
+READER_USB_IDS = {("1a86", "7523")}
+_port_lock = threading.Lock()
+_configured_ports: Set[str] = set()  # port paths readers were configured with
+_claimed_ports: Set[str] = set()  # real device paths a reader has open
+
+
+def reader_serial_devices(sys_root: str = "/sys/class/tty") -> List[str]:
+    """/dev paths of attached reader USB serial bridges, sorted."""
+    found = []
+    for tty in sorted(glob.glob(os.path.join(sys_root, "ttyUSB*"))):
+        interface = os.path.dirname(os.path.realpath(os.path.join(tty, "device")))
+        for usb_device in (interface, os.path.dirname(interface)):
+            try:
+                with open(os.path.join(usb_device, "idVendor")) as f:
+                    vid = f.read().strip()
+                with open(os.path.join(usb_device, "idProduct")) as f:
+                    pid = f.read().strip()
+            except OSError:
+                continue
+            if (vid, pid) in READER_USB_IDS:
+                found.append("/dev/" + os.path.basename(tty))
+            break
+    return found
+
+
+def claim_reader_port(
+    port: str, fallback: bool, devices: Callable[[], List[str]] = reader_serial_devices
+) -> Optional[str]:
+    """Pick the device to open for `port` and mark it in use.
+
+    The configured path wins when it exists. Otherwise (a udev name lost after
+    the cables moved) take the first reader bridge that no configured path
+    points at and no other reader holds. None if nothing is free."""
+    with _port_lock:
+        chosen = None
+        if os.path.exists(port):
+            chosen = port
+        elif fallback:
+            taken = set(_claimed_ports) | {
+                os.path.realpath(p) for p in _configured_ports if os.path.exists(p)
+            }
+            for dev in devices():
+                if os.path.realpath(dev) not in taken:
+                    chosen = dev
+                    break
+        if chosen is None:
+            return None
+        real = os.path.realpath(chosen)
+        if real in _claimed_ports:
+            return None
+        _claimed_ports.add(real)
+        return chosen
+
+
+def release_reader_port(port: Optional[str]) -> None:
+    if port is None:
+        return
+    with _port_lock:
+        _claimed_ports.discard(os.path.realpath(port))
 
 
 class ScanDebouncer:
@@ -185,9 +248,14 @@ class VX6336Reader(_ScanState):
         scan_duration: float = 30.0,
         retry_delay: float = 3.0,
         serial_factory: Optional[Callable[[], object]] = None,
+        port_fallback: bool = False,
     ):
         super().__init__(scan_duration)
         self.port = port
+        self.port_fallback = port_fallback
+        self.active_port: Optional[str] = None  # device actually open
+        with _port_lock:
+            _configured_ports.add(port)
         self.addr = addr
         self.retry_delay = retry_delay
         self.debouncer = ScanDebouncer(absent_timeout)
@@ -214,7 +282,23 @@ class VX6336Reader(_ScanState):
     def _open_serial(self):
         import serial  # pyserial; imported lazily so the mock needs nothing
 
-        return serial.Serial(self.port, vx6336.BAUDRATE, timeout=0.05)
+        device = claim_reader_port(self.port, self.port_fallback)
+        if device is None:
+            raise OSError("{} not present and no free reader found".format(self.port))
+        try:
+            ser = serial.Serial(device, vx6336.BAUDRATE, timeout=0.05)
+        except Exception:
+            release_reader_port(device)
+            raise
+        if device != self.port and device != self.active_port:
+            logger.warning(
+                "RFID reader %s missing; using %s instead (USB cable moved? "
+                "update deploy/jetson/99-tpt-rfid-reader.rules)",
+                self.port,
+                device,
+            )
+        self.active_port = device
+        return ser
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -243,6 +327,7 @@ class VX6336Reader(_ScanState):
         return {
             "mode": self.mode,
             "port": self.port,
+            "active_port": self.active_port if self.connected else None,
             "connected": self.connected,
             "scan_time_ms": info.scan_time * 100 if info else None,
         }
@@ -288,6 +373,8 @@ class VX6336Reader(_ScanState):
                         ser.close()
                     except OSError:
                         pass
+                    if self.active_port is not None:
+                        release_reader_port(self.active_port)
             self._stop.wait(self.retry_delay)
 
     def _read_info(self, ser) -> None:
@@ -721,6 +808,8 @@ def create_rfid_reader(
         return RFIDReaderMock(scan_duration=kwargs.get("scan_duration", 30.0))
     if model == "vx6436":
         from .vx6436_reader import VX6436Reader as reader_class
+
+        kwargs.pop("port_fallback", None)
     else:
         reader_class = VX6336Reader
     if ports and len(ports) > 1:

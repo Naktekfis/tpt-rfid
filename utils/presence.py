@@ -75,6 +75,12 @@ class PresenceMonitor:
                 self._last_seen[epc] = now
         return events
 
+    def reset(self) -> None:
+        """Forget every EPC, as on start (after the reader stopped reading)."""
+        with self._lock:
+            self._last_seen.clear()
+            self._state.clear()
+
     def diagnostics(self) -> dict:
         """Aggregate observed gaps; never expose the EPC-keyed tracking maps."""
         now = self._clock()

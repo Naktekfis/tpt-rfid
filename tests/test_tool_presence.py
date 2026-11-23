@@ -344,3 +344,27 @@ def test_start_resets_stale_presence_then_unseen_units_go_missing_without_alarm(
     clock.t = 7
     service.on_round(["BOOT-SEEN", "BOOT-GONE"])
     assert presence(gone) == "present"
+
+
+def test_reader_stall_sets_unknown_then_resumed_rounds_judge_afresh(env, database):
+    from utils.tool_presence import READER_STALL_AFTER
+
+    service, reader, clock = env
+    here = make_tool(database, "STALL-HERE")
+    gone = make_tool(database, "STALL-GONE")
+    presence = lambda t: db.session.get(Tool, int(t["tool_id"])).presence  # noqa: E731
+    service.on_round(["STALL-HERE", "STALL-GONE"])
+    assert presence(here) == "present" and presence(gone) == "present"
+    # Rounds stop (reader unplugged); only the worker's idle ticks arrive.
+    clock.t = READER_STALL_AFTER - 1
+    service._process([], None, clock.t)
+    assert presence(here) == "present"
+    clock.t = READER_STALL_AFTER + 1
+    service._process([], None, clock.t)
+    assert presence(here) == "unknown" and presence(gone) == "unknown"
+    # Reader back: one tag still there, the other left meanwhile -> no alarm.
+    for dt in (0, 3, 6):
+        clock.t = READER_STALL_AFTER + 2 + dt
+        service.on_round(["STALL-HERE"])
+    assert presence(here) == "present" and presence(gone) == "missing"
+    assert service.open_alarms() == [] and reader.beeps == 0

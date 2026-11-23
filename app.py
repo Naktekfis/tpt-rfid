@@ -104,6 +104,7 @@ rfid_reader = create_rfid_reader(
     primary=app.config.get("RFID_BEEP_READER", 0),
     addr=app.config.get("RFID_READER_ADDR", 0),
     absent_timeout=app.config.get("RFID_ABSENT_TIMEOUT", 2.5),
+    port_fallback=app.config.get("RFID_PORT_FALLBACK", True),
 )
 # Tool presence: "is the tagged tool in the reader field" per inventory round.
 presence_service = ToolPresenceService(

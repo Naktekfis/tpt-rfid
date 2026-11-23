@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 LAST_SEEN_WRITE_INTERVAL = 10.0  # s between last_seen_at writes per tool
 WORKER_IDLE_CHECK = 0.5  # s; pending alarms still fire if rounds stop
+# No inventory round for this long (s): the reader is gone, so presence is
+# unknown until it reads again (then judged afresh, as on start).
+READER_STALL_AFTER = 10.0
 
 
 class ToolPresenceService:
@@ -67,6 +70,7 @@ class ToolPresenceService:
             database.reset_tool_presence()
         self._first_round_at: Optional[float] = None
         self._boot_sweep_done = False
+        self._last_round_at: Optional[float] = None
         self._queue: Optional[queue.Queue] = None
         if background:
             self._queue = queue.Queue()
@@ -122,8 +126,32 @@ class ToolPresenceService:
                     self._diagnostics.record("event_handler", self._clock() - started)
             self._fire_due_alarms(self._clock())
             if epcs is not None:
+                self._last_round_at = now
                 self._touch_last_seen(epcs, now)
                 self._boot_sweep(now)
+            else:
+                self._check_stall(now)
+
+    def _check_stall(self, now: float) -> None:
+        if (
+            self._last_round_at is None
+            or now - self._last_round_at <= READER_STALL_AFTER
+        ):
+            return
+        self._last_round_at = None
+        logger.warning(
+            "Presence: no reader round for %.0f s; units set to unknown",
+            READER_STALL_AFTER,
+        )
+        self.monitor.reset()
+        with self._lock:
+            self._unknown.clear()
+            self._known.clear()
+            self._last_write.clear()
+        self._pending.clear()
+        self._first_round_at = None
+        self._boot_sweep_done = False
+        self.database.reset_tool_presence()
 
     def _boot_sweep(self, now: float) -> None:
         if self._boot_sweep_done:

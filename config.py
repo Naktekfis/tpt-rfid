@@ -60,6 +60,9 @@ class Config:
         p.strip() for p in os.getenv("RFID_READER_PORTS", "").split(",") if p.strip()
     ]
     RFID_BEEP_READER = int(os.getenv("RFID_BEEP_READER", "0"))
+    # A configured reader port that does not exist (udev name lost after the
+    # USB cables moved) falls back to any free CH340 reader bridge.
+    RFID_PORT_FALLBACK = os.getenv("RFID_PORT_FALLBACK", "true").lower() == "true"
     # A tag must be away this long (s) before the same tag is reported again.
     RFID_ABSENT_TIMEOUT = float(os.getenv("RFID_ABSENT_TIMEOUT", "2.5"))
     # A tool tag not seen for this long (s) counts as gone from the reader field.

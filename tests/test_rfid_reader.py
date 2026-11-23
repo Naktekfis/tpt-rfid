@@ -512,3 +512,43 @@ def test_multi_reader_sightings_per_reader():
     sightings = multi.sightings()
     assert sightings[EPC_A][0]["rate"] == 100 and sightings[EPC_A][1]["rate"] == 50
     assert sightings[EPC_B][0] is None and sightings[EPC_B][1]["rate"] == 50
+
+
+def test_claim_reader_port_falls_back_to_free_bridge(tmp_path, monkeypatch):
+    from utils import rfid_reader as rr
+
+    monkeypatch.setattr(rr, "_configured_ports", set())
+    monkeypatch.setattr(rr, "_claimed_ports", set())
+    a, b = tmp_path / "ttyUSB0", tmp_path / "ttyUSB1"
+    a.write_text("")
+    b.write_text("")
+    named = tmp_path / "rfid-reader-2"
+    named.symlink_to(b)
+    missing = str(tmp_path / "rfid-reader-1")
+    rr._configured_ports.update({missing, str(named)})
+    devices = lambda: [str(a), str(b)]  # noqa: E731
+
+    assert rr.claim_reader_port(missing, False, devices) is None
+    # The bridge behind reader 2's name is not taken by the fallback.
+    assert rr.claim_reader_port(missing, True, devices) == str(a)
+    assert rr.claim_reader_port(str(named), True, devices) == str(named)
+    # Both held: nothing left for another missing name.
+    assert rr.claim_reader_port(str(tmp_path / "rfid-reader-3"), True, devices) is None
+    rr.release_reader_port(str(a))
+    assert rr.claim_reader_port(missing, True, devices) == str(a)
+
+
+def test_reader_serial_devices_reads_usb_ids(tmp_path):
+    from utils.rfid_reader import reader_serial_devices
+
+    sys_tty = tmp_path / "class"
+    sys_tty.mkdir()
+    for name, vid in (("ttyUSB0", "1a86"), ("ttyUSB1", "10c4")):
+        usb = tmp_path / "devices" / name / "1-2.1"
+        interface = usb / "1-2.1:1.0"
+        (interface / name).mkdir(parents=True)
+        (usb / "idVendor").write_text(vid + "\n")
+        (usb / "idProduct").write_text("7523\n")
+        (sys_tty / name).mkdir()
+        (sys_tty / name / "device").symlink_to(interface / name)
+    assert reader_serial_devices(str(sys_tty)) == ["/dev/ttyUSB0"]
