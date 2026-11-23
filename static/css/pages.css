@@ -1237,9 +1237,16 @@ input[type="date"].input {
 
   .page--admin, .page { padding: var(--sp-4) max(var(--sp-4), env(safe-area-inset-right, 0px)) var(--sp-6) max(var(--sp-4), env(safe-area-inset-left, 0px)); }
   .page.login { display: block; padding: 0; }
-  .login__hero { display: none; }
-  .login__panel { padding: 0 var(--sp-5) var(--sp-8); }
-  .login__brand { display: flex; align-items: center; gap: var(--sp-3); margin: 0 calc(-1 * var(--sp-5)) var(--sp-8); padding: max(var(--sp-3), env(safe-area-inset-top, 0px)) var(--sp-5) var(--sp-3); background: var(--c-dark); color: #ffffff; font-weight: 700; font-size: var(--fs-lg); }
+  /* Phone: the PC photo panel becomes a photo banner over the form (as the dashboard hero). */
+  .login__hero { min-height: 42vh; min-height: 42dvh; justify-content: space-between; background: linear-gradient(rgb(18 22 27 / 0.35), rgb(18 22 27 / 0.9)), url("../assets/hero_itb.jpg") 55% 40% / cover var(--c-dark); }
+  .login__hero > .brandbar__brand { padding: max(var(--sp-4), env(safe-area-inset-top, 0px)) var(--sp-5) var(--sp-4); }
+  .login__photo { display: none; }
+  .login__hero-text { padding: var(--sp-5) var(--sp-5) var(--sp-6); }
+  .login__hero-text .hero { font-size: var(--fs-2xl); line-height: 1.15; }
+  .login__panel { padding: var(--sp-6) var(--sp-5) var(--sp-8); }
+  .login__brand { display: none; }
+  .login .form__actions { flex-wrap: wrap; }
+  .login .form__actions .btn, .login #face-start { flex: 1 1 100%; width: 100%; min-height: 48px; }
   .dash-hero { min-height: 8.5rem; padding: var(--sp-5); background: linear-gradient(rgb(18 22 27 / 0.7), rgb(18 22 27 / 0.7)), url("../assets/hero_itb.jpg") 55% 40% / cover var(--c-dark); }
   .dash-hero .hero { font-size: var(--fs-2xl); }
   .dash-hero__cta { top: var(--sp-4); right: var(--sp-4); }
